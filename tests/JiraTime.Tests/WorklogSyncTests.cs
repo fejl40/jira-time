@@ -31,7 +31,7 @@ public class WorklogSyncTests : IDisposable
     }
 
     private static TimeEntry Entry(string key = "ABC-1", string start = "09:00", string end = "10:30", string? desc = "Did things") =>
-        new() { IssueKey = key, Date = Day, Start = TimeOnly.Parse(start), End = TimeOnly.Parse(end), Description = desc };
+        new() { IssueKey = key, Date = Day, Duration = TimeOnly.Parse(end) - TimeOnly.Parse(start), Description = desc };
 
     private async Task<TimeEntry> Stored(string id) => (await _entries.GetAsync(id))!;
 
@@ -76,7 +76,7 @@ public class WorklogSyncTests : IDisposable
         var worklogId = (await Stored(entry.Id)).JiraWorklogId!;
 
         var edited = await Stored(entry.Id);
-        edited.End = new TimeOnly(11, 0);
+        edited.Duration = TimeSpan.FromHours(2);
         edited.Description = "More things";
         await _sync.SaveAsync(Server, edited);
 
@@ -185,7 +185,7 @@ public class WorklogSyncTests : IDisposable
     [Fact]
     public async Task Validation_errors_save_nothing_and_send_nothing()
     {
-        var result = await _sync.SaveAsync(Server, Entry(start: "10:00", end: "09:00"));
+        var result = await _sync.SaveAsync(Server, Entry(start: "10:00", end: "10:00"));
 
         Assert.False(result.Saved);
         Assert.Empty(_jira.Requests);

@@ -15,31 +15,16 @@ public class DayOff : IDocument
     public static string IdFor(DateOnly date) => date.ToString("yyyy-MM-dd");
 }
 
-/// <summary>When a normal workday runs. The lunch break is not logged.</summary>
-public record Workday(TimeOnly Start, TimeOnly End, TimeOnly LunchStart, TimeOnly LunchEnd)
-{
-    public static readonly Workday Default = new(new(8, 0), new(16, 30), new(12, 0), new(12, 30));
-
-    /// <summary>Hours each workday should have.</summary>
-    public static readonly TimeSpan Target = TimeSpan.FromHours(8);
-
-    /// <returns>An error message, or null when the times make sense.</returns>
-    public string? Validate()
-    {
-        if (End <= Start) return "The workday must end after it starts.";
-        if (LunchEnd < LunchStart) return "Lunch must end after it starts.";
-        if (LunchStart < Start || LunchEnd > End) return "Lunch must be inside the workday.";
-        return null;
-    }
-}
-
 public enum DayKind { Workday, Weekend, Holiday, DayOff }
 
 /// <summary>What kind of day a date is and how many hours it should have.</summary>
 public record DayInfo(DateOnly Date, DayKind Kind, string? Name)
 {
+    /// <summary>Hours each workday should have.</summary>
+    public static readonly TimeSpan Target = TimeSpan.FromHours(8);
+
     public bool IsWorkday => Kind == DayKind.Workday;
-    public TimeSpan Expected => IsWorkday ? Workday.Target : TimeSpan.Zero;
+    public TimeSpan Expected => IsWorkday ? Target : TimeSpan.Zero;
 }
 
 /// <summary>Official Danish public holidays (helligdage).</summary>

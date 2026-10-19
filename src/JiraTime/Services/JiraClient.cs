@@ -103,7 +103,7 @@ public class JiraClient(HttpClient http)
 
     private static object WorklogBody(JiraConnection c, TimeEntry e)
     {
-        var started = FormatStarted(e.Date, e.Start);
+        var started = FormatStarted(e.Date, TimeEntry.JiraStartTime);
         var seconds = (int)e.Duration.TotalSeconds;
         var text = e.Description ?? "";
         if (!c.IsCloud)

@@ -17,10 +17,8 @@
                         <option value="@i.Key">@i.Key @i.Summary</option>
                     }
                 </select>
-                <input type="time" class="field w-auto py-1" aria-label="From" value="@d.Start.ToString("HH:mm")" @onchange="e => SetTime(d, e, start: true)" />
-                <span class="text-slate-400">–</span>
-                <input type="time" class="field w-auto py-1" aria-label="To" value="@d.End.ToString("HH:mm")" @onchange="e => SetTime(d, e, start: false)" />
-                <span class="w-12 text-right text-sm font-medium tabular-nums">@(d.End > d.Start ? Format.Hours(d.Duration) : "")</span>
+                <input type="text" inputmode="decimal" class="field w-20 py-1" aria-label="Hours" value="@Format.Hours(d.Duration)" @onchange="e => SetHours(d, e)" />
+                <span class="text-sm text-slate-500 dark:text-slate-400">h</span>
                 <button type="button" class="btn-ghost" title="Remove this suggestion" @onclick="() => Remove(d)">✕</button>
                 @if (Errors.GetValueOrDefault(d.Id) is { } error)
                 {
@@ -31,7 +29,7 @@
     </ul>
 
     <div class="mt-4 flex items-center gap-2">
-        <span class="text-sm text-slate-500 dark:text-slate-400">@Format.Hours(Drafts.Where(d => d.End > d.Start).Aggregate(TimeSpan.Zero, (t, d) => t + d.Duration)) h suggested</span>
+        <span class="text-sm text-slate-500 dark:text-slate-400">@Format.Hours(Drafts.Aggregate(TimeSpan.Zero, (t, d) => t + d.Duration)) h suggested</span>
         <button type="button" class="btn-secondary ml-auto" disabled="@Busy" @onclick="() => OnDiscard.InvokeAsync()">Discard</button>
         <button type="button" class="btn-primary" disabled="@(Busy || Drafts.Count == 0)" @onclick="() => OnAccept.InvokeAsync()">
             @(Busy ? "Saving…" : Drafts.Count == 1 ? "Accept 1 entry" : $"Accept {Drafts.Count} entries")
@@ -64,13 +62,10 @@
         return OnChanged.InvokeAsync();
     }
 
-    private Task SetTime(TimeEntry d, ChangeEventArgs e, bool start)
+    private Task SetHours(TimeEntry d, ChangeEventArgs e)
     {
-        if (TimeOnly.TryParse(e.Value?.ToString(), out var t))
-        {
-            if (start) d.Start = t;
-            else d.End = t;
-        }
+        // Unreadable input counts as zero, which Accept then reports for that row.
+        d.Duration = Format.ParseHours(e.Value?.ToString()) ?? TimeSpan.Zero;
         return OnChanged.InvokeAsync();
     }
 

@@ -80,20 +80,4 @@ public class WorkCalendarTests
         await calendar.UnmarkDayOffAsync(day);
         Assert.Equal(DayKind.Workday, (await calendar.GetDayAsync(day)).Kind);
     }
-
-    [Fact]
-    public void Default_workday_is_8_hours_excluding_lunch()
-    {
-        var w = Workday.Default;
-
-        Assert.Null(w.Validate());
-        Assert.Equal(Workday.Target, (w.End - w.Start) - (w.LunchEnd - w.LunchStart));
-    }
-
-    [Theory]
-    [InlineData("16:00", "08:00", "12:00", "12:30")]
-    [InlineData("08:00", "16:30", "12:30", "12:00")]
-    [InlineData("08:00", "16:30", "07:00", "07:30")]
-    public void Invalid_workdays_are_rejected(string start, string end, string lunchStart, string lunchEnd) =>
-        Assert.NotNull(new Workday(TimeOnly.Parse(start), TimeOnly.Parse(end), TimeOnly.Parse(lunchStart), TimeOnly.Parse(lunchEnd)).Validate());
 }

@@ -10,7 +10,7 @@ public class TimeEntryService(IDocumentStore store)
     public async Task<IReadOnlyList<TimeEntry>> GetRangeAsync(DateOnly from, DateOnly to)
     {
         var entries = await _docs.QueryAsync(e => e.Date >= from && e.Date <= to);
-        return entries.OrderBy(e => e.Date).ThenBy(e => e.Start).ToList();
+        return entries.OrderBy(e => e.Date).ThenBy(e => e.CreatedUtc).ToList();
     }
 
     /// <summary>Most recently used issues, newest first. Used as quick picks when adding an entry.</summary>
@@ -30,12 +30,12 @@ public class TimeEntryService(IDocumentStore store)
     public async Task<string?> SaveAsync(TimeEntry entry)
     {
         if (string.IsNullOrWhiteSpace(entry.IssueKey)) return "Pick a Jira issue.";
-        if (entry.End <= entry.Start) return "End time must be after start time.";
+        if (entry.Duration <= TimeSpan.Zero) return "Enter the hours, e.g. 1.5.";
+        if (entry.Duration.Ticks % TimeSpan.TicksPerMinute != 0) return "Hours must be whole minutes.";
 
         var sameDay = await _docs.QueryAsync(e => e.Date == entry.Date && e.Id != entry.Id);
-        var clash = sameDay.FirstOrDefault(e => entry.Start < e.End && e.Start < entry.End);
-        if (clash is not null)
-            return $"Overlaps {clash.IssueKey} {clash.Start:HH\\:mm}–{clash.End:HH\\:mm}.";
+        var dayTotal = sameDay.Aggregate(entry.Duration, (t, e) => t + e.Duration);
+        if (dayTotal > TimeEntry.MaxDuration) return "A day can't have more than 24 hours.";
 
         entry.UpdatedUtc = DateTime.UtcNow;
         entry.SyncPending = true;

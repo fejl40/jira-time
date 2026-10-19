@@ -22,9 +22,6 @@ public class AppSettings : IDocument
     public string Id { get; set; } = SingletonId;
 
     public JiraProfile? Profile { get; set; }
-
-    /// <summary>When a normal workday runs; used to find gaps and place suggested entries.</summary>
-    public Workday Workday { get; set; } = Workday.Default;
 }
 
 /// <summary>One block of work on one Jira issue, on one day.</summary>
@@ -38,8 +35,15 @@ public class TimeEntry : IDocument
     public string IssueSummary { get; set; } = "";
 
     public DateOnly Date { get; set; }
-    public TimeOnly Start { get; set; }
-    public TimeOnly End { get; set; }
+
+    /// <summary>Hours worked on the issue that day. When during the day does not matter.</summary>
+    public TimeSpan Duration { get; set; }
+
+    /// <summary>Time of day put on the Jira worklog, which needs one.</summary>
+    public static readonly TimeOnly JiraStartTime = new(9, 0);
+
+    /// <summary>Most hours one entry can have.</summary>
+    public static readonly TimeSpan MaxDuration = TimeSpan.FromHours(24);
     public string? Description { get; set; }
 
     /// <summary>Set once the entry has been pushed to Jira as a worklog.</summary>
@@ -57,8 +61,20 @@ public class TimeEntry : IDocument
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
-    [JsonIgnore]
-    public TimeSpan Duration => End - Start;
+    // Entries saved before TASK-12 had start and end times instead of a duration. They are read as
+    // their duration and written back without the times on the next save.
+    private TimeOnly? _legacyStart, _legacyEnd;
+
+    [JsonInclude, JsonPropertyName("start"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TimeOnly? LegacyStart { get => null; set { _legacyStart = value; FromLegacy(); } }
+
+    [JsonInclude, JsonPropertyName("end"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public TimeOnly? LegacyEnd { get => null; set { _legacyEnd = value; FromLegacy(); } }
+
+    private void FromLegacy()
+    {
+        if (Duration == TimeSpan.Zero && _legacyStart is { } a && _legacyEnd is { } b && b > a) Duration = b - a;
+    }
 
     [JsonIgnore]
     public bool IsSynced => JiraWorklogId is not null && !SyncPending;

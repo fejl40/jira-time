@@ -3,7 +3,7 @@ using JiraTime.Storage;
 
 namespace JiraTime.Services;
 
-/// <summary>Server-side settings (profile, workday). Raises <see cref="Changed"/> so open pages can refresh.</summary>
+/// <summary>Server-side settings (profile). Raises <see cref="Changed"/> so open pages can refresh.</summary>
 public class SettingsService(IDocumentStore store)
 {
     private readonly IDocumentCollection<AppSettings> _docs = store.Collection<AppSettings>();
@@ -14,8 +14,6 @@ public class SettingsService(IDocumentStore store)
         await _docs.GetAsync(AppSettings.SingletonId) ?? new AppSettings();
 
     public Task SaveProfileAsync(JiraProfile? p) => UpdateAsync(s => s.Profile = p);
-
-    public Task SaveWorkdayAsync(Workday w) => UpdateAsync(s => s.Workday = w);
 
     private async Task UpdateAsync(Action<AppSettings> change)
     {

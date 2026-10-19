@@ -13,7 +13,7 @@ public class FileDocumentStoreTests : IDisposable
     private FileDocumentStore NewStore() => new(new FileDocumentStoreOptions { RootPath = _dir.Path });
 
     private static TimeEntry Entry(string key, DateOnly date) =>
-        new() { IssueKey = key, Date = date, Start = new(9, 0), End = new(10, 0) };
+        new() { IssueKey = key, Date = date, Duration = TimeSpan.FromHours(1) };
 
     [Fact]
     public async Task Upsert_writes_one_json_file_per_document_in_the_collection_folder()
@@ -53,8 +53,7 @@ public class FileDocumentStoreTests : IDisposable
 
         Assert.NotNull(loaded);
         Assert.Equal(entry.Date, loaded.Date);
-        Assert.Equal(entry.Start, loaded.Start);
-        Assert.Equal(entry.End, loaded.End);
+        Assert.Equal(entry.Duration, loaded.Duration);
     }
 
     [Fact]

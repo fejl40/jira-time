@@ -179,9 +179,6 @@
             }
         </div>
 
-        <div class="mt-4">
-            <DayTimeline Entries="DayEntries" Drafts="@(_proposals.GetValueOrDefault(_selectedDay) ?? [])" OnEntryClick="Edit" />
-        </div>
 
         @if (_proposals.TryGetValue(_selectedDay, out var proposals))
         {
@@ -203,7 +200,6 @@
             {
                 <li class="flex items-start gap-4 py-3 @(e.Id == _draft?.Id ? "opacity-40" : "")">
                     <span class="mt-1.5 size-2.5 flex-none rounded-full @IssueColors.For(e.IssueKey)"></span>
-                    <div class="w-28 flex-none font-mono text-sm tabular-nums text-slate-700 dark:text-slate-200">@Format.Time(e.Start)–@Format.Time(e.End)</div>
                     <div class="min-w-0 flex-1">
                         <div class="text-sm"><span class="font-semibold">@e.IssueKey</span> <span class="text-slate-600 dark:text-slate-300">@e.IssueSummary</span></div>
                         @if (e.Description is not null)
@@ -333,16 +329,14 @@
 
     private async Task FillDayAsync()
     {
-        var workday = (await Settings.GetAsync()).Workday;
         if (_days.GetValueOrDefault(_selectedDay) is not { } info) return;
-        var drafts = DayFiller.Propose(info, workday, DayEntries, _sprint);
+        var drafts = DayFiller.Propose(info, DayEntries, _sprint);
         if (drafts.Count > 0) _proposals[_selectedDay] = drafts.ToList();
     }
 
     private async Task FillPeriodAsync()
     {
-        var workday = (await Settings.GetAsync()).Workday;
-        foreach (var (day, drafts) in DayFiller.ProposePeriod(_days.Values, _today, workday, _entries, _sprint))
+        foreach (var (day, drafts) in DayFiller.ProposePeriod(_days.Values, _today, _entries, _sprint))
             _proposals[day] = drafts.ToList();
     }
 
@@ -353,7 +347,7 @@
     }
 
     private static TimeSpan DraftTotal(IEnumerable<TimeEntry> drafts) =>
-        drafts.Where(d => d.End > d.Start).Aggregate(TimeSpan.Zero, (t, d) => t + d.Duration);
+        drafts.Aggregate(TimeSpan.Zero, (t, d) => t + d.Duration);
 
     private void ProposalsChanged()
     {
@@ -430,10 +424,9 @@
 
     private void NewEntry()
     {
-        // Continue where the day left off, one hour by default.
-        var start = DayEntries.Count > 0 ? DayEntries.Max(e => e.End) : new TimeOnly(9, 0);
-        var end = start.Hour >= 23 ? new TimeOnly(23, 59) : start.AddHours(1);
-        _draft = new TimeEntry { IssueKey = "", Date = _selectedDay, Start = start, End = end };
+        // Default to what the day is still missing, so one entry can finish it.
+        var missing = Missing(_selectedDay);
+        _draft = new TimeEntry { IssueKey = "", Date = _selectedDay, Duration = missing > TimeSpan.Zero ? missing : TimeSpan.Zero };
         _draftIsNew = true;
     }
 

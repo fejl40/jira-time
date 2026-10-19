@@ -37,12 +37,8 @@
                 <input id="date" type="date" class="field" @bind="_date" />
             </div>
             <div>
-                <label class="field-label mt-0" for="start">From</label>
-                <input id="start" type="time" class="field" @bind="_start" />
-            </div>
-            <div>
-                <label class="field-label mt-0" for="end">To</label>
-                <input id="end" type="time" class="field" @bind="_end" />
+                <label class="field-label mt-0" for="hours">Hours</label>
+                <input id="hours" type="text" inputmode="decimal" class="field w-24" placeholder="1.5" @bind="_hours" @bind:event="oninput" />
             </div>
         </div>
     </div>
@@ -56,7 +52,6 @@
     }
 
     <div class="mt-4 flex items-center gap-2">
-        <span class="text-sm text-slate-500 dark:text-slate-400">@(_end > _start ? $"{Format.Hours(_end - _start)} h" : "")</span>
         @if (!IsNew)
         {
             <button type="button" class="btn-danger ml-auto" disabled="@_busy" @onclick="DeleteAsync">Delete</button>
@@ -77,7 +72,7 @@
 
     private JiraIssue? _issue;
     private DateOnly _date;
-    private TimeOnly _start, _end;
+    private string? _hours;
     private string? _description, _error;
     private string? _loadedId;
     private bool _busy;
@@ -88,8 +83,7 @@
         _loadedId = Entry.Id;
         _issue = string.IsNullOrEmpty(Entry.IssueKey) ? null : new JiraIssue(Entry.IssueKey, Entry.IssueSummary);
         _date = Entry.Date;
-        _start = Entry.Start;
-        _end = Entry.End;
+        _hours = Entry.Duration > TimeSpan.Zero ? Format.Hours(Entry.Duration) : "";
         _description = Entry.Description;
         _error = null;
     }
@@ -101,6 +95,11 @@
             _error = "Pick a Jira issue.";
             return;
         }
+        if (Format.ParseHours(_hours) is not { } hours)
+        {
+            _error = "Enter the hours, e.g. 1.5 or 1:30.";
+            return;
+        }
 
         var entry = new TimeEntry
         {
@@ -108,8 +107,7 @@
             IssueKey = _issue.Key,
             IssueSummary = _issue.Summary,
             Date = _date,
-            Start = _start,
-            End = _end,
+            Duration = hours,
             Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
             JiraWorklogId = Entry.JiraWorklogId,
             JiraWorklogIssueKey = Entry.JiraWorklogIssueKey,
