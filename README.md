@@ -46,7 +46,9 @@ Deleting `data/keys` makes the stored token unreadable and the app asks you to c
 Every entry is sent to Jira as a worklog as soon as it is saved; edits update it, moving an entry
 to another issue moves the worklog, and deleting an entry deletes the worklog. If Jira can't be
 reached the entry is still saved and shown as **Not in Jira** with the reason; retry it from the
-day view or use **Sync now** in the period header.
+day view or use **Sync now** in the period header. Removing work deletes its worklog in Jira, so the issue's
+logged hours go down. If Jira can't be reached then, the removal is remembered, counted under
+"not in Jira" and retried by **Sync now**.
 
 ## My sprint
 

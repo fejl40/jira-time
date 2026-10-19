@@ -301,7 +301,7 @@
     {
         _entries = await Entries.GetRangeAsync(_period.Start, _period.End);
         _recent = await Entries.GetRecentIssuesAsync();
-        _unsynced = _entries.Count(e => !e.IsSynced);
+        _unsynced = (await Entries.GetUnsyncedAsync(_period.Start, _period.End)).Count;
         _days = await Calendar.GetDaysAsync(_period.Start, _period.End);
         await LoadSprintAsync();
     }

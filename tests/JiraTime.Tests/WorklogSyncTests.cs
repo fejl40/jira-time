@@ -120,16 +120,66 @@ public class WorklogSyncTests : IDisposable
     }
 
     [Fact]
-    public async Task A_failed_delete_in_Jira_keeps_the_entry()
+    public async Task A_failed_delete_in_Jira_is_kept_as_a_pending_removal_and_retried()
     {
         var entry = Entry();
         await _sync.SaveAsync(Server, entry);
-        _jira.FailWith = HttpStatusCode.Forbidden;
+        _jira.Offline = true;
 
         var error = await _sync.DeleteAsync(Server, await Stored(entry.Id));
 
         Assert.NotNull(error);
-        Assert.NotNull(await _entries.GetAsync(entry.Id));
+        var pending = await Stored(entry.Id);
+        Assert.True(pending.DeletePending);
+        Assert.False(pending.IsSynced);
+        Assert.NotNull(pending.SyncError);
+        Assert.Empty(await _entries.GetRangeAsync(Day, Day));            // gone from totals
+        Assert.Single(await _entries.GetUnsyncedAsync(Day, Day));        // but still "not in Jira"
+        Assert.Single(_jira.Worklogs["ABC-1"]);
+
+        _jira.Offline = false;
+        Assert.Equal(0, await _sync.SyncRangeAsync(Server, Day, Day));
+
+        Assert.Empty(_jira.Worklogs["ABC-1"]);
+        Assert.Null(await _entries.GetAsync(entry.Id));
+        Assert.Empty(await _entries.GetUnsyncedAsync(Day, Day));
+    }
+
+    [Fact]
+    public async Task Removing_work_whose_worklog_is_already_gone_in_Jira_just_removes_it()
+    {
+        var entry = Entry();
+        await _sync.SaveAsync(Server, entry);
+        _jira.Worklogs["ABC-1"].Clear();
+
+        Assert.Null(await _sync.DeleteAsync(Server, await Stored(entry.Id)));
+        Assert.Null(await _entries.GetAsync(entry.Id));
+    }
+
+    [Fact]
+    public async Task Removing_moved_work_deletes_the_worklog_on_the_issue_Jira_has_it_on()
+    {
+        var entry = Entry();
+        await _sync.SaveAsync(Server, entry);
+        _jira.Offline = true;
+        var moved = await Stored(entry.Id);
+        moved.IssueKey = "ABC-2";
+        await _sync.SaveAsync(Server, moved); // stays on ABC-1 in Jira
+        _jira.Offline = false;
+
+        Assert.Null(await _sync.DeleteAsync(Server, await Stored(entry.Id)));
+        Assert.Empty(_jira.Worklogs["ABC-1"]);
+    }
+
+    [Fact]
+    public async Task Pending_removals_do_not_count_towards_the_24_hour_limit()
+    {
+        var entry = Entry(start: "00:00", end: "20:00");
+        await _sync.SaveAsync(Server, entry);
+        _jira.Offline = true;
+        await _sync.DeleteAsync(Server, await Stored(entry.Id));
+
+        Assert.True((await _sync.SaveAsync(Server, Entry(start: "00:00", end: "20:00"))).Saved);
     }
 
     [Fact]

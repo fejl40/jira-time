@@ -27,6 +27,7 @@ public class WorklogSync(JiraClient jira, TimeEntryService entries)
     /// <returns>The error message, or null when Jira is up to date.</returns>
     public async Task<string?> SyncAsync(JiraConnection c, TimeEntry entry, CancellationToken ct = default)
     {
+        if (entry.DeletePending) return await FinishDeleteAsync(c, entry, ct);
         try
         {
             // Moved to another issue: worklogs can't move, so remove the old one and create a new one.
@@ -78,20 +79,36 @@ public class WorklogSync(JiraClient jira, TimeEntryService entries)
         return failed;
     }
 
-    /// <summary>Deletes the worklog in Jira, then the entry. If Jira refuses, the entry is kept.</summary>
-    /// <returns>The error message, or null when deleted.</returns>
+    /// <summary>
+    /// Removes the work. Its worklog is deleted in Jira; if that fails the entry is kept as a pending
+    /// removal (hidden from totals) and the delete is retried by <see cref="SyncAsync"/>.
+    /// </summary>
+    /// <returns>Null when Jira is up to date, otherwise why the Jira delete has to be retried.</returns>
     public async Task<string?> DeleteAsync(JiraConnection c, TimeEntry entry, CancellationToken ct = default)
     {
-        if (entry.JiraWorklogId is not null)
+        if (entry.JiraWorklogId is null)
         {
-            try
-            {
+            await entries.DeleteAsync(entry.Id);
+            return null;
+        }
+        entry.DeletePending = true;
+        entry.SyncPending = true;
+        await entries.SaveSyncStateAsync(entry);
+        return await FinishDeleteAsync(c, entry, ct);
+    }
+
+    private async Task<string?> FinishDeleteAsync(JiraConnection c, TimeEntry entry, CancellationToken ct)
+    {
+        try
+        {
+            if (entry.JiraWorklogId is not null)
                 await DeleteIgnoringMissingAsync(c, entry.JiraWorklogIssueKey ?? entry.IssueKey, entry.JiraWorklogId, ct);
-            }
-            catch (JiraException ex)
-            {
-                return $"Could not delete the worklog in Jira, so the entry was kept: {ex.Message}";
-            }
+        }
+        catch (JiraException ex)
+        {
+            entry.SyncError = ex.Message;
+            await entries.SaveSyncStateAsync(entry);
+            return ex.Message;
         }
         await entries.DeleteAsync(entry.Id);
         return null;

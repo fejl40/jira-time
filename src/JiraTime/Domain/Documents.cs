@@ -55,6 +55,12 @@ public class TimeEntry : IDocument
     /// <summary>True when the entry changed locally and Jira has not caught up yet.</summary>
     public bool SyncPending { get; set; } = true;
 
+    /// <summary>
+    /// The user removed this work, but Jira still has its worklog. Hidden everywhere except
+    /// "not in Jira"; the worklog delete is retried until it succeeds, then the entry is dropped.
+    /// </summary>
+    public bool DeletePending { get; set; }
+
     /// <summary>Why the last attempt to sync failed, if it did.</summary>
     public string? SyncError { get; set; }
 

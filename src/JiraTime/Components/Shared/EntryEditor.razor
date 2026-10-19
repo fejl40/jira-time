@@ -124,8 +124,9 @@
     private async Task DeleteAsync()
     {
         _busy = true;
-        _error = await Sync.DeleteAsync(Connection, Entry);
+        // If Jira can't be reached the removal is retried later; it shows under "not in Jira".
+        await Sync.DeleteAsync(Connection, Entry);
         _busy = false;
-        if (_error is null) await OnDone.InvokeAsync();
+        await OnDone.InvokeAsync();
     }
 }
