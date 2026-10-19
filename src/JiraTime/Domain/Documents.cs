@@ -42,11 +42,23 @@ public class TimeEntry : IDocument
     /// <summary>Set once the entry has been pushed to Jira as a worklog.</summary>
     public string? JiraWorklogId { get; set; }
 
+    /// <summary>The issue the worklog lives on. Differs from <see cref="IssueKey"/> after the entry moved to another issue.</summary>
+    public string? JiraWorklogIssueKey { get; set; }
+
+    /// <summary>True when the entry changed locally and Jira has not caught up yet.</summary>
+    public bool SyncPending { get; set; } = true;
+
+    /// <summary>Why the last attempt to sync failed, if it did.</summary>
+    public string? SyncError { get; set; }
+
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedUtc { get; set; } = DateTime.UtcNow;
 
     [JsonIgnore]
     public TimeSpan Duration => End - Start;
+
+    [JsonIgnore]
+    public bool IsSynced => JiraWorklogId is not null && !SyncPending;
 }
 
 public record JiraConnection(string BaseUrl, JiraAuthType AuthType, string Token, string? Email)

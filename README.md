@@ -40,6 +40,13 @@ Deleting `data/keys` makes the stored token unreadable and the app asks you to c
 
 `data/` is created next to the project (`src/JiraTime/data/`). **Back up** the `data/` folder to keep your history. `data/` is git-ignored.
 
+## Jira worklogs
+
+Every entry is sent to Jira as a worklog as soon as it is saved; edits update it, moving an entry
+to another issue moves the worklog, and deleting an entry deletes the worklog. If Jira can't be
+reached the entry is still saved and shown as **Not in Jira** with the reason; retry it from the
+day view or use **Sync now** in the period header.
+
 ## Theme
 
 Light, dark or system (follows the OS). Switch with the icon in the header; the choice is kept in the browser.
@@ -83,7 +90,8 @@ Storage/                           document store interfaces + file-system imple
 Services/ConnectionState.cs        encrypted connection in browser localStorage (per tab/circuit)
 Services/SettingsService.cs        profile + period settings
 Services/TimeEntryService.cs       entries: query, save (with overlap check), delete
-Services/JiraClient.cs             Jira REST calls (myself, user search, issue picker)
+Services/JiraClient.cs             Jira REST calls (myself, user search, issue picker, worklogs)
+Services/WorklogSync.cs            keeps Jira worklogs in step with entries
 Components/Layout/MainLayout.razor header + redirect to setup when not configured
 Components/Pages/Setup/            Connect, Profile
 Components/Pages/Timesheet.razor   period grid + day view
@@ -94,5 +102,4 @@ Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
 
 ## Not done yet
 
-See `backlog/tasks/`: syncing entries to Jira as worklogs (TASK-2), importing existing
-worklogs (TASK-3), and testing against a real Jira instance (TASK-4).
+See `backlog/tasks/`.

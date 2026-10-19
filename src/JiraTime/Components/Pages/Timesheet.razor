@@ -3,6 +3,7 @@
 @using System.Globalization
 @inject TimeEntryService Entries
 @inject ConnectionState Conn
+@inject WorklogSync Sync
 @inject NavigationManager Nav
 
 <PageTitle>Timesheet · Jira Time</PageTitle>
@@ -17,6 +18,11 @@
             <p class="text-sm text-slate-500 dark:text-slate-400">@Format.Range(_period.Start, _period.End)</p>
         </div>
         <div class="ml-auto flex items-center gap-2">
+            @if (_unsynced > 0)
+            {
+                <span class="text-sm text-amber-700 dark:text-amber-400">@_unsynced not in Jira</span>
+                <button class="btn-secondary mr-3" disabled="@_syncing" @onclick="SyncPeriodAsync">@(_syncing ? "Syncing…" : "Sync now")</button>
+            }
             <span class="mr-3 text-sm text-slate-500 dark:text-slate-400">Period total <span class="ml-1 text-base font-semibold text-slate-800 dark:text-slate-100">@(Format.Hours(Total(_entries)) is { Length: > 0 } t ? t : "0") h</span></span>
             <a class="btn-secondary px-3" href="@Link(_period.Previous)" title="Previous period">‹</a>
             <a class="btn-secondary" href="">Today</a>
@@ -117,8 +123,23 @@
                         {
                             <div class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">@e.Description</div>
                         }
+                        @if (!e.IsSynced && e.SyncError is not null)
+                        {
+                            <div class="mt-0.5 text-xs text-amber-700 dark:text-amber-400">Jira: @e.SyncError</div>
+                        }
                     </div>
                     <div class="w-12 text-right text-sm font-medium tabular-nums">@Format.Hours(e.Duration)</div>
+                    <div class="w-28 text-right text-xs">
+                        @if (e.IsSynced)
+                        {
+                            <span class="text-emerald-700 dark:text-emerald-400" title="Logged in Jira">✓ In Jira</span>
+                        }
+                        else
+                        {
+                            <button class="font-medium text-amber-700 hover:underline dark:text-amber-400" title="@(e.SyncError ?? "Not sent to Jira yet")"
+                                    disabled="@_syncing" @onclick="() => RetryAsync(e)">Not in Jira · Retry</button>
+                        }
+                    </div>
                     <button class="btn-ghost text-xs" @onclick="() => Edit(e)">Edit</button>
                 </li>
             }
@@ -139,7 +160,8 @@
     private IReadOnlyList<JiraIssue> _recent = [];
     private DateOnly _selectedDay;
     private TimeEntry? _draft;
-    private bool _draftIsNew, _loaded;
+    private bool _draftIsNew, _loaded, _syncing;
+    private int _unsynced;
 
     private record IssueRow(string Key, string Summary, List<TimeEntry> Entries);
 
@@ -164,6 +186,25 @@
             .OrderBy(r => r.Key, StringComparer.OrdinalIgnoreCase)
             .ToList();
         _recent = await Entries.GetRecentIssuesAsync();
+        _unsynced = _entries.Count(e => !e.IsSynced);
+    }
+
+    private async Task RetryAsync(TimeEntry e)
+    {
+        if (Conn.Connection is not { } c) return;
+        _syncing = true;
+        await Sync.SyncAsync(c, e);
+        _syncing = false;
+        await ReloadAsync();
+    }
+
+    private async Task SyncPeriodAsync()
+    {
+        if (Conn.Connection is not { } c) return;
+        _syncing = true;
+        await Sync.SyncRangeAsync(c, _period.Start, _period.End);
+        _syncing = false;
+        await ReloadAsync();
     }
 
     private void SelectDay(DateOnly day)

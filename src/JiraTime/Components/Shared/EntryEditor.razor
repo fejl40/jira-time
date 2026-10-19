@@ -1,5 +1,5 @@
 @inject JiraClient Jira
-@inject TimeEntryService Entries
+@inject WorklogSync Sync
 
 <div class="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-4 ring-1 ring-slate-200 dark:ring-slate-700">
     <div class="grid gap-4 md:grid-cols-[1fr_auto]">
@@ -57,7 +57,7 @@
         </div>
     </div>
 
-    <label class="field-label" for="desc">What did you do? <span class="font-normal text-slate-400">(optional, becomes the worklog comment)</span></label>
+    <label class="field-label" for="desc">What did you do? <span class="font-normal text-slate-400">(optional, becomes the Jira worklog comment)</span></label>
     <textarea id="desc" rows="2" class="field" @bind="_description"></textarea>
 
     @if (_error is not null)
@@ -69,10 +69,10 @@
         <span class="text-sm text-slate-500 dark:text-slate-400">@(_end > _start ? $"{Format.Hours(_end - _start)} h" : "")</span>
         @if (!IsNew)
         {
-            <button type="button" class="btn-danger ml-auto" @onclick="DeleteAsync">Delete</button>
+            <button type="button" class="btn-danger ml-auto" disabled="@_busy" @onclick="DeleteAsync">Delete</button>
         }
         <button type="button" class="btn-secondary @(IsNew ? "ml-auto" : "")" @onclick="() => OnDone.InvokeAsync()">Cancel</button>
-        <button type="button" class="btn-primary" @onclick="SaveAsync">Save</button>
+        <button type="button" class="btn-primary" disabled="@_busy" @onclick="SaveAsync">@(_busy ? "Saving…" : "Save")</button>
     </div>
 </div>
 
@@ -89,6 +89,7 @@
     private TimeOnly _start, _end;
     private string? _description, _error;
     private string? _loadedId;
+    private bool _busy;
 
     protected override void OnParametersSet()
     {
@@ -120,15 +121,22 @@
             End = _end,
             Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
             JiraWorklogId = Entry.JiraWorklogId,
+            JiraWorklogIssueKey = Entry.JiraWorklogIssueKey,
             CreatedUtc = Entry.CreatedUtc,
         };
-        _error = await Entries.SaveAsync(entry);
-        if (_error is null) await OnDone.InvokeAsync();
+        _busy = true;
+        // A failed Jira sync still saves the entry; the day list shows it as not synced with a retry.
+        var result = await Sync.SaveAsync(Connection, entry);
+        _busy = false;
+        _error = result.ValidationError;
+        if (result.Saved) await OnDone.InvokeAsync();
     }
 
     private async Task DeleteAsync()
     {
-        await Entries.DeleteAsync(Entry.Id);
-        await OnDone.InvokeAsync();
+        _busy = true;
+        _error = await Sync.DeleteAsync(Connection, Entry);
+        _busy = false;
+        if (_error is null) await OnDone.InvokeAsync();
     }
 }

@@ -24,6 +24,7 @@ if (OperatingSystem.IsWindows())
 builder.Services.AddScoped<ConnectionState>();
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<TimeEntryService>();
+builder.Services.AddScoped<WorklogSync>();
 builder.Services.AddHttpClient<JiraClient>(c => c.Timeout = TimeSpan.FromSeconds(30));
 
 var app = builder.Build();

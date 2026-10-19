@@ -38,9 +38,19 @@ public class TimeEntryService(IDocumentStore store)
             return $"Overlaps {clash.IssueKey} {clash.Start:HH\\:mm}–{clash.End:HH\\:mm}.";
 
         entry.UpdatedUtc = DateTime.UtcNow;
+        entry.SyncPending = true;
         await _docs.UpsertAsync(entry);
         return null;
     }
+
+    public Task<TimeEntry?> GetAsync(string id) => _docs.GetAsync(id);
+
+    /// <summary>Stores the result of a Jira sync. No validation and no change to <see cref="TimeEntry.UpdatedUtc"/>.</summary>
+    public Task SaveSyncStateAsync(TimeEntry entry) => _docs.UpsertAsync(entry);
+
+    /// <summary>Entries in the range that Jira does not have (yet) in their current form.</summary>
+    public async Task<IReadOnlyList<TimeEntry>> GetUnsyncedAsync(DateOnly from, DateOnly to) =>
+        (await GetRangeAsync(from, to)).Where(e => !e.IsSynced).ToList();
 
     public Task DeleteAsync(string id) => _docs.DeleteAsync(id);
 }
