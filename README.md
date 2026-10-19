@@ -10,7 +10,7 @@ Blazor (Interactive Server, .NET 10) + Tailwind CSS v4.
 Requires the .NET 10 SDK and Node.js (Node is only used to build the Tailwind CSS).
 
 ```sh
-dotnet run
+dotnet run --project src/JiraTime
 ```
 
 Opens http://localhost:5115. The first build runs `npm install` and compiles Tailwind
@@ -38,7 +38,7 @@ automatically. While editing styles, `npm run watch:css` alongside `dotnet watch
 ciphertext; the key never leaves `data/keys`. Copying the browser's storage gives nothing usable.
 Deleting `data/keys` makes the stored token unreadable and the app asks you to connect again.
 
-**Back up** the `data/` folder to keep your history. `data/` is git-ignored.
+`data/` is created next to the project (`src/JiraTime/data/`). **Back up** the `data/` folder to keep your history. `data/` is git-ignored.
 
 ## Storage abstraction
 
@@ -56,7 +56,22 @@ interfaces and replace `AddFileDocumentStore(...)` in `Program.cs`.
 Periods are 14 days, repeating from an anchor date (default Monday 5 Jan 2026). Change it under
 Settings → Timesheet periods so it lines up with your myTE periods.
 
+## Tests
+
+```sh
+dotnet test
+```
+
+xUnit tests in `tests/JiraTime.Tests` cover periods, the file document store and time entry rules.
+
+## Contributing
+
+Tasks are tracked with [Backlog.md](https://github.com/MrLesk/Backlog.md) in `backlog/`
+(`npm i -g backlog.md`, then `backlog board` or `backlog browser`). The git policy is in `CLAUDE.md`.
+
 ## Layout
+
+Paths below are relative to `src/JiraTime/`.
 
 ```
 Program.cs                         DI: storage, data protection, Jira client
@@ -76,5 +91,5 @@ Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
 
 ## Not done yet
 
-- Pushing entries to Jira as worklogs (`TimeEntry.JiraWorklogId` is reserved for it).
-- Importing existing worklogs from Jira.
+See `backlog/tasks/`: syncing entries to Jira as worklogs (TASK-2), importing existing
+worklogs (TASK-3), and testing against a real Jira instance (TASK-4).

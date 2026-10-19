@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/JiraTime/JiraTime.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/JiraTime.Tests/JiraTime.Tests.csproj" />
+  </Folder>
+</Solution>

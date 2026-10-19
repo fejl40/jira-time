@@ -2,7 +2,7 @@ bin/
 obj/
 node_modules/
 data/
-wwwroot/app.css
+src/JiraTime/wwwroot/app.css
 *.user
 .vs/
 .vscode/
