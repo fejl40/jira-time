@@ -86,6 +86,16 @@ public record JiraProfile(string Id, string? Username, string DisplayName, strin
 
 public record JiraIssue(string Key, string Summary);
 
+/// <summary>An issue assigned to the user in an open sprint.</summary>
+/// <param name="StatusCategory">Jira's status category key: "new", "indeterminate" (in progress) or "done".</param>
+public record SprintIssue(string Key, string Summary, string Type, string Status, string StatusCategory)
+{
+    [JsonIgnore]
+    public bool IsInProgress => StatusCategory == "indeterminate";
+
+    public JiraIssue ToIssue() => new(Key, Summary);
+}
+
 /// <summary>
 /// A semi-monthly timesheet period: the 1st to the 15th, or the 16th to the last day of the month.
 /// </summary>

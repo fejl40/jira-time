@@ -26,18 +26,8 @@
                         </div>
                     </ItemTemplate>
                 </Autocomplete>
-                @if (Recent.Count > 0)
-                {
-                    <div class="mt-2 flex flex-wrap gap-1.5">
-                        @foreach (var r in Recent)
-                        {
-                            <button type="button" title="@r.Summary" @onclick="() => _issue = r"
-                                    class="rounded-full bg-white dark:bg-slate-900 px-2.5 py-1 text-xs ring-1 ring-slate-300 dark:ring-slate-600 hover:ring-blue-600">
-                                @r.Key
-                            </button>
-                        }
-                    </div>
-                }
+                <QuickPicks Label="My sprint" Issues="@Sprint.Select(i => i.ToIssue()).ToList()" OnPick="i => _issue = i" />
+                <QuickPicks Label="Recent" Issues="@Recent.Where(r => Sprint.All(i => i.Key != r.Key)).ToList()" OnPick="i => _issue = i" />
             }
         </div>
 
@@ -81,6 +71,7 @@
     [Parameter] public bool IsNew { get; set; }
     [Parameter, EditorRequired] public JiraConnection Connection { get; set; } = default!;
     [Parameter] public IReadOnlyList<JiraIssue> Recent { get; set; } = [];
+    [Parameter] public IReadOnlyList<SprintIssue> Sprint { get; set; } = [];
     /// <summary>Raised after save, delete or cancel.</summary>
     [Parameter] public EventCallback OnDone { get; set; }
 

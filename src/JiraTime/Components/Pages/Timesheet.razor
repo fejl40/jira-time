@@ -5,6 +5,8 @@
 @inject ConnectionState Conn
 @inject WorklogSync Sync
 @inject WorkCalendarService Calendar
+@inject SprintIssues Sprint
+@inject SettingsService Settings
 @inject NavigationManager Nav
 
 <PageTitle>Timesheet · Jira Time</PageTitle>
@@ -146,7 +148,7 @@
         @if (_draft is not null && Conn.Connection is { } connection)
         {
             <div class="mt-5">
-                <EntryEditor Entry="_draft" IsNew="_draftIsNew" Connection="connection" Recent="_recent" OnDone="EditorDoneAsync" />
+                <EntryEditor Entry="_draft" IsNew="_draftIsNew" Connection="connection" Recent="_recent" Sprint="_sprint" OnDone="EditorDoneAsync" />
             </div>
         }
 
@@ -197,6 +199,7 @@
     private IReadOnlyList<TimeEntry> _entries = [];
     private List<IssueRow> _rows = [];
     private IReadOnlyList<JiraIssue> _recent = [];
+    private IReadOnlyList<SprintIssue> _sprint = [];
     private DateOnly _selectedDay;
     private TimeEntry? _draft;
     private bool _draftIsNew, _loaded, _syncing;
@@ -245,6 +248,21 @@
         _recent = await Entries.GetRecentIssuesAsync();
         _unsynced = _entries.Count(e => !e.IsSynced);
         _days = await Calendar.GetDaysAsync(_period.Start, _period.End);
+        await LoadSprintAsync();
+    }
+
+    /// <summary>Active-sprint issues for quick picks and suggestions. Jira being down just means no picks.</summary>
+    private async Task LoadSprintAsync()
+    {
+        if (Conn.Connection is not { } c || (await Settings.GetAsync()).Profile is not { } profile) return;
+        try
+        {
+            _sprint = await Sprint.GetAsync(c, profile);
+        }
+        catch (JiraException)
+        {
+            _sprint = [];
+        }
     }
 
     private async Task MarkDayOffAsync(ChangeEventArgs e)

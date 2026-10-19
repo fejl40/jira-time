@@ -48,6 +48,12 @@ to another issue moves the worklog, and deleting an entry deletes the worklog. I
 reached the entry is still saved and shown as **Not in Jira** with the reason; retry it from the
 day view or use **Sync now** in the period header.
 
+## My sprint
+
+The entry editor shows the issues assigned to the selected profile in an open sprint (not Done) as
+quick picks, next to recently used issues. Tasks and stories both count. On Jira without sprints it
+falls back to all open issues assigned to you. The list is cached for five minutes.
+
 ## Theme
 
 Light, dark or system (follows the OS). Switch with the icon in the header; the choice is kept in the browser.
@@ -79,7 +85,7 @@ workday up to today. The workday window (default 08:00–16:30, lunch 12:00–12
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the file document store and time entry rules.
+xUnit tests in `tests/JiraTime.Tests` cover periods, the file document store, time entry rules, workdays, worklog sync and sprint issues.
 
 ## Contributing
 
@@ -99,11 +105,12 @@ Services/SettingsService.cs        profile + period settings
 Services/TimeEntryService.cs       entries: query, save (with overlap check), delete
 Services/JiraClient.cs             Jira REST calls (myself, user search, issue picker, worklogs)
 Services/WorklogSync.cs            keeps Jira worklogs in step with entries
+Services/SprintIssues.cs           my open-sprint issues, cached briefly
 Components/Layout/MainLayout.razor header + redirect to setup when not configured
 Components/Pages/Setup/            Connect, Profile
 Components/Pages/Timesheet.razor   period grid + day view
 Components/Pages/SettingsPage.razor
-Components/Shared/                 Autocomplete, EntryEditor, DayTimeline, UserRow
+Components/Shared/                 Autocomplete, EntryEditor, QuickPicks, DayTimeline, UserRow
 Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
 ```
 

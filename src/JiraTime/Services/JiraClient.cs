@@ -44,6 +44,36 @@ public class JiraClient(HttpClient http)
             .ToList();
     }
 
+    /// <summary>
+    /// Issues assigned to <paramref name="profile"/> in open sprints that are not Done (tasks, stories, ...).
+    /// Falls back to all assigned, not-Done issues when the instance has no sprints (no Jira Software).
+    /// </summary>
+    public async Task<IReadOnlyList<SprintIssue>> GetSprintIssuesAsync(JiraConnection c, JiraProfile profile, CancellationToken ct = default)
+    {
+        var assignee = (profile.Username ?? profile.Id).Replace("\"", "\\\"");
+        var mine = $"assignee = \"{assignee}\" AND statusCategory != Done";
+        try
+        {
+            return await SearchAsync(c, $"{mine} AND sprint in openSprints() ORDER BY updated DESC", ct);
+        }
+        catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest)
+        {
+            return await SearchAsync(c, $"{mine} ORDER BY updated DESC", ct);
+        }
+    }
+
+    private async Task<IReadOnlyList<SprintIssue>> SearchAsync(JiraConnection c, string jql, CancellationToken ct)
+    {
+        // Cloud retired GET /search in favour of /search/jql; Server/DC only has /search.
+        var path = c.IsCloud ? "/rest/api/3/search/jql" : "/rest/api/2/search";
+        var result = await GetAsync<SearchResult>(c,
+            $"{path}?jql={Uri.EscapeDataString(jql)}&fields=summary,issuetype,status&maxResults=100", ct);
+        return result.Issues
+            .Select(i => new SprintIssue(i.Key, i.Fields?.Summary ?? "", i.Fields?.IssueType?.Name ?? "",
+                i.Fields?.Status?.Name ?? "", i.Fields?.Status?.StatusCategory?.Key ?? ""))
+            .ToList();
+    }
+
     /// <summary>Creates a worklog for <paramref name="entry"/> on its issue.</summary>
     /// <returns>The new worklog id.</returns>
     public async Task<string> AddWorklogAsync(JiraConnection c, TimeEntry entry, CancellationToken ct = default)
@@ -164,5 +194,11 @@ public class JiraClient(HttpClient http)
     private record PickerSection(List<PickerIssue> Issues);
     private record PickerIssue(string Key, string? SummaryText);
     private record RawWorklog(string? Id);
+    private record SearchResult(List<SearchIssue> Issues);
+    private record SearchIssue(string Key, SearchFields? Fields);
+    private record SearchFields(string? Summary, NamedField? IssueType, StatusField? Status);
+    private record NamedField(string? Name);
+    private record StatusField(string? Name, StatusCategoryField? StatusCategory);
+    private record StatusCategoryField(string? Key);
     private record JiraErrorBody(List<string>? ErrorMessages, Dictionary<string, string>? Errors);
 }

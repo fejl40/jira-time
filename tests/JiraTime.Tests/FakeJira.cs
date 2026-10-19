@@ -20,6 +20,9 @@ public sealed class FakeJira : HttpMessageHandler
     /// <summary>When set, every request fails with this status.</summary>
     public HttpStatusCode? FailWith { get; set; }
 
+    /// <summary>When set and it returns a status, that request fails with it.</summary>
+    public Func<Uri, HttpStatusCode?>? FailWhen { get; set; }
+
     /// <summary>When set, requests throw as if the server can't be reached.</summary>
     public bool Offline { get; set; }
 
@@ -38,7 +41,7 @@ public sealed class FakeJira : HttpMessageHandler
         var path = req.RequestUri!.AbsolutePath;
         Requests.Add(new Request(req.Method, path + req.RequestUri.Query, body));
 
-        if (FailWith is { } status)
+        if ((FailWith ?? FailWhen?.Invoke(req.RequestUri)) is { } status)
             return Json(status, new { errorMessages = new[] { $"Failed with {(int)status}" } });
 
         if (req.Method == HttpMethod.Get && Gets.TryGetValue(path, out var get))
