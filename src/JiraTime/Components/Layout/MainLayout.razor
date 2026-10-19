@@ -69,7 +69,7 @@
         var onSetup = Nav.ToBaseRelativePath(Nav.Uri).StartsWith("setup", StringComparison.OrdinalIgnoreCase);
         if (!onSetup && (_connection is null || _profile is null))
         {
-            Nav.NavigateTo(_connection is null ? "setup/connect" : "setup/profile");
+            Nav.NavigateTo("setup/connect");
             return; // _ready flips once the navigation lands
         }
         _ready = true;

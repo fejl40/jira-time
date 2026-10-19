@@ -21,17 +21,6 @@ public class JiraClient(HttpClient http)
     public async Task<JiraProfile> GetMyselfAsync(JiraConnection c, CancellationToken ct = default) =>
         ToProfile(await GetAsync<RawUser>(c, $"{Api(c)}/myself", ct));
 
-    public async Task<IReadOnlyList<JiraProfile>> SearchUsersAsync(JiraConnection c, string query, CancellationToken ct = default)
-    {
-        var q = Uri.EscapeDataString(query);
-        // Server/DC calls the parameter `username`, but it matches name, display name and email.
-        var path = c.IsCloud
-            ? $"{Api(c)}/user/search?query={q}&maxResults=20"
-            : $"{Api(c)}/user/search?username={q}&maxResults=20";
-        var users = await GetAsync<List<RawUser>>(c, path, ct);
-        return users.Where(u => u.Active != false).Select(ToProfile).ToList();
-    }
-
     /// <summary>Issue search for autocomplete. Uses the issue picker, which exists on both Cloud and Server/DC.</summary>
     public async Task<IReadOnlyList<JiraIssue>> SearchIssuesAsync(JiraConnection c, string query, CancellationToken ct = default)
     {
@@ -189,7 +178,7 @@ public class JiraClient(HttpClient http)
     private static JiraProfile ToProfile(RawUser u) =>
         new(u.AccountId ?? u.Key ?? u.Name ?? "", u.Name, u.DisplayName ?? u.Name ?? "?", u.EmailAddress);
 
-    private record RawUser(string? AccountId, string? Key, string? Name, string? DisplayName, string? EmailAddress, bool? Active);
+    private record RawUser(string? AccountId, string? Key, string? Name, string? DisplayName, string? EmailAddress);
     private record PickerResult(List<PickerSection> Sections);
     private record PickerSection(List<PickerIssue> Issues);
     private record PickerIssue(string Key, string? SummaryText);

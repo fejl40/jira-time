@@ -21,8 +21,8 @@ automatically. While editing styles, `npm run watch:css` alongside `dotnet watch
 1. **Connect**: Jira URL + token.
    - *Server / Data Center*: Personal Access Token, sent as `Bearer`.
    - *Cloud*: Atlassian email + API token, sent as Basic auth.
-   The token is checked against Jira (`/myself`) before it is saved.
-2. **Profile**: search for your Jira user. The token's owner is offered as a shortcut.
+   The token is checked against Jira (`/myself`) before it is saved, and the user it belongs to
+   becomes your profile. To log hours as someone else, connect with their token.
 
 ## Where data lives
 
@@ -30,7 +30,7 @@ automatically. While editing styles, `npm run watch:css` alongside `dotnet watch
 |---|---|
 | Jira URL, auth type, email, **token** | Browser `localStorage` (`jira-time.connection`), encrypted by the server |
 | Encryption keys | `data/keys/` on the server (DPAPI-protected on Windows) |
-| Profile, workday | `data/documents/settings/app.json` |
+| Profile | `data/documents/settings/app.json` |
 | Days off | `data/documents/days-off/<date>.json` |
 | Time entries | `data/documents/time-entries/<id>.json`, one file per entry |
 
@@ -50,7 +50,7 @@ day view or use **Sync now** in the period header.
 
 ## My sprint
 
-The entry editor shows the issues assigned to the selected profile in an open sprint (not Done) as
+The entry editor shows the issues assigned to you in an open sprint (not Done) as
 quick picks, next to recently used issues. Tasks and stories both count. On Jira without sprints it
 falls back to all open issues assigned to you. The list is cached for five minutes.
 
@@ -118,13 +118,14 @@ Domain/WorkCalendar.cs             day kinds, Danish holidays, days off
 Domain/DayFiller.cs                suggestions for a day's missing hours
 Storage/                           document store interfaces + file-system implementation
 Services/ConnectionState.cs        encrypted connection in browser localStorage (per tab/circuit)
-Services/SettingsService.cs        profile + period settings
+Services/SettingsService.cs        profile
 Services/TimeEntryService.cs       entries: query, save (with validation), delete
-Services/JiraClient.cs             Jira REST calls (myself, user search, issue picker, worklogs)
+Services/JiraClient.cs             Jira REST calls (myself, issue picker, sprint search, worklogs)
+Services/JiraSetup.cs              connect: check the token, take its user as the profile
 Services/WorklogSync.cs            keeps Jira worklogs in step with entries
 Services/SprintIssues.cs           my open-sprint issues, cached briefly
 Components/Layout/MainLayout.razor header + redirect to setup when not configured
-Components/Pages/Setup/            Connect, Profile
+Components/Pages/Setup/            Connect
 Components/Pages/Timesheet.razor   period grid + day view
 Components/Pages/SettingsPage.razor
 Components/Shared/                 Autocomplete, EntryEditor, QuickPicks, DraftList, UserRow

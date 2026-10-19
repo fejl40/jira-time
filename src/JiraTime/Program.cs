@@ -25,6 +25,7 @@ builder.Services.AddScoped<ConnectionState>();
 builder.Services.AddSingleton<SettingsService>();
 builder.Services.AddSingleton<TimeEntryService>();
 builder.Services.AddScoped<WorklogSync>();
+builder.Services.AddScoped<JiraSetup>();
 builder.Services.AddSingleton<WorkCalendarService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<SprintIssues>();
