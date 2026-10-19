@@ -1,9 +1,9 @@
 @* A horizontal bar showing when during the day each entry happened. *@
 <div class="select-none">
-    <div class="relative h-9 rounded-md bg-slate-100 ring-1 ring-slate-200">
+    <div class="relative h-9 rounded-md bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700">
         @for (var h = _from + 1; h < _to; h++)
         {
-            <div class="absolute inset-y-0 w-px bg-slate-200" style="left:@Pct(h * 60)%"></div>
+            <div class="absolute inset-y-0 w-px bg-slate-200 dark:bg-slate-700" style="left:@Pct(h * 60)%"></div>
         }
         @foreach (var e in Entries)
         {

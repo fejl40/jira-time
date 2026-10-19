@@ -40,6 +40,10 @@ Deleting `data/keys` makes the stored token unreadable and the app asks you to c
 
 `data/` is created next to the project (`src/JiraTime/data/`). **Back up** the `data/` folder to keep your history. `data/` is git-ignored.
 
+## Theme
+
+Light, dark or system (follows the OS). Switch with the icon in the header; the choice is kept in the browser.
+
 ## Storage abstraction
 
 The app only uses `IDocumentStore` / `IDocumentCollection<T>` (`Storage/IDocumentStore.cs`):

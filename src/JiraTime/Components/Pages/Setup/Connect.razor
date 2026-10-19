@@ -8,17 +8,17 @@
 <form class="card mx-auto max-w-lg" @onsubmit="SubmitAsync" @onsubmit:preventDefault>
     <div class="step">Step 1 of 2</div>
     <h1 class="text-xl font-semibold">Connect to Jira</h1>
-    <p class="mt-1 text-sm text-slate-600">
+    <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
         Your token is encrypted by this app's server before it is saved in your browser,
         so the stored value can't be used on its own.
     </p>
 
     <label class="field-label">Jira type</label>
-    <div class="flex overflow-hidden rounded-md ring-1 ring-slate-300">
+    <div class="flex overflow-hidden rounded-md ring-1 ring-slate-300 dark:ring-slate-600">
         @foreach (var (type, label) in new[] { (JiraAuthType.Pat, "Server / Data Center"), (JiraAuthType.Cloud, "Cloud") })
         {
             <button type="button" @onclick="() => _authType = type"
-                    class="flex-1 py-2 text-sm @(_authType == type ? "bg-blue-600 text-white" : "bg-white hover:bg-slate-50")">
+                    class="flex-1 py-2 text-sm @(_authType == type ? "bg-blue-600 text-white" : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800")">
                 @label
             </button>
         }

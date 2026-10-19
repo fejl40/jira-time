@@ -10,18 +10,18 @@
 
     @if (_open)
     {
-        <ul role="listbox" class="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-lg bg-white p-1 shadow-lg ring-1 ring-slate-200">
+        <ul role="listbox" class="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-lg bg-white dark:bg-slate-900 p-1 shadow-lg ring-1 ring-slate-200 dark:ring-slate-700">
             @if (_loading)
             {
-                <li class="px-3 py-2 text-sm text-slate-500">Searching…</li>
+                <li class="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">Searching…</li>
             }
             else if (_error is not null)
             {
-                <li class="px-3 py-2 text-sm text-red-600">@_error</li>
+                <li class="px-3 py-2 text-sm text-red-600 dark:text-red-400">@_error</li>
             }
             else if (_results.Count == 0)
             {
-                <li class="px-3 py-2 text-sm text-slate-500">No matches</li>
+                <li class="px-3 py-2 text-sm text-slate-500 dark:text-slate-400">No matches</li>
             }
             else
             {
@@ -30,7 +30,7 @@
                     var index = i;
                     var item = _results[i];
                     <li role="option" aria-selected="@(index == _active ? "true" : "false")"
-                        class="cursor-pointer rounded-md px-2 py-1.5 @(index == _active ? "bg-blue-50" : "")"
+                        class="cursor-pointer rounded-md px-2 py-1.5 @(index == _active ? "bg-blue-50 dark:bg-blue-950/60" : "")"
                         @onmousedown="() => SelectAsync(item)" @onmousedown:preventDefault
                         @onmouseover="() => _active = index">
                         @ItemTemplate(item)

@@ -1,16 +1,16 @@
 @inject JiraClient Jira
 @inject TimeEntryService Entries
 
-<div class="rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200">
+<div class="rounded-lg bg-slate-50 dark:bg-slate-800/60 p-4 ring-1 ring-slate-200 dark:ring-slate-700">
     <div class="grid gap-4 md:grid-cols-[1fr_auto]">
         <div>
             <label class="field-label mt-0" for="issue-search">Jira issue</label>
             @if (_issue is not null)
             {
-                <div class="flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm ring-1 ring-slate-300">
+                <div class="flex items-center gap-2 rounded-md bg-white dark:bg-slate-900 px-3 py-2 text-sm ring-1 ring-slate-300 dark:ring-slate-600">
                     <span class="size-2.5 flex-none rounded-full @IssueColors.For(_issue.Key)"></span>
                     <span class="font-semibold">@_issue.Key</span>
-                    <span class="truncate text-slate-600">@_issue.Summary</span>
+                    <span class="truncate text-slate-600 dark:text-slate-300">@_issue.Summary</span>
                     <button type="button" class="btn-ghost ml-auto" title="Choose another issue" @onclick="() => _issue = null">✕</button>
                 </div>
             }
@@ -22,7 +22,7 @@
                     <ItemTemplate>
                         <div class="flex gap-2 text-sm">
                             <span class="flex-none font-semibold">@context.Key</span>
-                            <span class="truncate text-slate-600">@context.Summary</span>
+                            <span class="truncate text-slate-600 dark:text-slate-300">@context.Summary</span>
                         </div>
                     </ItemTemplate>
                 </Autocomplete>
@@ -32,7 +32,7 @@
                         @foreach (var r in Recent)
                         {
                             <button type="button" title="@r.Summary" @onclick="() => _issue = r"
-                                    class="rounded-full bg-white px-2.5 py-1 text-xs ring-1 ring-slate-300 hover:ring-blue-600">
+                                    class="rounded-full bg-white dark:bg-slate-900 px-2.5 py-1 text-xs ring-1 ring-slate-300 dark:ring-slate-600 hover:ring-blue-600">
                                 @r.Key
                             </button>
                         }
@@ -66,7 +66,7 @@
     }
 
     <div class="mt-4 flex items-center gap-2">
-        <span class="text-sm text-slate-500">@(_end > _start ? $"{Format.Hours(_end - _start)} h" : "")</span>
+        <span class="text-sm text-slate-500 dark:text-slate-400">@(_end > _start ? $"{Format.Hours(_end - _start)} h" : "")</span>
         @if (!IsNew)
         {
             <button type="button" class="btn-danger ml-auto" @onclick="DeleteAsync">Delete</button>

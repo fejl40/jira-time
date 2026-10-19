@@ -6,6 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <ResourcePreloader />
+    @* Sets the theme before the page paints, so there is no flash of the wrong one. *@
+    <script src="@Assets["theme.js"]"></script>
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["JiraTime.styles.css"]" />
     <ImportMap />

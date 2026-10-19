@@ -14,10 +14,10 @@
     <div class="flex flex-wrap items-center gap-3">
         <div>
             <h1 class="text-xl font-semibold">Timesheet</h1>
-            <p class="text-sm text-slate-500">@Format.Range(_period.Start, _period.End)</p>
+            <p class="text-sm text-slate-500 dark:text-slate-400">@Format.Range(_period.Start, _period.End)</p>
         </div>
         <div class="ml-auto flex items-center gap-2">
-            <span class="mr-3 text-sm text-slate-500">Period total <span class="ml-1 text-base font-semibold text-slate-800">@(Format.Hours(Total(_entries)) is { Length: > 0 } t ? t : "0") h</span></span>
+            <span class="mr-3 text-sm text-slate-500 dark:text-slate-400">Period total <span class="ml-1 text-base font-semibold text-slate-800 dark:text-slate-100">@(Format.Hours(Total(_entries)) is { Length: > 0 } t ? t : "0") h</span></span>
             <a class="btn-secondary px-3" href="@Link(_period.Previous)" title="Previous period">‹</a>
             <a class="btn-secondary" href="">Today</a>
             <a class="btn-secondary px-3" href="@Link(_period.Next)" title="Next period">›</a>
@@ -25,17 +25,17 @@
     </div>
 
     @* Period grid: issues × days *@
-    <div class="overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+    <div class="overflow-x-auto rounded-xl bg-white dark:bg-slate-900 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700">
         <table class="w-full border-collapse text-sm">
             <thead>
-                <tr class="border-b border-slate-200 text-xs text-slate-500">
-                    <th class="sticky left-0 z-10 min-w-64 bg-white px-4 py-2 text-left font-medium">Issue</th>
+                <tr class="border-b border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400">
+                    <th class="sticky left-0 z-10 min-w-64 bg-white dark:bg-slate-900 px-4 py-2 text-left font-medium">Issue</th>
                     @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
                     {
                         <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium">
                             <button type="button" class="w-full px-1 py-2" @onclick="() => SelectDay(day)">
                                 <div class="uppercase">@day.ToString("ddd", CultureInfo.InvariantCulture)[..2]</div>
-                                <div class="text-sm @(day == _today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700")">@day.Day</div>
+                                <div class="text-sm @(day == _today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700 dark:text-slate-200")">@day.Day</div>
                             </button>
                         </th>
                     }
@@ -45,13 +45,13 @@
             <tbody>
                 @foreach (var row in _rows)
                 {
-                    <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
-                        <td class="sticky left-0 z-10 max-w-80 bg-white px-4 py-2">
+                    <tr class="border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
+                        <td class="sticky left-0 z-10 max-w-80 bg-white dark:bg-slate-900 px-4 py-2">
                             <div class="flex items-center gap-2">
                                 <span class="size-2.5 flex-none rounded-full @IssueColors.For(row.Key)"></span>
                                 <a href="@($"{Conn.Connection?.BaseUrl}/browse/{row.Key}")" target="_blank" rel="noopener"
-                                   class="font-semibold text-blue-700 hover:underline">@row.Key</a>
-                                <span class="truncate text-slate-600" title="@row.Summary">@row.Summary</span>
+                                   class="font-semibold text-blue-700 dark:text-blue-400 hover:underline">@row.Key</a>
+                                <span class="truncate text-slate-600 dark:text-slate-300" title="@row.Summary">@row.Summary</span>
                             </div>
                         </td>
                         @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
@@ -66,13 +66,13 @@
                 @if (_rows.Count == 0)
                 {
                     <tr>
-                        <td colspan="@(_period.Length + 2)" class="px-4 py-10 text-center text-slate-500">No time logged in this period yet. Pick a day below and add an entry.</td>
+                        <td colspan="@(_period.Length + 2)" class="px-4 py-10 text-center text-slate-500 dark:text-slate-400">No time logged in this period yet. Pick a day below and add an entry.</td>
                     </tr>
                 }
             </tbody>
             <tfoot>
-                <tr class="border-t border-slate-200 bg-slate-50 text-xs font-semibold">
-                    <td class="sticky left-0 z-10 bg-slate-50 px-4 py-2 text-slate-500">Day total</td>
+                <tr class="border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold">
+                    <td class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-slate-500 dark:text-slate-400">Day total</td>
                     @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
                     {
                         <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@Format.Hours(Total(_entries.Where(e => e.Date == day)))</td>
@@ -87,7 +87,7 @@
     <section class="card p-6">
         <div class="flex flex-wrap items-center gap-3">
             <h2 class="text-lg font-semibold">@_selectedDay.ToString("dddd d MMMM", CultureInfo.InvariantCulture)</h2>
-            <span class="text-sm text-slate-500">@(Format.Hours(Total(DayEntries)) is { Length: > 0 } h ? $"{h} h" : "Nothing logged")</span>
+            <span class="text-sm text-slate-500 dark:text-slate-400">@(Format.Hours(Total(DayEntries)) is { Length: > 0 } h ? $"{h} h" : "Nothing logged")</span>
             @if (_draft is null)
             {
                 <button class="btn-primary ml-auto" @onclick="NewEntry">+ Add entry</button>
@@ -105,17 +105,17 @@
             </div>
         }
 
-        <ul class="mt-5 divide-y divide-slate-100">
+        <ul class="mt-5 divide-y divide-slate-100 dark:divide-slate-800">
             @foreach (var e in DayEntries)
             {
                 <li class="flex items-start gap-4 py-3 @(e.Id == _draft?.Id ? "opacity-40" : "")">
                     <span class="mt-1.5 size-2.5 flex-none rounded-full @IssueColors.For(e.IssueKey)"></span>
-                    <div class="w-28 flex-none font-mono text-sm tabular-nums text-slate-700">@Format.Time(e.Start)–@Format.Time(e.End)</div>
+                    <div class="w-28 flex-none font-mono text-sm tabular-nums text-slate-700 dark:text-slate-200">@Format.Time(e.Start)–@Format.Time(e.End)</div>
                     <div class="min-w-0 flex-1">
-                        <div class="text-sm"><span class="font-semibold">@e.IssueKey</span> <span class="text-slate-600">@e.IssueSummary</span></div>
+                        <div class="text-sm"><span class="font-semibold">@e.IssueKey</span> <span class="text-slate-600 dark:text-slate-300">@e.IssueSummary</span></div>
                         @if (e.Description is not null)
                         {
-                            <div class="mt-0.5 text-sm text-slate-500">@e.Description</div>
+                            <div class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">@e.Description</div>
                         }
                     </div>
                     <div class="w-12 text-right text-sm font-medium tabular-nums">@Format.Hours(e.Duration)</div>
@@ -204,9 +204,9 @@
     private string DayCellClass(DateOnly day, int index, bool footer = false)
     {
         var classes = new List<string>();
-        if (index > 0 && day.DayOfWeek == DayOfWeek.Monday) classes.Add("border-l-2 border-slate-300"); // week boundary
-        if (day == _selectedDay) classes.Add("bg-blue-50");
-        else if (!footer && day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) classes.Add("bg-slate-50");
+        if (index > 0 && day.DayOfWeek == DayOfWeek.Monday) classes.Add("border-l-2 border-slate-300 dark:border-slate-600"); // week boundary
+        if (day == _selectedDay) classes.Add("bg-blue-50 dark:bg-blue-950/60");
+        else if (!footer && day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) classes.Add("bg-slate-50 dark:bg-slate-800/60");
         return string.Join(' ', classes);
     }
 }
