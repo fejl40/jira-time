@@ -30,7 +30,8 @@ automatically. While editing styles, `npm run watch:css` alongside `dotnet watch
 |---|---|
 | Jira URL, auth type, email, **token** | Browser `localStorage` (`jira-time.connection`), encrypted by the server |
 | Encryption keys | `data/keys/` on the server (DPAPI-protected on Windows) |
-| Profile | `data/documents/settings/app.json` |
+| Profile, workday | `data/documents/settings/app.json` |
+| Days off | `data/documents/days-off/<date>.json` |
 | Time entries | `data/documents/time-entries/<id>.json`, one file per entry |
 
 **Token encryption:** the server encrypts the connection with ASP.NET Core Data Protection
@@ -65,6 +66,12 @@ interfaces and replace `AddFileDocumentStore(...)` in `Program.cs`.
 ## Periods
 
 Periods are semi-monthly: the 1st to the 15th, and the 16th to the last day of the month.
+
+## Workdays
+
+Monday to Friday need 8 hours. Danish public holidays are skipped automatically, and you can mark
+a day off (vacation, sick, other) from the day view. The grid shows the hours still missing on each
+workday up to today. The workday window (default 08:00–16:30, lunch 12:00–12:30) is set under Settings.
 
 ## Tests
 

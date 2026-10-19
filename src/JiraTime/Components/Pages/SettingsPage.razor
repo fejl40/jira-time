@@ -38,6 +38,29 @@
     </section>
 
     <section class="card p-6">
+        <h2 class="font-semibold">Workday</h2>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Monday to Friday need 8 hours, except Danish public holidays and days you mark off. Suggested entries are placed inside these hours and never in the lunch break.</p>
+        <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div><label class="field-label mt-0" for="wd-start">Starts</label><input id="wd-start" type="time" class="field" @bind="_start" @bind:after="Touch" /></div>
+            <div><label class="field-label mt-0" for="wd-end">Ends</label><input id="wd-end" type="time" class="field" @bind="_end" @bind:after="Touch" /></div>
+            <div><label class="field-label mt-0" for="lunch-start">Lunch from</label><input id="lunch-start" type="time" class="field" @bind="_lunchStart" @bind:after="Touch" /></div>
+            <div><label class="field-label mt-0" for="lunch-end">Lunch to</label><input id="lunch-end" type="time" class="field" @bind="_lunchEnd" @bind:after="Touch" /></div>
+        </div>
+        @if (_workdayError is not null)
+        {
+            <div class="alert-error" role="alert">@_workdayError</div>
+        }
+        <div class="mt-4 flex items-center gap-3">
+            <button class="btn-primary" @onclick="SaveWorkdayAsync">Save</button>
+            @if (_workdaySaved)
+            {
+                <span class="text-sm text-emerald-700 dark:text-emerald-400">Saved</span>
+            }
+            <span class="hint mt-0 ml-auto">@Format.Hours((_end - _start) - (_lunchEnd - _lunchStart)) h between start and end, excluding lunch</span>
+        </div>
+    </section>
+
+    <section class="card p-6">
         <h2 class="font-semibold">Timesheet periods</h2>
         <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Periods run from the 1st to the 15th and from the 16th to the end of the month.</p>
         <p class="hint mt-2">Current period: @{ var cur = Period.For(DateOnly.FromDateTime(DateTime.Today)); } @Format.Range(cur.Start, cur.End)</p>
@@ -46,8 +69,26 @@
 
 @code {
     private AppSettings? _settings;
+    private TimeOnly _start, _end, _lunchStart, _lunchEnd;
+    private string? _workdayError;
+    private bool _workdaySaved;
 
-    protected override async Task OnInitializedAsync() => _settings = await Settings.GetAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        _settings = await Settings.GetAsync();
+        (_start, _end, _lunchStart, _lunchEnd) = _settings.Workday;
+    }
+
+    private void Touch() => _workdaySaved = false;
+
+    private async Task SaveWorkdayAsync()
+    {
+        var w = new Workday(_start, _end, _lunchStart, _lunchEnd);
+        _workdayError = w.Validate();
+        if (_workdayError is not null) return;
+        await Settings.SaveWorkdayAsync(w);
+        _workdaySaved = true;
+    }
 
     private async Task DisconnectAsync()
     {

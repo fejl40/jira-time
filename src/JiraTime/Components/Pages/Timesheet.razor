@@ -4,6 +4,7 @@
 @inject TimeEntryService Entries
 @inject ConnectionState Conn
 @inject WorklogSync Sync
+@inject WorkCalendarService Calendar
 @inject NavigationManager Nav
 
 <PageTitle>Timesheet · Jira Time</PageTitle>
@@ -24,6 +25,10 @@
                 <button class="btn-secondary mr-3" disabled="@_syncing" @onclick="SyncPeriodAsync">@(_syncing ? "Syncing…" : "Sync now")</button>
             }
             <span class="mr-3 text-sm text-slate-500 dark:text-slate-400">Period total <span class="ml-1 text-base font-semibold text-slate-800 dark:text-slate-100">@(Format.Hours(Total(_entries)) is { Length: > 0 } t ? t : "0") h</span></span>
+            @if (PeriodMissing > TimeSpan.Zero)
+            {
+                <span class="mr-3 text-sm text-amber-700 dark:text-amber-400" title="Hours missing on workdays up to today">@Format.Hours(PeriodMissing) h missing</span>
+            }
             <a class="btn-secondary px-3" href="@Link(_period.Previous)" title="Previous period">‹</a>
             <a class="btn-secondary" href="">Today</a>
             <a class="btn-secondary px-3" href="@Link(_period.Next)" title="Next period">›</a>
@@ -38,7 +43,7 @@
                     <th class="sticky left-0 z-10 min-w-64 bg-white dark:bg-slate-900 px-4 py-2 text-left font-medium">Issue</th>
                     @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
                     {
-                        <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium">
+                        <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium" title="@DayTitle(day)">
                             <button type="button" class="w-full px-1 py-2" @onclick="() => SelectDay(day)">
                                 <div class="uppercase">@day.ToString("ddd", CultureInfo.InvariantCulture)[..2]</div>
                                 <div class="text-sm @(day == _today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700 dark:text-slate-200")">@day.Day</div>
@@ -85,6 +90,17 @@
                     }
                     <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(Total(_entries))</td>
                 </tr>
+                @if (PeriodMissing > TimeSpan.Zero)
+                {
+                    <tr class="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                        <td class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-4 py-2">Missing</td>
+                        @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
+                        {
+                            <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@(Missing(day) is { } m && m > TimeSpan.Zero ? Format.Hours(m) : "")</td>
+                        }
+                        <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(PeriodMissing)</td>
+                    </tr>
+                }
             </tfoot>
         </table>
     </div>
@@ -94,6 +110,29 @@
         <div class="flex flex-wrap items-center gap-3">
             <h2 class="text-lg font-semibold">@_selectedDay.ToString("dddd d MMMM", CultureInfo.InvariantCulture)</h2>
             <span class="text-sm text-slate-500 dark:text-slate-400">@(Format.Hours(Total(DayEntries)) is { Length: > 0 } h ? $"{h} h" : "Nothing logged")</span>
+            @if (SelectedDay is { Kind: DayKind.Holiday or DayKind.Weekend } info)
+            {
+                <span class="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs text-slate-600 dark:text-slate-300">@(info.Name ?? "Weekend")</span>
+            }
+            else if (SelectedDay is { Kind: DayKind.DayOff } off)
+            {
+                <span class="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs text-slate-600 dark:text-slate-300">Day off · @off.Name</span>
+                <button class="btn-ghost text-xs" @onclick="UnmarkDayOffAsync">Undo</button>
+            }
+            else if (SelectedDay is { Kind: DayKind.Workday })
+            {
+                @if (Missing(_selectedDay) is { } miss && miss > TimeSpan.Zero && _selectedDay <= _today)
+                {
+                    <span class="text-sm text-amber-700 dark:text-amber-400">@Format.Hours(miss) h missing</span>
+                }
+                <select class="field w-auto py-1 text-xs" aria-label="Mark day off" value="" @onchange="MarkDayOffAsync">
+                    <option value="">Mark day off…</option>
+                    @foreach (var r in Enum.GetValues<DayOffReason>())
+                    {
+                        <option value="@r">@r</option>
+                    }
+                </select>
+            }
             @if (_draft is null)
             {
                 <button class="btn-primary ml-auto" @onclick="NewEntry">+ Add entry</button>
@@ -165,7 +204,25 @@
 
     private record IssueRow(string Key, string Summary, List<TimeEntry> Entries);
 
+    private IReadOnlyDictionary<DateOnly, DayInfo> _days = new Dictionary<DateOnly, DayInfo>();
+
     private IReadOnlyList<TimeEntry> DayEntries => _entries.Where(e => e.Date == _selectedDay).ToList();
+    private DayInfo? SelectedDay => _days.GetValueOrDefault(_selectedDay);
+
+    /// <summary>Missing hours on a day; only counted up to today.</summary>
+    private TimeSpan Missing(DateOnly day) =>
+        day > _today || !_days.TryGetValue(day, out var info)
+            ? TimeSpan.Zero
+            : WorkCalendarService.Missing(info, Total(_entries.Where(e => e.Date == day)));
+
+    private TimeSpan PeriodMissing => _period.Days.Aggregate(TimeSpan.Zero, (t, d) => t + Missing(d));
+
+    private string? DayTitle(DateOnly day) => _days.GetValueOrDefault(day) switch
+    {
+        { Kind: DayKind.Holiday, Name: var n } => n,
+        { Kind: DayKind.DayOff, Name: var n } => $"Day off ({n})",
+        _ => null,
+    };
 
     protected override async Task OnParametersSetAsync()
     {
@@ -187,6 +244,20 @@
             .ToList();
         _recent = await Entries.GetRecentIssuesAsync();
         _unsynced = _entries.Count(e => !e.IsSynced);
+        _days = await Calendar.GetDaysAsync(_period.Start, _period.End);
+    }
+
+    private async Task MarkDayOffAsync(ChangeEventArgs e)
+    {
+        if (!Enum.TryParse<DayOffReason>(e.Value?.ToString(), out var reason)) return;
+        await Calendar.MarkDayOffAsync(_selectedDay, reason);
+        await ReloadAsync();
+    }
+
+    private async Task UnmarkDayOffAsync()
+    {
+        await Calendar.UnmarkDayOffAsync(_selectedDay);
+        await ReloadAsync();
     }
 
     private async Task RetryAsync(TimeEntry e)
@@ -247,7 +318,8 @@
         var classes = new List<string>();
         if (index > 0 && day.DayOfWeek == DayOfWeek.Monday) classes.Add("border-l-2 border-slate-300 dark:border-slate-600"); // week boundary
         if (day == _selectedDay) classes.Add("bg-blue-50 dark:bg-blue-950/60");
-        else if (!footer && day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) classes.Add("bg-slate-50 dark:bg-slate-800/60");
+        else if (!footer && _days.GetValueOrDefault(day) is { IsWorkday: false }) classes.Add("bg-slate-50 dark:bg-slate-800/60");
+        if (!footer && _days.GetValueOrDefault(day) is { Kind: DayKind.Holiday or DayKind.DayOff }) classes.Add("text-slate-400 dark:text-slate-500");
         return string.Join(' ', classes);
     }
 }

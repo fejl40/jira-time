@@ -24,5 +24,19 @@ public class SettingsServiceTests
         var settings = await new SettingsService(store).GetAsync();
 
         Assert.Equal("Carl Lilholm", settings.Profile?.DisplayName);
+        Assert.Equal(Workday.Default, settings.Workday);
+    }
+
+    [Fact]
+    public async Task Workday_is_saved_and_read_back()
+    {
+        using var dir = new TempDir();
+        using var store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = dir.Path });
+        var w = new Workday(new(7, 30), new(16, 0), new(11, 30), new(12, 0));
+
+        await new SettingsService(store).SaveWorkdayAsync(w);
+
+        using var reopened = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = dir.Path });
+        Assert.Equal(w, (await new SettingsService(reopened).GetAsync()).Workday);
     }
 }

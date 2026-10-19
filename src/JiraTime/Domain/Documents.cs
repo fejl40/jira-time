@@ -22,6 +22,9 @@ public class AppSettings : IDocument
     public string Id { get; set; } = SingletonId;
 
     public JiraProfile? Profile { get; set; }
+
+    /// <summary>When a normal workday runs; used to find gaps and place suggested entries.</summary>
+    public Workday Workday { get; set; } = Workday.Default;
 }
 
 /// <summary>One block of work on one Jira issue, on one day.</summary>
