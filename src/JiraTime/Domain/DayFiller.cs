@@ -34,6 +34,17 @@ public static class DayFiller
         return drafts;
     }
 
+    /// <summary>
+    /// <see cref="Propose"/> for every day up to and including <paramref name="today"/>; days that need
+    /// nothing are left out.
+    /// </summary>
+    public static IReadOnlyDictionary<DateOnly, IReadOnlyList<TimeEntry>> ProposePeriod(
+        IEnumerable<DayInfo> days, DateOnly today, Workday workday, IReadOnlyList<TimeEntry> logged, IReadOnlyList<SprintIssue> sprint) =>
+        days.Where(d => d.Date <= today)
+            .Select(d => (d.Date, Drafts: Propose(d, workday, logged.Where(e => e.Date == d.Date).ToList(), sprint)))
+            .Where(p => p.Drafts.Count > 0)
+            .ToDictionary(p => p.Date, p => p.Drafts);
+
     /// <summary>Free stretches of the workday window, outside lunch and outside <paramref name="logged"/>, in order.</summary>
     public static IReadOnlyList<(TimeOnly Start, TimeOnly End)> Gaps(Workday workday, IEnumerable<TimeEntry> logged)
     {

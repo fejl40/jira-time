@@ -62,6 +62,10 @@ Each block gets a best-guess issue: the one logged right before it, then right a
 In Progress sprint issue, then any sprint issue. Suggestions are drafts: change the issue or times,
 remove some, then **Accept** to save them (and send them to Jira) or **Discard**.
 
+**Fill period** in the period header does the same for every short workday so far (never future
+days). Suggested hours show dashed in the grid with a **Suggested** row; accept them all from the
+header, or open a day to review and accept just that day.
+
 ## Theme
 
 Light, dark or system (follows the OS). Switch with the icon in the header; the choice is kept in the browser.

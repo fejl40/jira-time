@@ -31,6 +31,16 @@
             {
                 <span class="mr-3 text-sm text-amber-700 dark:text-amber-400" title="Hours missing on workdays up to today">@Format.Hours(PeriodMissing) h missing</span>
             }
+            @if (_proposals.Count > 0)
+            {
+                <span class="text-sm text-blue-700 dark:text-blue-300">@Format.Hours(DraftTotal(_proposals.Values.SelectMany(l => l))) h suggested on @(_proposals.Count == 1 ? "1 day" : $"{_proposals.Count} days")</span>
+                <button class="btn-secondary" disabled="@_accepting" @onclick="DiscardAll">Discard all</button>
+                <button class="btn-primary mr-3" disabled="@_accepting" @onclick="() => AcceptAsync(_proposals.Keys)">@(_accepting ? "Saving…" : "Accept all")</button>
+            }
+            else if (PeriodMissing > TimeSpan.Zero)
+            {
+                <button class="btn-secondary mr-3" title="Suggest entries for every workday so far that is short of 8 hours" @onclick="FillPeriodAsync">Fill period</button>
+            }
             <a class="btn-secondary px-3" href="@Link(_period.Previous)" title="Previous period">‹</a>
             <a class="btn-secondary" href="">Today</a>
             <a class="btn-secondary px-3" href="@Link(_period.Next)" title="Next period">›</a>
@@ -56,14 +66,21 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var row in _rows)
+                @foreach (var row in Rows)
                 {
                     <tr class="border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50/60 dark:hover:bg-slate-800/40">
                         <td class="sticky left-0 z-10 max-w-80 bg-white dark:bg-slate-900 px-4 py-2">
                             <div class="flex items-center gap-2">
                                 <span class="size-2.5 flex-none rounded-full @IssueColors.For(row.Key)"></span>
-                                <a href="@($"{Conn.Connection?.BaseUrl}/browse/{row.Key}")" target="_blank" rel="noopener"
-                                   class="font-semibold text-blue-700 dark:text-blue-400 hover:underline">@row.Key</a>
+                                @if (row.Key == "")
+                                {
+                                    <span class="italic text-slate-500 dark:text-slate-400">No issue guessed yet</span>
+                                }
+                                else
+                                {
+                                    <a href="@($"{Conn.Connection?.BaseUrl}/browse/{row.Key}")" target="_blank" rel="noopener"
+                                       class="font-semibold text-blue-700 dark:text-blue-400 hover:underline">@row.Key</a>
+                                }
                                 <span class="truncate text-slate-600 dark:text-slate-300" title="@row.Summary">@row.Summary</span>
                             </div>
                         </td>
@@ -71,12 +88,16 @@
                         {
                             <td class="@DayCellClass(day, i) cursor-pointer p-2 text-center tabular-nums" @onclick="() => SelectDay(day)">
                                 @Format.Hours(Total(row.Entries.Where(e => e.Date == day)))
+                                @if (DraftTotal(row.Drafts.Where(d => d.Date == day)) is { } draft && draft > TimeSpan.Zero)
+                                {
+                                    <span class="ml-0.5 inline-block rounded border border-dashed border-blue-400 px-1 text-xs text-blue-700 dark:border-blue-600 dark:text-blue-300" title="Suggested, not saved" data-draft-cell>@Format.Hours(draft)</span>
+                                }
                             </td>
                         }
                         <td class="px-3 py-2 text-right font-medium tabular-nums">@Format.Hours(Total(row.Entries))</td>
                     </tr>
                 }
-                @if (_rows.Count == 0)
+                @if (Rows.Count == 0)
                 {
                     <tr>
                         <td colspan="@(_period.Length + 2)" class="px-4 py-10 text-center text-slate-500 dark:text-slate-400">No time logged in this period yet. Pick a day below and add an entry.</td>
@@ -92,6 +113,17 @@
                     }
                     <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(Total(_entries))</td>
                 </tr>
+                @if (_proposals.Count > 0)
+                {
+                    <tr class="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                        <td class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-4 py-2">Suggested</td>
+                        @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
+                        {
+                            <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@Format.Hours(DraftTotal(_proposals.GetValueOrDefault(day) ?? []))</td>
+                        }
+                        <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(DraftTotal(_proposals.Values.SelectMany(l => l)))</td>
+                    </tr>
+                }
                 @if (PeriodMissing > TimeSpan.Zero)
                 {
                     <tr class="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold text-amber-700 dark:text-amber-400">
@@ -211,7 +243,6 @@
 
     private Period _period;
     private IReadOnlyList<TimeEntry> _entries = [];
-    private List<IssueRow> _rows = [];
     private IReadOnlyList<JiraIssue> _recent = [];
     private IReadOnlyList<SprintIssue> _sprint = [];
     private DateOnly _selectedDay;
@@ -219,7 +250,19 @@
     private bool _draftIsNew, _loaded, _syncing;
     private int _unsynced;
 
-    private record IssueRow(string Key, string Summary, List<TimeEntry> Entries);
+    private record IssueRow(string Key, string Summary, List<TimeEntry> Entries, List<TimeEntry> Drafts);
+
+    /// <summary>One row per issue with saved or suggested time in the period.</summary>
+    private List<IssueRow> Rows =>
+        _entries.Select(e => (Entry: e, Draft: false))
+            .Concat(_proposals.Values.SelectMany(l => l).Select(d => (Entry: d, Draft: true)))
+            .GroupBy(x => x.Entry.IssueKey)
+            .Select(g => new IssueRow(g.Key,
+                g.OrderBy(x => x.Draft).ThenByDescending(x => x.Entry.UpdatedUtc).First().Entry.IssueSummary,
+                g.Where(x => !x.Draft).Select(x => x.Entry).ToList(),
+                g.Where(x => x.Draft).Select(x => x.Entry).ToList()))
+            .OrderBy(r => r.Key == "").ThenBy(r => r.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
     private IReadOnlyDictionary<DateOnly, DayInfo> _days = new Dictionary<DateOnly, DayInfo>();
 
@@ -261,11 +304,6 @@
     private async Task ReloadAsync()
     {
         _entries = await Entries.GetRangeAsync(_period.Start, _period.End);
-        _rows = _entries
-            .GroupBy(e => e.IssueKey)
-            .Select(g => new IssueRow(g.Key, g.OrderByDescending(e => e.UpdatedUtc).First().IssueSummary, g.ToList()))
-            .OrderBy(r => r.Key, StringComparer.OrdinalIgnoreCase)
-            .ToList();
         _recent = await Entries.GetRecentIssuesAsync();
         _unsynced = _entries.Count(e => !e.IsSynced);
         _days = await Calendar.GetDaysAsync(_period.Start, _period.End);
@@ -300,6 +338,22 @@
         var drafts = DayFiller.Propose(info, workday, DayEntries, _sprint);
         if (drafts.Count > 0) _proposals[_selectedDay] = drafts.ToList();
     }
+
+    private async Task FillPeriodAsync()
+    {
+        var workday = (await Settings.GetAsync()).Workday;
+        foreach (var (day, drafts) in DayFiller.ProposePeriod(_days.Values, _today, workday, _entries, _sprint))
+            _proposals[day] = drafts.ToList();
+    }
+
+    private void DiscardAll()
+    {
+        _proposals.Clear();
+        _proposalErrors.Clear();
+    }
+
+    private static TimeSpan DraftTotal(IEnumerable<TimeEntry> drafts) =>
+        drafts.Where(d => d.End > d.Start).Aggregate(TimeSpan.Zero, (t, d) => t + d.Duration);
 
     private void ProposalsChanged()
     {

@@ -112,4 +112,35 @@ public class DayFillerTests
 
         Assert.Equal("ABC-1 07:00-11:30, ABC-1 12:00-15:30", Show(drafts));
     }
+
+    [Fact]
+    public void Period_fill_covers_short_workdays_up_to_today_only()
+    {
+        // Thu 15 Oct .. Wed 21 Oct, today Tue 20 Oct. Fri 16 is full, Mon 19 has 2 h, Sat/Sun are weekend.
+        var start = new DateOnly(2026, 10, 15);
+        var days = Enumerable.Range(0, 7).Select(i => start.AddDays(i)).Select(d => new DayInfo(d,
+            d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? DayKind.Weekend : DayKind.Workday, null)).ToList();
+        var logged = new[]
+        {
+            E("XYZ-1", "08:00", "12:00").On(16), E("XYZ-1", "12:30", "16:30").On(16),
+            E("XYZ-2", "08:00", "10:00"),
+        };
+
+        var plan = DayFiller.ProposePeriod(days, today: new DateOnly(2026, 10, 20), Window, logged, [Doing]);
+
+        Assert.Equal(new[] { "2026-10-15", "2026-10-19", "2026-10-20" }.Select(DateOnly.Parse), plan.Keys.Order());
+        Assert.Equal("XYZ-2 10:00-12:00, XYZ-2 12:30-16:30", Show(plan[Monday]));
+        Assert.Equal("ABC-1 08:00-12:00, ABC-1 12:30-16:30", Show(plan[new DateOnly(2026, 10, 20)]));
+        Assert.All(plan, p => Assert.All(p.Value, d => Assert.Equal(p.Key, d.Date)));
+        Assert.All(plan, p => Assert.Equal(TimeSpan.FromHours(8), Total([.. logged.Where(e => e.Date == p.Key), .. p.Value])));
+    }
+}
+
+internal static class TimeEntryTestExtensions
+{
+    public static TimeEntry On(this TimeEntry e, int octoberDay)
+    {
+        e.Date = new DateOnly(2026, 10, octoberDay);
+        return e;
+    }
 }
