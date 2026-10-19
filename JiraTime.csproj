@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+  </PropertyGroup>
+
+  <!-- Tailwind: Styles/app.css is compiled to wwwroot/app.css on every build.
+       Needs Node.js; `npm install` runs automatically the first time. -->
+  <ItemGroup>
+    <UpToDateCheckInput Include="Styles/**/*.css" />
+    <Content Remove="package.json;package-lock.json" />
+  </ItemGroup>
+
+  <Target Name="NpmInstall" BeforeTargets="TailwindBuild" Condition="!Exists('node_modules/.bin/tailwindcss')">
+    <Exec Command="npm install" />
+  </Target>
+
+  <Target Name="TailwindBuild" BeforeTargets="ResolveStaticWebAssetsInputs;Build">
+    <Exec Command="npm run --silent build:css" />
+    <ItemGroup>
+      <Content Include="wwwroot/app.css" Condition="!@(Content-&gt;AnyHaveMetadataValue('Identity','wwwroot/app.css'))" />
+    </ItemGroup>
+  </Target>
+
+</Project>

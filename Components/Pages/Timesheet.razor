@@ -1,0 +1,214 @@
+@page "/"
+@page "/period/{StartText}"
+@using System.Globalization
+@inject TimeEntryService Entries
+@inject SettingsService Settings
+@inject ConnectionState Conn
+@inject NavigationManager Nav
+
+<PageTitle>Timesheet · Jira Time</PageTitle>
+
+@if (_loaded)
+{
+<div class="mx-auto max-w-7xl space-y-6">
+    @* Period header *@
+    <div class="flex flex-wrap items-center gap-3">
+        <div>
+            <h1 class="text-xl font-semibold">Timesheet</h1>
+            <p class="text-sm text-slate-500">@Format.Range(_period.Start, _period.End)</p>
+        </div>
+        <div class="ml-auto flex items-center gap-2">
+            <span class="mr-3 text-sm text-slate-500">Period total <span class="ml-1 text-base font-semibold text-slate-800">@(Format.Hours(Total(_entries)) is { Length: > 0 } t ? t : "0") h</span></span>
+            <a class="btn-secondary px-3" href="@Link(_period.Previous)" title="Previous period">‹</a>
+            <a class="btn-secondary" href="">Today</a>
+            <a class="btn-secondary px-3" href="@Link(_period.Next)" title="Next period">›</a>
+        </div>
+    </div>
+
+    @* Two-week grid: issues × days *@
+    <div class="overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+        <table class="w-full border-collapse text-sm">
+            <thead>
+                <tr class="border-b border-slate-200 text-xs text-slate-500">
+                    <th class="sticky left-0 z-10 min-w-64 bg-white px-4 py-2 text-left font-medium">Issue</th>
+                    @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
+                    {
+                        <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium">
+                            <button type="button" class="w-full px-1 py-2" @onclick="() => SelectDay(day)">
+                                <div class="uppercase">@day.ToString("ddd", CultureInfo.InvariantCulture)[..2]</div>
+                                <div class="text-sm @(day == _today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700")">@day.Day</div>
+                            </button>
+                        </th>
+                    }
+                    <th class="min-w-16 px-3 py-2 text-right font-medium">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in _rows)
+                {
+                    <tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
+                        <td class="sticky left-0 z-10 max-w-80 bg-white px-4 py-2">
+                            <div class="flex items-center gap-2">
+                                <span class="size-2.5 flex-none rounded-full @IssueColors.For(row.Key)"></span>
+                                <a href="@($"{Conn.Connection?.BaseUrl}/browse/{row.Key}")" target="_blank" rel="noopener"
+                                   class="font-semibold text-blue-700 hover:underline">@row.Key</a>
+                                <span class="truncate text-slate-600" title="@row.Summary">@row.Summary</span>
+                            </div>
+                        </td>
+                        @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
+                        {
+                            <td class="@DayCellClass(day, i) cursor-pointer p-2 text-center tabular-nums" @onclick="() => SelectDay(day)">
+                                @Format.Hours(Total(row.Entries.Where(e => e.Date == day)))
+                            </td>
+                        }
+                        <td class="px-3 py-2 text-right font-medium tabular-nums">@Format.Hours(Total(row.Entries))</td>
+                    </tr>
+                }
+                @if (_rows.Count == 0)
+                {
+                    <tr>
+                        <td colspan="16" class="px-4 py-10 text-center text-slate-500">No time logged in this period yet. Pick a day below and add an entry.</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr class="border-t border-slate-200 bg-slate-50 text-xs font-semibold">
+                    <td class="sticky left-0 z-10 bg-slate-50 px-4 py-2 text-slate-500">Day total</td>
+                    @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
+                    {
+                        <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@Format.Hours(Total(_entries.Where(e => e.Date == day)))</td>
+                    }
+                    <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(Total(_entries))</td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    @* Selected day *@
+    <section class="card p-6">
+        <div class="flex flex-wrap items-center gap-3">
+            <h2 class="text-lg font-semibold">@_selectedDay.ToString("dddd d MMMM", CultureInfo.InvariantCulture)</h2>
+            <span class="text-sm text-slate-500">@(Format.Hours(Total(DayEntries)) is { Length: > 0 } h ? $"{h} h" : "Nothing logged")</span>
+            @if (_draft is null)
+            {
+                <button class="btn-primary ml-auto" @onclick="NewEntry">+ Add entry</button>
+            }
+        </div>
+
+        <div class="mt-4">
+            <DayTimeline Entries="DayEntries" OnEntryClick="Edit" />
+        </div>
+
+        @if (_draft is not null && Conn.Connection is { } connection)
+        {
+            <div class="mt-5">
+                <EntryEditor Entry="_draft" IsNew="_draftIsNew" Connection="connection" Recent="_recent" OnDone="EditorDoneAsync" />
+            </div>
+        }
+
+        <ul class="mt-5 divide-y divide-slate-100">
+            @foreach (var e in DayEntries)
+            {
+                <li class="flex items-start gap-4 py-3 @(e.Id == _draft?.Id ? "opacity-40" : "")">
+                    <span class="mt-1.5 size-2.5 flex-none rounded-full @IssueColors.For(e.IssueKey)"></span>
+                    <div class="w-28 flex-none font-mono text-sm tabular-nums text-slate-700">@Format.Time(e.Start)–@Format.Time(e.End)</div>
+                    <div class="min-w-0 flex-1">
+                        <div class="text-sm"><span class="font-semibold">@e.IssueKey</span> <span class="text-slate-600">@e.IssueSummary</span></div>
+                        @if (e.Description is not null)
+                        {
+                            <div class="mt-0.5 text-sm text-slate-500">@e.Description</div>
+                        }
+                    </div>
+                    <div class="w-12 text-right text-sm font-medium tabular-nums">@Format.Hours(e.Duration)</div>
+                    <button class="btn-ghost text-xs" @onclick="() => Edit(e)">Edit</button>
+                </li>
+            }
+        </ul>
+    </section>
+</div>
+
+}
+
+@code {
+    [Parameter] public string? StartText { get; set; }
+
+    private static readonly DateOnly _today = DateOnly.FromDateTime(DateTime.Today);
+
+    private Period _period;
+    private IReadOnlyList<TimeEntry> _entries = [];
+    private List<IssueRow> _rows = [];
+    private IReadOnlyList<JiraIssue> _recent = [];
+    private DateOnly _selectedDay;
+    private TimeEntry? _draft;
+    private bool _draftIsNew, _loaded;
+
+    private record IssueRow(string Key, string Summary, List<TimeEntry> Entries);
+
+    private IReadOnlyList<TimeEntry> DayEntries => _entries.Where(e => e.Date == _selectedDay).ToList();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var anchor = (await Settings.GetAsync()).PeriodAnchor;
+        var date = DateOnly.TryParseExact(StartText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : _today;
+        _period = Period.For(date, anchor);
+        _selectedDay = _period.Contains(_today) ? _today : _period.Start;
+        _draft = null;
+        await ReloadAsync();
+        _loaded = true;
+    }
+
+    private async Task ReloadAsync()
+    {
+        _entries = await Entries.GetRangeAsync(_period.Start, _period.End);
+        _rows = _entries
+            .GroupBy(e => e.IssueKey)
+            .Select(g => new IssueRow(g.Key, g.OrderByDescending(e => e.UpdatedUtc).First().IssueSummary, g.ToList()))
+            .OrderBy(r => r.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        _recent = await Entries.GetRecentIssuesAsync();
+    }
+
+    private void SelectDay(DateOnly day)
+    {
+        _selectedDay = day;
+        _draft = null;
+    }
+
+    private void NewEntry()
+    {
+        // Continue where the day left off, one hour by default.
+        var start = DayEntries.Count > 0 ? DayEntries.Max(e => e.End) : new TimeOnly(9, 0);
+        var end = start.Hour >= 23 ? new TimeOnly(23, 59) : start.AddHours(1);
+        _draft = new TimeEntry { IssueKey = "", Date = _selectedDay, Start = start, End = end };
+        _draftIsNew = true;
+    }
+
+    private void Edit(TimeEntry e)
+    {
+        _draft = e;
+        _draftIsNew = false;
+    }
+
+    private async Task EditorDoneAsync()
+    {
+        var saved = _draft;
+        _draft = null;
+        await ReloadAsync();
+        // Follow the entry if its date was moved to another day in this period.
+        if (saved is not null && _entries.FirstOrDefault(e => e.Id == saved.Id) is { } moved && moved.Date != _selectedDay)
+            _selectedDay = moved.Date;
+    }
+
+    private static TimeSpan Total(IEnumerable<TimeEntry> entries) => entries.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
+
+    private static string Link(Period p) => $"period/{Format.Iso(p.Start)}";
+
+    private string DayCellClass(DateOnly day, int index, bool footer = false)
+    {
+        var classes = new List<string>();
+        if (index == 7) classes.Add("border-l-2 border-slate-300"); // week 1 | week 2
+        if (day == _selectedDay) classes.Add("bg-blue-50");
+        else if (!footer && day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) classes.Add("bg-slate-50");
+        return string.Join(' ', classes);
+    }
+}

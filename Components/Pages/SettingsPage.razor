@@ -1,0 +1,82 @@
+@page "/settings"
+@inject SettingsService Settings
+@inject ConnectionState Conn
+@inject NavigationManager Nav
+
+<PageTitle>Settings · Jira Time</PageTitle>
+
+<div class="mx-auto max-w-2xl space-y-6">
+    <h1 class="text-xl font-semibold">Settings</h1>
+
+    <section class="card p-6">
+        <h2 class="font-semibold">Jira connection</h2>
+        @if (Conn.Connection is { } c)
+        {
+            <dl class="mt-3 grid grid-cols-[8rem_1fr] gap-y-1 text-sm">
+                <dt class="text-slate-500">URL</dt><dd>@c.BaseUrl</dd>
+                <dt class="text-slate-500">Type</dt><dd>@(c.IsCloud ? "Cloud (API token)" : "Server / Data Center (PAT)")</dd>
+                @if (c.Email is not null)
+                {
+                    <dt class="text-slate-500">Email</dt><dd>@c.Email</dd>
+                }
+            </dl>
+        }
+        <p class="hint mt-3">The token is encrypted with a key that only this server has, then kept in this browser's local storage.</p>
+        <div class="mt-4 flex gap-2">
+            <a href="setup/connect" class="btn-secondary">Change connection</a>
+            <button class="btn-danger" @onclick="DisconnectAsync">Disconnect</button>
+        </div>
+    </section>
+
+    <section class="card p-6">
+        <h2 class="font-semibold">Profile</h2>
+        @if (_settings?.Profile is { } p)
+        {
+            <div class="mt-3"><UserRow User="p" /></div>
+        }
+        <div class="mt-4"><a href="setup/profile" class="btn-secondary">Change profile</a></div>
+    </section>
+
+    <section class="card p-6">
+        <h2 class="font-semibold">Timesheet periods</h2>
+        <p class="mt-1 text-sm text-slate-600">Periods are two weeks long. Pick any date that starts a period; the rest follow from it.</p>
+        <div class="mt-3 flex items-end gap-2">
+            <div>
+                <label class="field-label mt-0" for="anchor">A period starts on</label>
+                <input id="anchor" type="date" class="field" @bind="_anchor" @bind:after="() => _saved = false" />
+            </div>
+            <button class="btn-primary" @onclick="SaveAnchorAsync">Save</button>
+            @if (_saved)
+            {
+                <span class="pb-2 text-sm text-emerald-700">Saved</span>
+            }
+        </div>
+        <p class="hint mt-2">Current period with this setting: @{ var cur = Period.For(DateOnly.FromDateTime(DateTime.Today), _anchor); } @Format.Range(cur.Start, cur.End)</p>
+    </section>
+</div>
+
+@code {
+    private AppSettings? _settings;
+    private DateOnly _anchor;
+    private bool _saved;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _settings = await Settings.GetAsync();
+        _anchor = _settings.PeriodAnchor;
+    }
+
+    private async Task SaveAnchorAsync()
+    {
+        await Settings.SavePeriodAnchorAsync(_anchor);
+        _saved = true;
+    }
+
+    private async Task DisconnectAsync()
+    {
+        // Time entries stay on the server; only the token and profile are forgotten.
+        await Conn.ClearAsync();
+        await Settings.SaveProfileAsync(null);
+        Nav.NavigateTo("setup/connect");
+    }
+}

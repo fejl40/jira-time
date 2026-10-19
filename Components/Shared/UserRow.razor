@@ -1,0 +1,16 @@
+<div class="flex items-center gap-3">
+    <span class="avatar">@User.Initials</span>
+    <div class="min-w-0">
+        <div class="truncate text-sm font-medium">@User.DisplayName</div>
+        <div class="truncate text-xs text-slate-500">@User.Subtitle</div>
+    </div>
+    @if (Tag is not null)
+    {
+        <span class="ml-auto text-xs font-medium text-blue-600">@Tag</span>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public JiraProfile User { get; set; } = default!;
+    [Parameter] public string? Tag { get; set; }
+}

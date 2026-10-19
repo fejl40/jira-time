@@ -1,0 +1,97 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@inject ConnectionState Conn
+@inject SettingsService Settings
+@inject NavigationManager Nav
+
+<div class="flex min-h-full flex-col">
+    <header class="flex h-14 flex-none items-center gap-6 bg-slate-800 px-5 text-white">
+        <a href="" class="font-semibold tracking-tight">Jira Time</a>
+
+        @if (_connection is not null && _profile is not null)
+        {
+            <nav class="flex gap-1 text-sm">
+                <NavLink href="" Match="NavLinkMatch.All" class="rounded-md px-3 py-1.5 text-slate-300 hover:bg-white/10 hover:text-white" ActiveClass="!bg-white/15 !text-white">Timesheet</NavLink>
+                <NavLink href="settings" class="rounded-md px-3 py-1.5 text-slate-300 hover:bg-white/10 hover:text-white" ActiveClass="!bg-white/15 !text-white">Settings</NavLink>
+            </nav>
+        }
+
+        <div class="ml-auto flex items-center gap-3 text-sm">
+            @if (_connection is not null)
+            {
+                <span class="hidden text-slate-400 sm:inline">@_connection.Host</span>
+            }
+            @if (_profile is not null)
+            {
+                <span class="avatar bg-slate-600 text-white">@_profile.Initials</span>
+                <span class="hidden sm:inline">@_profile.DisplayName</span>
+            }
+        </div>
+    </header>
+
+    <main class="flex-1 px-4 py-8 sm:px-6">
+        @if (_ready)
+        {
+            @Body
+        }
+    </main>
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private JiraConnection? _connection;
+    private JiraProfile? _profile;
+    private bool _ready;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Error / not-found pages are rendered statically: no browser storage there, just show the page.
+        if (!RendererInfo.IsInteractive)
+        {
+            _ready = true;
+            return;
+        }
+
+        Conn.Changed += OnChanged;
+        Settings.Changed += OnChanged;
+        Nav.LocationChanged += OnLocationChanged;
+
+        _connection = await Conn.LoadAsync();
+        _profile = (await Settings.GetAsync()).Profile;
+
+        // Send first-time users through setup before showing anything else.
+        var onSetup = Nav.ToBaseRelativePath(Nav.Uri).StartsWith("setup", StringComparison.OrdinalIgnoreCase);
+        if (!onSetup && (_connection is null || _profile is null))
+        {
+            Nav.NavigateTo(_connection is null ? "setup/connect" : "setup/profile");
+            return; // _ready flips once the navigation lands
+        }
+        _ready = true;
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (_ready) return;
+        _ready = true;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void OnChanged() => InvokeAsync(async () =>
+    {
+        _connection = Conn.Connection;
+        _profile = (await Settings.GetAsync()).Profile;
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Conn.Changed -= OnChanged;
+        Settings.Changed -= OnChanged;
+        Nav.LocationChanged -= OnLocationChanged;
+    }
+}

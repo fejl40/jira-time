@@ -1,0 +1,48 @@
+@* A horizontal bar showing when during the day each entry happened. *@
+<div class="select-none">
+    <div class="relative h-9 rounded-md bg-slate-100 ring-1 ring-slate-200">
+        @for (var h = _from + 1; h < _to; h++)
+        {
+            <div class="absolute inset-y-0 w-px bg-slate-200" style="left:@Pct(h * 60)%"></div>
+        }
+        @foreach (var e in Entries)
+        {
+            <button type="button" title="@($"{e.IssueKey} {Format.Time(e.Start)}–{Format.Time(e.End)} {e.Description}")"
+                    @onclick="() => OnEntryClick.InvokeAsync(e)"
+                    class="absolute inset-y-1 overflow-hidden rounded px-1.5 text-left text-[11px] font-medium leading-7 text-white hover:brightness-110 @IssueColors.For(e.IssueKey)"
+                    style="left:@Pct(Minutes(e.Start))%; width:@Pct(Minutes(e.Start) + (int)e.Duration.TotalMinutes, Minutes(e.Start))%">
+                @e.IssueKey
+            </button>
+        }
+    </div>
+    <div class="relative mt-1 h-4 text-[10px] text-slate-400">
+        @for (var h = _from; h <= _to; h += 2)
+        {
+            <span class="absolute -translate-x-1/2" style="left:@Pct(h * 60)%">@h.ToString("00"):00</span>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<TimeEntry> Entries { get; set; } = [];
+    [Parameter] public EventCallback<TimeEntry> OnEntryClick { get; set; }
+
+    private int _from = 7, _to = 19;
+
+    protected override void OnParametersSet()
+    {
+        // Default 07–19, widened to fit early or late entries (even hours so labels line up).
+        _from = Math.Min(7, Entries.Count > 0 ? Entries.Min(e => e.Start.Hour) : 7) / 2 * 2;
+        _to = Math.Max(19, Entries.Count > 0 ? Entries.Max(e => (int)Math.Ceiling(Minutes(e.End) / 60.0)) : 19);
+        if ((_to - _from) % 2 == 1) _to = Math.Min(24, _to + 1);
+    }
+
+    private static int Minutes(TimeOnly t) => t.Hour * 60 + t.Minute;
+
+    private string Pct(int minutes, int origin = -1)
+    {
+        var span = (_to - _from) * 60.0;
+        var value = origin < 0 ? (minutes - _from * 60) / span : (minutes - origin) / span;
+        return (value * 100).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+    }
+}

@@ -1,0 +1,113 @@
+@page "/setup/connect"
+@inject JiraClient Jira
+@inject ConnectionState Conn
+@inject NavigationManager Nav
+
+<PageTitle>Connect · Jira Time</PageTitle>
+
+<form class="card mx-auto max-w-lg" @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+    <div class="step">Step 1 of 2</div>
+    <h1 class="text-xl font-semibold">Connect to Jira</h1>
+    <p class="mt-1 text-sm text-slate-600">
+        Your token is encrypted by this app's server before it is saved in your browser,
+        so the stored value can't be used on its own.
+    </p>
+
+    <label class="field-label">Jira type</label>
+    <div class="flex overflow-hidden rounded-md ring-1 ring-slate-300">
+        @foreach (var (type, label) in new[] { (JiraAuthType.Pat, "Server / Data Center"), (JiraAuthType.Cloud, "Cloud") })
+        {
+            <button type="button" @onclick="() => _authType = type"
+                    class="flex-1 py-2 text-sm @(_authType == type ? "bg-blue-600 text-white" : "bg-white hover:bg-slate-50")">
+                @label
+            </button>
+        }
+    </div>
+
+    <label class="field-label" for="url">Jira URL</label>
+    <input id="url" type="url" class="field" autofocus
+           placeholder="@(IsCloud ? "https://yourcompany.atlassian.net" : "https://jira.yourclient.com")"
+           @bind="_baseUrl" @bind:event="oninput" />
+
+    @if (IsCloud)
+    {
+        <label class="field-label" for="email">Atlassian account email</label>
+        <input id="email" type="email" class="field" autocomplete="username" @bind="_email" @bind:event="oninput" />
+    }
+
+    <label class="field-label" for="token">@(IsCloud ? "API token" : "Personal Access Token")</label>
+    <input id="token" type="password" class="field" autocomplete="off" @bind="_token" @bind:event="oninput" />
+    <p class="hint">
+        @(IsCloud
+            ? "Create one at id.atlassian.com → Security → API tokens."
+            : "In Jira: your avatar → Profile → Personal Access Tokens → Create token.")
+    </p>
+
+    @if (_error is not null)
+    {
+        <div class="alert-error" role="alert">@_error</div>
+    }
+
+    <div class="mt-7 flex justify-end gap-2">
+        @if (_hasExisting)
+        {
+            <a href="settings" class="btn-secondary">Cancel</a>
+        }
+        <button type="submit" class="btn-primary" disabled="@(!CanSubmit)">@(_busy ? "Checking…" : "Connect")</button>
+    </div>
+</form>
+
+@code {
+    private JiraAuthType _authType = JiraAuthType.Pat;
+    private string _baseUrl = "", _email = "", _token = "";
+    private string? _error;
+    private bool _busy, _hasExisting;
+
+    private bool IsCloud => _authType == JiraAuthType.Cloud;
+    private bool CanSubmit => !_busy && !string.IsNullOrWhiteSpace(_baseUrl) && !string.IsNullOrWhiteSpace(_token)
+                              && (!IsCloud || !string.IsNullOrWhiteSpace(_email));
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Prefill when changing an existing connection (the token is always re-entered).
+        if (await Conn.LoadAsync() is { } c)
+        {
+            _hasExisting = true;
+            _authType = c.AuthType;
+            _baseUrl = c.BaseUrl;
+            _email = c.Email ?? "";
+        }
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (!CanSubmit) return;
+
+        var url = _baseUrl.Trim().TrimEnd('/');
+        if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            url = "https://" + url;
+        if (!Uri.TryCreate(url, UriKind.Absolute, out _))
+        {
+            _error = "That doesn't look like a valid URL.";
+            return;
+        }
+
+        var connection = new JiraConnection(url, _authType, _token.Trim(), IsCloud ? _email.Trim() : null);
+        _busy = true;
+        _error = null;
+        try
+        {
+            await Jira.GetMyselfAsync(connection); // throws if the token is wrong
+            await Conn.SaveAsync(connection);
+            Nav.NavigateTo("setup/profile");
+        }
+        catch (JiraException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

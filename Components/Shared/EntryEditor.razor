@@ -1,0 +1,134 @@
+@inject JiraClient Jira
+@inject TimeEntryService Entries
+
+<div class="rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200">
+    <div class="grid gap-4 md:grid-cols-[1fr_auto]">
+        <div>
+            <label class="field-label mt-0" for="issue-search">Jira issue</label>
+            @if (_issue is not null)
+            {
+                <div class="flex items-center gap-2 rounded-md bg-white px-3 py-2 text-sm ring-1 ring-slate-300">
+                    <span class="size-2.5 flex-none rounded-full @IssueColors.For(_issue.Key)"></span>
+                    <span class="font-semibold">@_issue.Key</span>
+                    <span class="truncate text-slate-600">@_issue.Summary</span>
+                    <button type="button" class="btn-ghost ml-auto" title="Choose another issue" @onclick="() => _issue = null">✕</button>
+                </div>
+            }
+            else
+            {
+                <Autocomplete TItem="JiraIssue" Id="issue-search" MinLength="1" Placeholder="Search by key or text, e.g. PROJ-123"
+                              Search="(q, ct) => Jira.SearchIssuesAsync(Connection, q, ct)"
+                              TextOf="_ => string.Empty" OnSelected="i => _issue = i">
+                    <ItemTemplate>
+                        <div class="flex gap-2 text-sm">
+                            <span class="flex-none font-semibold">@context.Key</span>
+                            <span class="truncate text-slate-600">@context.Summary</span>
+                        </div>
+                    </ItemTemplate>
+                </Autocomplete>
+                @if (Recent.Count > 0)
+                {
+                    <div class="mt-2 flex flex-wrap gap-1.5">
+                        @foreach (var r in Recent)
+                        {
+                            <button type="button" title="@r.Summary" @onclick="() => _issue = r"
+                                    class="rounded-full bg-white px-2.5 py-1 text-xs ring-1 ring-slate-300 hover:ring-blue-600">
+                                @r.Key
+                            </button>
+                        }
+                    </div>
+                }
+            }
+        </div>
+
+        <div class="flex gap-3">
+            <div>
+                <label class="field-label mt-0" for="date">Date</label>
+                <input id="date" type="date" class="field" @bind="_date" />
+            </div>
+            <div>
+                <label class="field-label mt-0" for="start">From</label>
+                <input id="start" type="time" class="field" @bind="_start" />
+            </div>
+            <div>
+                <label class="field-label mt-0" for="end">To</label>
+                <input id="end" type="time" class="field" @bind="_end" />
+            </div>
+        </div>
+    </div>
+
+    <label class="field-label" for="desc">What did you do? <span class="font-normal text-slate-400">(optional, becomes the worklog comment)</span></label>
+    <textarea id="desc" rows="2" class="field" @bind="_description"></textarea>
+
+    @if (_error is not null)
+    {
+        <div class="alert-error" role="alert">@_error</div>
+    }
+
+    <div class="mt-4 flex items-center gap-2">
+        <span class="text-sm text-slate-500">@(_end > _start ? $"{Format.Hours(_end - _start)} h" : "")</span>
+        @if (!IsNew)
+        {
+            <button type="button" class="btn-danger ml-auto" @onclick="DeleteAsync">Delete</button>
+        }
+        <button type="button" class="btn-secondary @(IsNew ? "ml-auto" : "")" @onclick="() => OnDone.InvokeAsync()">Cancel</button>
+        <button type="button" class="btn-primary" @onclick="SaveAsync">Save</button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TimeEntry Entry { get; set; } = default!;
+    [Parameter] public bool IsNew { get; set; }
+    [Parameter, EditorRequired] public JiraConnection Connection { get; set; } = default!;
+    [Parameter] public IReadOnlyList<JiraIssue> Recent { get; set; } = [];
+    /// <summary>Raised after save, delete or cancel.</summary>
+    [Parameter] public EventCallback OnDone { get; set; }
+
+    private JiraIssue? _issue;
+    private DateOnly _date;
+    private TimeOnly _start, _end;
+    private string? _description, _error;
+    private string? _loadedId;
+
+    protected override void OnParametersSet()
+    {
+        if (_loadedId == Entry.Id) return; // keep edits across parent re-renders
+        _loadedId = Entry.Id;
+        _issue = string.IsNullOrEmpty(Entry.IssueKey) ? null : new JiraIssue(Entry.IssueKey, Entry.IssueSummary);
+        _date = Entry.Date;
+        _start = Entry.Start;
+        _end = Entry.End;
+        _description = Entry.Description;
+        _error = null;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_issue is null)
+        {
+            _error = "Pick a Jira issue.";
+            return;
+        }
+
+        var entry = new TimeEntry
+        {
+            Id = Entry.Id,
+            IssueKey = _issue.Key,
+            IssueSummary = _issue.Summary,
+            Date = _date,
+            Start = _start,
+            End = _end,
+            Description = string.IsNullOrWhiteSpace(_description) ? null : _description.Trim(),
+            JiraWorklogId = Entry.JiraWorklogId,
+            CreatedUtc = Entry.CreatedUtc,
+        };
+        _error = await Entries.SaveAsync(entry);
+        if (_error is null) await OnDone.InvokeAsync();
+    }
+
+    private async Task DeleteAsync()
+    {
+        await Entries.DeleteAsync(Entry.Id);
+        await OnDone.InvokeAsync();
+    }
+}

@@ -1,0 +1,123 @@
+@typeparam TItem
+@implements IDisposable
+
+@* Search-as-you-type box. Results come from the Search delegate (debounced, stale requests cancelled). *@
+<div class="relative">
+    <input id="@Id" type="text" class="field" role="combobox" autocomplete="off"
+           aria-autocomplete="list" aria-expanded="@(_open ? "true" : "false")"
+           placeholder="@Placeholder" value="@_text"
+           @oninput="OnInput" @onkeydown="OnKeyDown" @onfocus="OnFocus" @onblur="() => _open = false" />
+
+    @if (_open)
+    {
+        <ul role="listbox" class="absolute inset-x-0 top-full z-20 mt-1 max-h-72 overflow-y-auto rounded-lg bg-white p-1 shadow-lg ring-1 ring-slate-200">
+            @if (_loading)
+            {
+                <li class="px-3 py-2 text-sm text-slate-500">Searching…</li>
+            }
+            else if (_error is not null)
+            {
+                <li class="px-3 py-2 text-sm text-red-600">@_error</li>
+            }
+            else if (_results.Count == 0)
+            {
+                <li class="px-3 py-2 text-sm text-slate-500">No matches</li>
+            }
+            else
+            {
+                @for (var i = 0; i < _results.Count; i++)
+                {
+                    var index = i;
+                    var item = _results[i];
+                    <li role="option" aria-selected="@(index == _active ? "true" : "false")"
+                        class="cursor-pointer rounded-md px-2 py-1.5 @(index == _active ? "bg-blue-50" : "")"
+                        @onmousedown="() => SelectAsync(item)" @onmousedown:preventDefault
+                        @onmouseover="() => _active = index">
+                        @ItemTemplate(item)
+                    </li>
+                }
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Func<string, CancellationToken, Task<IReadOnlyList<TItem>>> Search { get; set; } = default!;
+    [Parameter, EditorRequired] public RenderFragment<TItem> ItemTemplate { get; set; } = default!;
+    /// <summary>Text put in the box after a pick. Return "" to clear it.</summary>
+    [Parameter] public Func<TItem, string> TextOf { get; set; } = i => i?.ToString() ?? "";
+    [Parameter] public EventCallback<TItem> OnSelected { get; set; }
+    [Parameter] public int MinLength { get; set; } = 2;
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string? Id { get; set; }
+
+    private string _text = "";
+    private IReadOnlyList<TItem> _results = [];
+    private bool _open, _loading;
+    private string? _error;
+    private int _active = -1;
+    private CancellationTokenSource? _cts;
+
+    private Task OnInput(ChangeEventArgs e)
+    {
+        _text = e.Value as string ?? "";
+        return RunSearchAsync(debounce: true);
+    }
+
+    private Task OnFocus() => MinLength == 0 && !_open ? RunSearchAsync(debounce: false) : Task.CompletedTask;
+
+    private async Task RunSearchAsync(bool debounce)
+    {
+        _cts?.Cancel();
+        _error = null;
+        var query = _text.Trim();
+        if (query.Length < MinLength)
+        {
+            _open = _loading = false;
+            _results = [];
+            return;
+        }
+
+        var cts = _cts = new CancellationTokenSource();
+        _open = _loading = true;
+        try
+        {
+            if (debounce) await Task.Delay(250, cts.Token);
+            var results = await Search(query, cts.Token);
+            if (cts.IsCancellationRequested) return;
+            _results = results;
+            _active = results.Count > 0 ? 0 : -1;
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _results = [];
+            _error = ex.Message;
+        }
+        _loading = false;
+    }
+
+    private async Task SelectAsync(TItem item)
+    {
+        _text = TextOf(item);
+        _open = false;
+        await OnSelected.InvokeAsync(item);
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape") { _open = false; return; }
+        if (!_open || _results.Count == 0) return;
+        switch (e.Key)
+        {
+            case "ArrowDown": _active = (_active + 1) % _results.Count; break;
+            case "ArrowUp": _active = (_active - 1 + _results.Count) % _results.Count; break;
+            case "Enter" when _active >= 0: await SelectAsync(_results[_active]); break;
+        }
+    }
+
+    public void Dispose() => _cts?.Cancel();
+}

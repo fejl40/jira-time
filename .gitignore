@@ -1,0 +1,12 @@
+bin/
+obj/
+node_modules/
+data/
+wwwroot/app.css
+*.user
+.vs/
+.vscode/
+
+# Editors / OS
+.idea/
+.DS_Store

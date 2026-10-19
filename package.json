@@ -1,0 +1,12 @@
+{
+  "name": "jira-time-styles",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i Styles/app.css -o wwwroot/app.css --minify",
+    "watch:css": "tailwindcss -i Styles/app.css -o wwwroot/app.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.0",
+    "tailwindcss": "^4.1.0"
+  }
+}
