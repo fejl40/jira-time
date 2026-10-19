@@ -54,6 +54,14 @@ The entry editor shows the issues assigned to the selected profile in an open sp
 quick picks, next to recently used issues. Tasks and stories both count. On Jira without sprints it
 falls back to all open issues assigned to you. The list is cached for five minutes.
 
+## Fill day
+
+**Fill day** in the day view suggests entries for the hours a workday is missing (up to today). It
+fills the free time inside the workday window, outside lunch and around what you already logged.
+Each block gets a best-guess issue: the one logged right before it, then right after it, then your
+In Progress sprint issue, then any sprint issue. Suggestions are drafts: change the issue or times,
+remove some, then **Accept** to save them (and send them to Jira) or **Discard**.
+
 ## Theme
 
 Light, dark or system (follows the OS). Switch with the icon in the header; the choice is kept in the browser.
@@ -85,7 +93,7 @@ workday up to today. The workday window (default 08:00–16:30, lunch 12:00–12
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the file document store, time entry rules, workdays, worklog sync and sprint issues.
+xUnit tests in `tests/JiraTime.Tests` cover periods, the file document store, time entry rules, workdays, worklog sync, sprint issues and fill suggestions.
 
 ## Contributing
 
@@ -99,6 +107,8 @@ Paths below are relative to `src/JiraTime/`.
 ```
 Program.cs                         DI: storage, data protection, Jira client
 Domain/Documents.cs                AppSettings, TimeEntry, JiraProfile, Period, ...
+Domain/WorkCalendar.cs             workday window, Danish holidays, days off
+Domain/DayFiller.cs                suggestions for a day's missing hours
 Storage/                           document store interfaces + file-system implementation
 Services/ConnectionState.cs        encrypted connection in browser localStorage (per tab/circuit)
 Services/SettingsService.cs        profile + period settings
@@ -110,7 +120,7 @@ Components/Layout/MainLayout.razor header + redirect to setup when not configure
 Components/Pages/Setup/            Connect, Profile
 Components/Pages/Timesheet.razor   period grid + day view
 Components/Pages/SettingsPage.razor
-Components/Shared/                 Autocomplete, EntryEditor, QuickPicks, DayTimeline, UserRow
+Components/Shared/                 Autocomplete, EntryEditor, QuickPicks, DraftList, DayTimeline, UserRow
 Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
 ```
 

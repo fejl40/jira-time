@@ -14,6 +14,14 @@
                 @e.IssueKey
             </button>
         }
+        @foreach (var d in Drafts.Where(d => d.End > d.Start))
+        {
+            <div title="@($"Suggested: {d.IssueKey} {Format.Time(d.Start)}–{Format.Time(d.End)}")" data-draft-block
+                 class="absolute inset-y-1 overflow-hidden rounded border-2 border-dashed border-blue-400 bg-blue-100/70 px-1.5 text-[11px] font-medium leading-6 text-blue-800 dark:border-blue-600 dark:bg-blue-950/70 dark:text-blue-200"
+                 style="left:@Pct(Minutes(d.Start))%; width:@Pct(Minutes(d.Start) + (int)d.Duration.TotalMinutes, Minutes(d.Start))%">
+                @(d.IssueKey == "" ? "?" : d.IssueKey)
+            </div>
+        }
     </div>
     <div class="relative mt-1 h-4 text-[10px] text-slate-400">
         @for (var h = _from; h <= _to; h += 2)
@@ -25,6 +33,8 @@
 
 @code {
     [Parameter, EditorRequired] public IReadOnlyList<TimeEntry> Entries { get; set; } = [];
+    /// <summary>Suggested entries, drawn dashed.</summary>
+    [Parameter] public IReadOnlyList<TimeEntry> Drafts { get; set; } = [];
     [Parameter] public EventCallback<TimeEntry> OnEntryClick { get; set; }
 
     private int _from = 7, _to = 19;
@@ -32,8 +42,9 @@
     protected override void OnParametersSet()
     {
         // Default 07–19, widened to fit early or late entries (even hours so labels line up).
-        _from = Math.Min(7, Entries.Count > 0 ? Entries.Min(e => e.Start.Hour) : 7) / 2 * 2;
-        _to = Math.Max(19, Entries.Count > 0 ? Entries.Max(e => (int)Math.Ceiling(Minutes(e.End) / 60.0)) : 19);
+        var all = Entries.Concat(Drafts).ToList();
+        _from = Math.Min(7, all.Count > 0 ? all.Min(e => e.Start.Hour) : 7) / 2 * 2;
+        _to = Math.Max(19, all.Count > 0 ? all.Max(e => (int)Math.Ceiling(Minutes(e.End) / 60.0)) : 19);
         if ((_to - _from) % 2 == 1) _to = Math.Min(24, _to + 1);
     }
 

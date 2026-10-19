@@ -1,9 +1,10 @@
 ---
 id: TASK-10
 title: 'Fill day: suggest entries for a day''s missing hours'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-19 11:45'
+updated_date: '2026-10-19 12:06'
 labels: []
 dependencies:
   - TASK-8
@@ -21,10 +22,16 @@ A 'Fill day' button in the day view proposes entries for the gaps between existi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Proposals fill exactly the missing hours, only in gaps inside the workday window and outside lunch
-- [ ] #2 Issue choice follows the best-guess order above
-- [ ] #3 Proposals are visibly drafts and can be edited or removed one by one
-- [ ] #4 Accept saves all remaining proposals as entries (which then sync to Jira); cancel discards them
-- [ ] #5 Days off, holidays and weekends get no proposals
-- [ ] #6 Unit tests cover gap finding and issue choice
+- [x] #1 Proposals fill exactly the missing hours, only in gaps inside the workday window and outside lunch
+- [x] #2 Issue choice follows the best-guess order above
+- [x] #3 Proposals are visibly drafts and can be edited or removed one by one
+- [x] #4 Accept saves all remaining proposals as entries (which then sync to Jira); cancel discards them
+- [x] #5 Days off, holidays and weekends get no proposals
+- [x] #6 Unit tests cover gap finding and issue choice
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Domain/DayFiller proposes draft entries for a workday's missing hours: free gaps inside the workday window, outside lunch and logged time, earliest first, cut off at 8 h. Issue per block: entry right before (lunch is transparent), then right after, then first In Progress sprint issue, then any sprint issue, else empty for the user to choose. Timesheet keeps proposals per day (ready for Fill period); the day view has a Fill day button for short workdays up to today, draws drafts dashed in the timeline, and DraftList lets each draft's issue and times be changed or removed. Accept saves through WorklogSync (so worklogs reach Jira); drafts that fail validation stay with the reason. Discard drops them; marking the day off discards too. DayFillerTests cover gaps, best-guess order, 8 h cut-off, custom windows and non-workdays; checked in the browser against the mock Jira.
+<!-- SECTION:FINAL_SUMMARY:END -->

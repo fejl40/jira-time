@@ -137,13 +137,27 @@
             }
             @if (_draft is null)
             {
-                <button class="btn-primary ml-auto" @onclick="NewEntry">+ Add entry</button>
+                <div class="ml-auto flex gap-2">
+                    @if (CanFill(_selectedDay) && !_proposals.ContainsKey(_selectedDay))
+                    {
+                        <button class="btn-secondary" title="Suggest entries for the missing hours" @onclick="FillDayAsync">Fill day</button>
+                    }
+                    <button class="btn-primary" @onclick="NewEntry">+ Add entry</button>
+                </div>
             }
         </div>
 
         <div class="mt-4">
-            <DayTimeline Entries="DayEntries" OnEntryClick="Edit" />
+            <DayTimeline Entries="DayEntries" Drafts="@(_proposals.GetValueOrDefault(_selectedDay) ?? [])" OnEntryClick="Edit" />
         </div>
+
+        @if (_proposals.TryGetValue(_selectedDay, out var proposals))
+        {
+            <div class="mt-5">
+                <DraftList Drafts="proposals" Choices="Choices" Errors="_proposalErrors" Busy="_accepting"
+                           OnAccept="() => AcceptAsync([_selectedDay])" OnDiscard="() => Discard(_selectedDay)" OnChanged="ProposalsChanged" />
+            </div>
+        }
 
         @if (_draft is not null && Conn.Connection is { } connection)
         {
@@ -209,6 +223,11 @@
 
     private IReadOnlyDictionary<DateOnly, DayInfo> _days = new Dictionary<DateOnly, DayInfo>();
 
+    /// <summary>Suggested entries per day, not saved yet.</summary>
+    private readonly Dictionary<DateOnly, List<TimeEntry>> _proposals = [];
+    private Dictionary<string, string> _proposalErrors = [];
+    private bool _accepting;
+
     private IReadOnlyList<TimeEntry> DayEntries => _entries.Where(e => e.Date == _selectedDay).ToList();
     private DayInfo? SelectedDay => _days.GetValueOrDefault(_selectedDay);
 
@@ -233,6 +252,8 @@
         _period = Period.For(date);
         _selectedDay = _period.Contains(_today) ? _today : _period.Start;
         _draft = null;
+        _proposals.Clear();
+        _proposalErrors.Clear();
         await ReloadAsync();
         _loaded = true;
     }
@@ -265,9 +286,60 @@
         }
     }
 
+    /// <summary>Issues offered for suggestions: sprint first, then recent.</summary>
+    private IReadOnlyList<JiraIssue> Choices =>
+        _sprint.Select(i => i.ToIssue()).Concat(_recent).DistinctBy(i => i.Key).ToList();
+
+    /// <summary>Only workdays up to today with hours missing can be filled.</summary>
+    private bool CanFill(DateOnly day) => day <= _today && Missing(day) > TimeSpan.Zero;
+
+    private async Task FillDayAsync()
+    {
+        var workday = (await Settings.GetAsync()).Workday;
+        if (_days.GetValueOrDefault(_selectedDay) is not { } info) return;
+        var drafts = DayFiller.Propose(info, workday, DayEntries, _sprint);
+        if (drafts.Count > 0) _proposals[_selectedDay] = drafts.ToList();
+    }
+
+    private void ProposalsChanged()
+    {
+        foreach (var (day, list) in _proposals.Where(p => p.Value.Count == 0).ToList()) _proposals.Remove(day);
+    }
+
+    private void Discard(DateOnly day)
+    {
+        if (_proposals.Remove(day, out var list))
+            foreach (var d in list) _proposalErrors.Remove(d.Id);
+    }
+
+    /// <summary>Saves the suggestions for <paramref name="days"/> (each then syncs to Jira). Ones that fail validation stay as drafts with the reason.</summary>
+    private async Task AcceptAsync(IEnumerable<DateOnly> days)
+    {
+        if (Conn.Connection is not { } c) return;
+        _accepting = true;
+        foreach (var day in days.ToList())
+        {
+            if (!_proposals.TryGetValue(day, out var list)) continue;
+            foreach (var d in list.ToList())
+            {
+                var result = await Sync.SaveAsync(c, d);
+                if (result.Saved)
+                {
+                    list.Remove(d);
+                    _proposalErrors.Remove(d.Id);
+                }
+                else _proposalErrors[d.Id] = result.ValidationError!;
+            }
+            if (list.Count == 0) _proposals.Remove(day);
+        }
+        _accepting = false;
+        await ReloadAsync();
+    }
+
     private async Task MarkDayOffAsync(ChangeEventArgs e)
     {
         if (!Enum.TryParse<DayOffReason>(e.Value?.ToString(), out var reason)) return;
+        Discard(_selectedDay);
         await Calendar.MarkDayOffAsync(_selectedDay, reason);
         await ReloadAsync();
     }
