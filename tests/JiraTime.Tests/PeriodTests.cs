@@ -4,50 +4,62 @@ namespace JiraTime.Tests;
 
 public class PeriodTests
 {
-    private static readonly DateOnly Anchor = new(2026, 1, 5); // a Monday
+    private static DateOnly D(string s) => DateOnly.Parse(s);
 
     [Theory]
-    [InlineData("2026-01-05", "2026-01-05")] // the anchor itself
-    [InlineData("2026-01-18", "2026-01-05")] // last day of the first period
-    [InlineData("2026-01-19", "2026-01-19")] // first day of the next one
-    [InlineData("2026-10-19", "2026-10-12")]
-    [InlineData("2026-01-04", "2025-12-22")] // before the anchor
-    [InlineData("2025-12-22", "2025-12-22")]
-    public void For_returns_the_period_containing_the_date(string date, string expectedStart)
+    [InlineData("2026-10-01", "2026-10-01", "2026-10-15")]
+    [InlineData("2026-10-15", "2026-10-01", "2026-10-15")]
+    [InlineData("2026-10-16", "2026-10-16", "2026-10-31")]
+    [InlineData("2026-10-31", "2026-10-16", "2026-10-31")]
+    [InlineData("2026-09-30", "2026-09-16", "2026-09-30")] // 30-day month
+    [InlineData("2026-02-20", "2026-02-16", "2026-02-28")] // February
+    [InlineData("2028-02-29", "2028-02-16", "2028-02-29")] // leap year
+    public void For_returns_the_half_month_containing_the_date(string date, string start, string end)
     {
-        var period = Period.For(DateOnly.Parse(date), Anchor);
+        var p = Period.For(D(date));
 
-        Assert.Equal(DateOnly.Parse(expectedStart), period.Start);
-        Assert.True(period.Contains(DateOnly.Parse(date)));
+        Assert.Equal(D(start), p.Start);
+        Assert.Equal(D(end), p.End);
+        Assert.True(p.Contains(D(date)));
     }
 
-    [Fact]
-    public void Period_spans_14_days()
+    [Theory]
+    [InlineData("2026-10-01", 15)]
+    [InlineData("2026-10-16", 16)]
+    [InlineData("2026-09-16", 15)]
+    [InlineData("2026-02-16", 13)]
+    [InlineData("2028-02-16", 14)]
+    public void Length_and_days_match_the_period(string date, int length)
     {
-        var p = new Period(Anchor);
+        var p = Period.For(D(date));
 
-        Assert.Equal(new DateOnly(2026, 1, 18), p.End);
-        Assert.Equal(14, p.Days.Count());
+        Assert.Equal(length, p.Length);
+        Assert.Equal(length, p.Days.Count());
         Assert.Equal(p.Start, p.Days.First());
         Assert.Equal(p.End, p.Days.Last());
     }
 
-    [Fact]
-    public void Next_and_previous_step_14_days()
+    [Theory]
+    [InlineData("2026-10-05", "2026-10-16", "2026-09-16")]
+    [InlineData("2026-10-20", "2026-11-01", "2026-10-01")]
+    [InlineData("2026-12-20", "2027-01-01", "2026-12-01")] // across year end
+    [InlineData("2027-01-10", "2027-01-16", "2026-12-16")]
+    public void Next_and_previous_step_between_half_months(string date, string nextStart, string previousStart)
     {
-        var p = new Period(Anchor);
+        var p = Period.For(D(date));
 
-        Assert.Equal(new DateOnly(2026, 1, 19), p.Next.Start);
-        Assert.Equal(new DateOnly(2025, 12, 22), p.Previous.Start);
+        Assert.Equal(D(nextStart), p.Next.Start);
+        Assert.Equal(D(previousStart), p.Previous.Start);
         Assert.Equal(p, p.Next.Previous);
+        Assert.Equal(p, p.Previous.Next);
     }
 
     [Fact]
     public void Contains_excludes_days_outside()
     {
-        var p = new Period(Anchor);
+        var p = Period.For(D("2026-10-20"));
 
-        Assert.False(p.Contains(p.Start.AddDays(-1)));
-        Assert.False(p.Contains(p.End.AddDays(1)));
+        Assert.False(p.Contains(D("2026-10-15")));
+        Assert.False(p.Contains(D("2026-11-01")));
     }
 }

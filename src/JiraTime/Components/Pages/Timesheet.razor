@@ -2,7 +2,6 @@
 @page "/period/{StartText}"
 @using System.Globalization
 @inject TimeEntryService Entries
-@inject SettingsService Settings
 @inject ConnectionState Conn
 @inject NavigationManager Nav
 
@@ -25,7 +24,7 @@
         </div>
     </div>
 
-    @* Two-week grid: issues × days *@
+    @* Period grid: issues × days *@
     <div class="overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
         <table class="w-full border-collapse text-sm">
             <thead>
@@ -67,7 +66,7 @@
                 @if (_rows.Count == 0)
                 {
                     <tr>
-                        <td colspan="16" class="px-4 py-10 text-center text-slate-500">No time logged in this period yet. Pick a day below and add an entry.</td>
+                        <td colspan="@(_period.Length + 2)" class="px-4 py-10 text-center text-slate-500">No time logged in this period yet. Pick a day below and add an entry.</td>
                     </tr>
                 }
             </tbody>
@@ -148,9 +147,8 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        var anchor = (await Settings.GetAsync()).PeriodAnchor;
         var date = DateOnly.TryParseExact(StartText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : _today;
-        _period = Period.For(date, anchor);
+        _period = Period.For(date);
         _selectedDay = _period.Contains(_today) ? _today : _period.Start;
         _draft = null;
         await ReloadAsync();
@@ -206,7 +204,7 @@
     private string DayCellClass(DateOnly day, int index, bool footer = false)
     {
         var classes = new List<string>();
-        if (index == 7) classes.Add("border-l-2 border-slate-300"); // week 1 | week 2
+        if (index > 0 && day.DayOfWeek == DayOfWeek.Monday) classes.Add("border-l-2 border-slate-300"); // week boundary
         if (day == _selectedDay) classes.Add("bg-blue-50");
         else if (!footer && day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) classes.Add("bg-slate-50");
         return string.Join(' ', classes);

@@ -39,38 +39,15 @@
 
     <section class="card p-6">
         <h2 class="font-semibold">Timesheet periods</h2>
-        <p class="mt-1 text-sm text-slate-600">Periods are two weeks long. Pick any date that starts a period; the rest follow from it.</p>
-        <div class="mt-3 flex items-end gap-2">
-            <div>
-                <label class="field-label mt-0" for="anchor">A period starts on</label>
-                <input id="anchor" type="date" class="field" @bind="_anchor" @bind:after="() => _saved = false" />
-            </div>
-            <button class="btn-primary" @onclick="SaveAnchorAsync">Save</button>
-            @if (_saved)
-            {
-                <span class="pb-2 text-sm text-emerald-700">Saved</span>
-            }
-        </div>
-        <p class="hint mt-2">Current period with this setting: @{ var cur = Period.For(DateOnly.FromDateTime(DateTime.Today), _anchor); } @Format.Range(cur.Start, cur.End)</p>
+        <p class="mt-1 text-sm text-slate-600">Periods run from the 1st to the 15th and from the 16th to the end of the month.</p>
+        <p class="hint mt-2">Current period: @{ var cur = Period.For(DateOnly.FromDateTime(DateTime.Today)); } @Format.Range(cur.Start, cur.End)</p>
     </section>
 </div>
 
 @code {
     private AppSettings? _settings;
-    private DateOnly _anchor;
-    private bool _saved;
 
-    protected override async Task OnInitializedAsync()
-    {
-        _settings = await Settings.GetAsync();
-        _anchor = _settings.PeriodAnchor;
-    }
-
-    private async Task SaveAnchorAsync()
-    {
-        await Settings.SavePeriodAnchorAsync(_anchor);
-        _saved = true;
-    }
+    protected override async Task OnInitializedAsync() => _settings = await Settings.GetAsync();
 
     private async Task DisconnectAsync()
     {

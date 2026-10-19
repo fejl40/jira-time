@@ -22,9 +22,6 @@ public class AppSettings : IDocument
     public string Id { get; set; } = SingletonId;
 
     public JiraProfile? Profile { get; set; }
-
-    /// <summary>Any day that starts a two-week period. Periods repeat every 14 days from here.</summary>
-    public DateOnly PeriodAnchor { get; set; } = new(2026, 1, 5);
 }
 
 /// <summary>One block of work on one Jira issue, on one day.</summary>
@@ -74,20 +71,31 @@ public record JiraProfile(string Id, string? Username, string DisplayName, strin
 
 public record JiraIssue(string Key, string Summary);
 
-/// <summary>A two-week timesheet period.</summary>
-public readonly record struct Period(DateOnly Start)
+/// <summary>
+/// A semi-monthly timesheet period: the 1st to the 15th, or the 16th to the last day of the month.
+/// </summary>
+public readonly record struct Period
 {
-    public const int Length = 14;
-    public DateOnly End => Start.AddDays(Length - 1);
-    public Period Next => new(Start.AddDays(Length));
-    public Period Previous => new(Start.AddDays(-Length));
+    public const int SplitDay = 15;
+
+    public DateOnly Start { get; }
+    public DateOnly End { get; }
+
+    private Period(DateOnly start, DateOnly end) => (Start, End) = (start, end);
+
+    public int Length => End.DayNumber - Start.DayNumber + 1;
+    public Period Next => For(End.AddDays(1));
+    public Period Previous => For(Start.AddDays(-1));
     public IEnumerable<DateOnly> Days => Enumerable.Range(0, Length).Select(Start.AddDays);
     public bool Contains(DateOnly d) => d >= Start && d <= End;
 
-    /// <summary>The period containing <paramref name="date"/>, with periods repeating every 14 days from <paramref name="anchor"/>.</summary>
-    public static Period For(DateOnly date, DateOnly anchor)
+    /// <summary>The period containing <paramref name="date"/>.</summary>
+    public static Period For(DateOnly date)
     {
-        var offset = (int)Math.Floor((date.DayNumber - anchor.DayNumber) / (double)Length);
-        return new Period(anchor.AddDays(offset * Length));
+        if (date.Day <= SplitDay)
+            return new Period(new DateOnly(date.Year, date.Month, 1), new DateOnly(date.Year, date.Month, SplitDay));
+
+        var last = DateTime.DaysInMonth(date.Year, date.Month);
+        return new Period(new DateOnly(date.Year, date.Month, SplitDay + 1), new DateOnly(date.Year, date.Month, last));
     }
 }

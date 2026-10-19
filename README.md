@@ -1,6 +1,6 @@
 # Jira Time
 
-A local timesheet for logging hours on Jira issues, in two-week periods like myTE.
+A local timesheet for logging hours on Jira issues, in semi-monthly periods like myTE.
 Each entry records *when* the work happened (date, from, to), not just how long.
 
 Blazor (Interactive Server, .NET 10) + Tailwind CSS v4.
@@ -30,7 +30,7 @@ automatically. While editing styles, `npm run watch:css` alongside `dotnet watch
 |---|---|
 | Jira URL, auth type, email, **token** | Browser `localStorage` (`jira-time.connection`), encrypted by the server |
 | Encryption keys | `data/keys/` on the server (DPAPI-protected on Windows) |
-| Profile, period start | `data/documents/settings/app.json` |
+| Profile | `data/documents/settings/app.json` |
 | Time entries | `data/documents/time-entries/<id>.json`, one file per entry |
 
 **Token encryption:** the server encrypts the connection with ASP.NET Core Data Protection
@@ -53,8 +53,7 @@ interfaces and replace `AddFileDocumentStore(...)` in `Program.cs`.
 
 ## Periods
 
-Periods are 14 days, repeating from an anchor date (default Monday 5 Jan 2026). Change it under
-Settings → Timesheet periods so it lines up with your myTE periods.
+Periods are semi-monthly: the 1st to the 15th, and the 16th to the last day of the month.
 
 ## Tests
 
@@ -83,7 +82,7 @@ Services/TimeEntryService.cs       entries: query, save (with overlap check), de
 Services/JiraClient.cs             Jira REST calls (myself, user search, issue picker)
 Components/Layout/MainLayout.razor header + redirect to setup when not configured
 Components/Pages/Setup/            Connect, Profile
-Components/Pages/Timesheet.razor   two-week grid + day view
+Components/Pages/Timesheet.razor   period grid + day view
 Components/Pages/SettingsPage.razor
 Components/Shared/                 Autocomplete, EntryEditor, DayTimeline, UserRow
 Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
