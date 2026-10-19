@@ -24,15 +24,29 @@ automatically. While editing styles, `npm run watch:css` alongside `dotnet watch
    The token is checked against Jira (`/myself`) before it is saved, and the user it belongs to
    becomes your profile. To log hours as someone else, connect with their token.
 
+## Several users
+
+Several people can use one Jira Time server, each in their own browser with their own token. A
+user is the Jira host plus the user id that host returns for the token: on every visit the server
+asks Jira who the token belongs to, so nobody can see or change someone else's hours, and the same
+user id on two Jira hosts counts as two users. If Jira can't be reached, a token Jira confirmed
+before still works (the header shows **Offline**), so you can keep logging and sync later. A token
+Jira rejects sends you back to Connect.
+
+Data saved before this existed has no owner. The first time its user signs in (the user in the old
+profile setting), it is given to them on the host they sign in to. A copy of the old data is stored
+in `data/documents/backups/` first, and nothing is deleted.
+
 ## Where data lives
 
 | What | Where |
 |---|---|
 | Jira URL, auth type, email, **token** | Browser `localStorage` (`jira-time.connection`), encrypted by the server |
 | Encryption keys | `data/keys/` on the server (DPAPI-protected on Windows) |
-| Profile | `data/documents/settings/app.json` |
-| Days off | `data/documents/days-off/<date>.json` |
-| Time entries | `data/documents/time-entries/<id>.json`, one file per entry |
+| Users Jira confirmed (profile, hashes of confirmed tokens) | `data/documents/users/<owner>.json` |
+| Days off | `data/documents/days-off/<owner>-<date>.json` |
+| Time entries | `data/documents/time-entries/<id>.json`, one file per entry, with its owner |
+| Copy of the data from before multi-user support | `data/documents/backups/` |
 
 **Token encryption:** the server encrypts the connection with ASP.NET Core Data Protection
 (`ProtectedLocalStorage`) before handing it to the browser. The browser only ever stores
@@ -120,12 +134,14 @@ Program.cs                         DI: storage, data protection, Jira client
 Domain/Documents.cs                AppSettings, TimeEntry, JiraProfile, Period, ...
 Domain/WorkCalendar.cs             day kinds, Danish holidays, days off
 Domain/DayFiller.cs                suggestions for a day's missing hours
+Domain/Users.cs                    UserKey (host + Jira user id), UserAccount
 Storage/                           document store interfaces + file-system implementation
 Services/ConnectionState.cs        encrypted connection in browser localStorage (per tab/circuit)
-Services/SettingsService.cs        profile
+Services/CurrentUser.cs            the verified user of this tab; data services filter by it
+Services/JiraIdentity.cs           signs a tab in as the user Jira says the token belongs to
+Services/LegacyDataMigration.cs    gives data from before multi-user support to its owner
 Services/TimeEntryService.cs       entries: query, save (with validation), delete
 Services/JiraClient.cs             Jira REST calls (myself, issue picker, sprint search, worklogs)
-Services/JiraSetup.cs              connect: check the token, take its user as the profile
 Services/WorklogSync.cs            keeps Jira worklogs in step with entries
 Services/SprintIssues.cs           my open-sprint issues, cached briefly
 Components/Layout/MainLayout.razor header + redirect to setup when not configured

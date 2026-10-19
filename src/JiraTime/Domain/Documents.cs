@@ -16,6 +16,10 @@ public enum JiraAuthType
 /// NOT here: they live encrypted in the browser, see <c>Services.ConnectionState</c>.
 /// </summary>
 [DocumentCollection("settings")]
+/// <summary>
+/// The single settings document from before multi-user support. Only read to find out whose the old
+/// data is; the profile now comes from Jira on each visit.
+/// </summary>
 public class AppSettings : IDocument
 {
     public const string SingletonId = "app";
@@ -29,6 +33,9 @@ public class AppSettings : IDocument
 public class TimeEntry : IDocument
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
+
+    /// <summary><see cref="UserKey.Id"/> of the user. Empty on data from before multi-user support.</summary>
+    public string? Owner { get; set; }
 
     public required string IssueKey { get; set; }
     /// <summary>Cached so the timesheet renders without calling Jira.</summary>
@@ -148,4 +155,16 @@ public readonly record struct Period
         var last = DateTime.DaysInMonth(date.Year, date.Month);
         return new Period(new DateOnly(date.Year, date.Month, SplitDay + 1), new DateOnly(date.Year, date.Month, last));
     }
+}
+
+/// <summary>Copy of the data from before multi-user support, stored before it was given to its owner.</summary>
+[DocumentCollection("backups")]
+public class LegacyBackup : IDocument
+{
+    public string Id { get; set; } = "";
+    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+    public UserKey? ClaimedBy { get; set; }
+    public List<TimeEntry> Entries { get; set; } = [];
+    public List<DayOff> DaysOff { get; set; } = [];
+    public AppSettings? Settings { get; set; }
 }

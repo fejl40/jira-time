@@ -18,7 +18,7 @@ public class SaveDayTests : IDisposable
     public SaveDayTests()
     {
         _store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
-        _entries = new TimeEntryService(_store);
+        _entries = new TimeEntryService(_store, TestUsers.SignedIn());
         _sync = new WorklogSync(new JiraClient(_jira.Client()), _entries);
     }
 

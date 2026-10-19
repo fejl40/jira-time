@@ -15,7 +15,7 @@ public class TimeEntryServiceTests : IDisposable
     public TimeEntryServiceTests()
     {
         _store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
-        _service = new TimeEntryService(_store);
+        _service = new TimeEntryService(_store, TestUsers.SignedIn());
     }
 
     public void Dispose()
@@ -109,13 +109,13 @@ public class TimeEntryServiceTests : IDisposable
     {
         var folder = Path.Combine(_dir.Path, "time-entries");
         Directory.CreateDirectory(folder);
-        await File.WriteAllTextAsync(Path.Combine(folder, "old.json"), """
-            { "id": "old", "issueKey": "ABC-1", "issueSummary": "", "date": "2026-10-19",
+        await File.WriteAllTextAsync(Path.Combine(folder, "old.json"), $$"""
+            { "id": "old", "owner": "{{TestUsers.Carl.Id}}", "issueKey": "ABC-1", "issueSummary": "", "date": "2026-10-19",
               "start": "09:00:00", "end": "11:30:00", "syncPending": false, "jiraWorklogId": "1" }
             """);
 
         using var store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
-        var service = new TimeEntryService(store);
+        var service = new TimeEntryService(store, TestUsers.SignedIn());
         var old = Assert.Single(await service.GetRangeAsync(Day, Day));
         Assert.Equal(TimeSpan.FromHours(2.5), old.Duration);
 

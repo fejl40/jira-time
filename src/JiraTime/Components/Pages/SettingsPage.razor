@@ -1,5 +1,6 @@
 @page "/settings"
-@inject SettingsService Settings
+@inject CurrentUser User
+@inject JiraIdentity Identity
 @inject ConnectionState Conn
 @inject NavigationManager Nav
 
@@ -31,7 +32,7 @@
     <section class="card p-6">
         <h2 class="font-semibold">Profile</h2>
         <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">The Jira user your token belongs to. Change the connection to log hours as someone else.</p>
-        @if (_settings?.Profile is { } p)
+        @if (User.Profile is { } p)
         {
             <div class="mt-3"><UserRow User="p" /></div>
         }
@@ -50,15 +51,12 @@
 </div>
 
 @code {
-    private AppSettings? _settings;
-
-    protected override async Task OnInitializedAsync() => _settings = await Settings.GetAsync();
 
     private async Task DisconnectAsync()
     {
         // Time entries stay on the server; only the token and profile are forgotten.
         await Conn.ClearAsync();
-        await Settings.SaveProfileAsync(null);
+        Identity.SignOut();
         Nav.NavigateTo("setup/connect");
     }
 }

@@ -21,12 +21,14 @@ var dataProtection = builder.Services.AddDataProtection()
 if (OperatingSystem.IsWindows())
     dataProtection.ProtectKeysWithDpapi();
 
+// Per browser tab: who is signed in (verified with Jira), and that user's data.
 builder.Services.AddScoped<ConnectionState>();
-builder.Services.AddSingleton<SettingsService>();
-builder.Services.AddSingleton<TimeEntryService>();
+builder.Services.AddScoped<CurrentUser>();
+builder.Services.AddScoped<JiraIdentity>();
+builder.Services.AddSingleton<LegacyDataMigration>();
+builder.Services.AddScoped<TimeEntryService>();
 builder.Services.AddScoped<WorklogSync>();
-builder.Services.AddScoped<JiraSetup>();
-builder.Services.AddSingleton<WorkCalendarService>();
+builder.Services.AddScoped<WorkCalendarService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<SprintIssues>();
 builder.Services.AddHttpClient<JiraClient>(c => c.Timeout = TimeSpan.FromSeconds(30));

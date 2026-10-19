@@ -3,13 +3,15 @@ using JiraTime.Storage;
 
 namespace JiraTime.Services;
 
-public class TimeEntryService(IDocumentStore store)
+/// <summary>The signed-in user's time entries. Every read and write is limited to <see cref="CurrentUser"/>.</summary>
+public class TimeEntryService(IDocumentStore store, CurrentUser user)
 {
     private readonly IDocumentCollection<TimeEntry> _docs = store.Collection<TimeEntry>();
 
     public async Task<IReadOnlyList<TimeEntry>> GetRangeAsync(DateOnly from, DateOnly to)
     {
-        var entries = await _docs.QueryAsync(e => e.Date >= from && e.Date <= to && !e.DeletePending);
+        var owner = user.Owner;
+        var entries = await _docs.QueryAsync(e => e.Owner == owner && e.Date >= from && e.Date <= to && !e.DeletePending);
         return entries.OrderBy(e => e.Date).ThenBy(e => e.CreatedUtc).ToList();
     }
 
@@ -17,7 +19,8 @@ public class TimeEntryService(IDocumentStore store)
     public async Task<IReadOnlyList<JiraIssue>> GetRecentIssuesAsync(int count = 8)
     {
         var since = DateOnly.FromDateTime(DateTime.Today.AddDays(-60));
-        var entries = await _docs.QueryAsync(e => e.Date >= since && !e.DeletePending);
+        var owner = user.Owner;
+        var entries = await _docs.QueryAsync(e => e.Owner == owner && e.Date >= since && !e.DeletePending);
         return entries
             .OrderByDescending(e => e.UpdatedUtc)
             .DistinctBy(e => e.IssueKey)
@@ -44,10 +47,13 @@ public class TimeEntryService(IDocumentStore store)
     public async Task<string?> SaveAsync(TimeEntry entry, bool checkDayTotal = true)
     {
         if (Validate(entry) is { } error) return error;
+        var owner = user.Owner;
+        if (!await IsMineOrNewAsync(entry)) return "This entry belongs to someone else.";
+        entry.Owner = owner;
 
         if (checkDayTotal)
         {
-            var sameDay = await _docs.QueryAsync(e => e.Date == entry.Date && e.Id != entry.Id && !e.DeletePending);
+            var sameDay = await _docs.QueryAsync(e => e.Owner == owner && e.Date == entry.Date && e.Id != entry.Id && !e.DeletePending);
             if (sameDay.Aggregate(entry.Duration, (t, e) => t + e.Duration) > TimeEntry.MaxDuration) return TooManyHours;
         }
 
@@ -57,17 +63,37 @@ public class TimeEntryService(IDocumentStore store)
         return null;
     }
 
-    public Task<TimeEntry?> GetAsync(string id) => _docs.GetAsync(id);
+    /// <returns>The entry, or null when it doesn't exist or belongs to someone else.</returns>
+    public async Task<TimeEntry?> GetAsync(string id) =>
+        await _docs.GetAsync(id) is { } e && e.Owner == user.Owner ? e : null;
 
     /// <summary>Stores the result of a Jira sync. No validation and no change to <see cref="TimeEntry.UpdatedUtc"/>.</summary>
-    public Task SaveSyncStateAsync(TimeEntry entry) => _docs.UpsertAsync(entry);
+    public async Task SaveSyncStateAsync(TimeEntry entry)
+    {
+        if (!await IsMineOrNewAsync(entry)) throw new InvalidOperationException("This entry belongs to someone else.");
+        entry.Owner = user.Owner;
+        await _docs.UpsertAsync(entry);
+    }
+
+    private async Task<bool> IsMineOrNewAsync(TimeEntry entry) =>
+        await _docs.GetAsync(entry.Id) is not { } stored || stored.Owner == user.Owner;
 
     /// <summary>
     /// Entries in the range that Jira does not have (yet) in their current form, including removed
     /// work whose worklog still has to be deleted.
     /// </summary>
     public async Task<IReadOnlyList<TimeEntry>> GetUnsyncedAsync(DateOnly from, DateOnly to) =>
-        (await _docs.QueryAsync(e => e.Date >= from && e.Date <= to)).Where(e => !e.IsSynced).OrderBy(e => e.Date).ToList();
+        (await QueryMineAsync(from, to)).Where(e => !e.IsSynced).OrderBy(e => e.Date).ToList();
 
-    public Task DeleteAsync(string id) => _docs.DeleteAsync(id);
+    private Task<IReadOnlyList<TimeEntry>> QueryMineAsync(DateOnly from, DateOnly to)
+    {
+        var owner = user.Owner;
+        return _docs.QueryAsync(e => e.Owner == owner && e.Date >= from && e.Date <= to);
+    }
+
+    /// <summary>Deletes the entry if it is the signed-in user's.</summary>
+    public async Task DeleteAsync(string id)
+    {
+        if (await GetAsync(id) is not null) await _docs.DeleteAsync(id);
+    }
 }

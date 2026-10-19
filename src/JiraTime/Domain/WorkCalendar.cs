@@ -4,15 +4,17 @@ namespace JiraTime.Domain;
 
 public enum DayOffReason { Vacation, Sick, Other }
 
-/// <summary>A workday the user marked as not worked (id = the date, yyyy-MM-dd).</summary>
+/// <summary>A workday the user marked as not worked (id = owner + date).</summary>
 [DocumentCollection("days-off")]
 public class DayOff : IDocument
 {
     public string Id { get; set; } = "";
+    /// <summary><see cref="UserKey.Id"/> of the user. Empty on data from before multi-user support.</summary>
+    public string? Owner { get; set; }
     public DateOnly Date { get; set; }
     public DayOffReason Reason { get; set; }
 
-    public static string IdFor(DateOnly date) => date.ToString("yyyy-MM-dd");
+    public static string IdFor(string owner, DateOnly date) => $"{owner}-{date:yyyy-MM-dd}";
 }
 
 public enum DayKind { Workday, Weekend, Holiday, DayOff }

@@ -6,7 +6,7 @@
 @inject WorklogSync Sync
 @inject WorkCalendarService Calendar
 @inject SprintIssues Sprint
-@inject SettingsService Settings
+@inject CurrentUser User
 @inject NavigationManager Nav
 
 <PageTitle>Timesheet · Jira Time</PageTitle>
@@ -273,7 +273,7 @@
     /// <summary>Active-sprint issues for quick picks and suggestions. Jira being down just means no picks.</summary>
     private async Task LoadSprintAsync()
     {
-        if (Conn.Connection is not { } c || (await Settings.GetAsync()).Profile is not { } profile) return;
+        if (User.Connection is not { } c || User.Profile is not { } profile) return;
         try
         {
             _sprint = await Sprint.GetAsync(c, profile);

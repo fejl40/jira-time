@@ -68,7 +68,7 @@ public class WorkCalendarTests
     {
         using var dir = new TempDir();
         using var store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = dir.Path });
-        var calendar = new WorkCalendarService(store);
+        var calendar = new WorkCalendarService(store, TestUsers.SignedIn());
         var day = D("2026-10-20");
 
         await calendar.MarkDayOffAsync(day, DayOffReason.Vacation);

@@ -1,5 +1,5 @@
 @page "/setup/connect"
-@inject JiraSetup Setup
+@inject JiraIdentity Identity
 @inject ConnectionState Conn
 @inject NavigationManager Nav
 
@@ -94,19 +94,15 @@
         var connection = new JiraConnection(url, _authType, _token.Trim(), IsCloud ? _email.Trim() : null);
         _busy = true;
         _error = null;
-        try
+        // A new connection is only kept after Jira confirms the token and tells us whose it is.
+        var result = await Identity.SignInAsync(connection, allowOffline: false);
+        _busy = false;
+        if (!result.SignedIn)
         {
-            await Setup.ConnectAsync(connection); // throws if the token is wrong
-            await Conn.SaveAsync(connection);
-            Nav.NavigateTo("");
+            _error = result.Error;
+            return;
         }
-        catch (JiraException ex)
-        {
-            _error = ex.Message;
-        }
-        finally
-        {
-            _busy = false;
-        }
+        await Conn.SaveAsync(connection);
+        Nav.NavigateTo("");
     }
 }
