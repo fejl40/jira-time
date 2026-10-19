@@ -56,20 +56,22 @@ The entry editor shows the issues assigned to you in an open sprint (not Done) a
 quick picks, next to recently used issues. Tasks and stories both count. On Jira without sprints it
 falls back to all open issues assigned to you. The list is cached for five minutes.
 
-## Fill day
+## Logging a day
 
-Time is logged per day: an entry is an issue, a day and a number of hours (`1.5`, `1,5` or `1:30`),
-plus an optional comment. When during the day you did it doesn't matter. Jira needs a start time on
-each worklog, so the app uses 09:00 on the entry's day.
+Time is logged per day: each row is an issue, a number of hours (`1.5`, `1,5` or `1:30`) and an
+optional comment. When during the day you did it doesn't matter. Jira needs a start time on each
+worklog, so the app uses 09:00 on the row's day.
 
-**Fill day** in the day view suggests an entry with the hours the workday is still missing (up to
-today), on a best-guess issue: the one you last logged that day, then your In Progress sprint issue,
-then any sprint issue. Suggestions are drafts: change the issue or hours, remove them, then
-**Accept** to save them (and send them to Jira) or **Discard**.
+Pick a day in the grid to edit it. A workday up to today that is short of 8 h opens with a
+suggested row for the missing hours, on a best-guess issue: the one you last logged that day, then
+your In Progress sprint issue, then any sprint issue. Change the issue, hours or comment, **+ Add
+issue** for more rows (or **Search Jira…** in the issue list), remove rows, then **Save day**. Saving
+creates, updates and removes the day's worklogs in Jira to match. **Discard changes** drops what you
+haven't saved; a discarded or saved day isn't suggested again until you reload.
 
-**Fill period** in the period header does the same for every short workday so far (never future
-days). Suggested hours show dashed in the grid with a **Suggested** row; accept them all from the
-header, or open a day to review and accept just that day.
+**Fill period** in the period header adds suggestions to every short workday so far (never future
+days). Unsaved hours show dashed in the grid with an **Unsaved** row; **Save all** saves every day
+at once, or open a day to adjust it first.
 
 ## Theme
 
@@ -130,7 +132,7 @@ Components/Layout/MainLayout.razor header + redirect to setup when not configure
 Components/Pages/Setup/            Connect
 Components/Pages/Timesheet.razor   period grid + day view
 Components/Pages/SettingsPage.razor
-Components/Shared/                 Autocomplete, EntryEditor, QuickPicks, DraftList, UserRow
+Components/Shared/                 Autocomplete, DayEditor, UserRow
 Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
 ```
 

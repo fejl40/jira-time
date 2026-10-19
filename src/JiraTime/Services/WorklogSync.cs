@@ -15,6 +15,55 @@ public class WorklogSync(JiraClient jira, TimeEntryService entries)
         public bool Saved => ValidationError is null;
     }
 
+    /// <summary>Outcome of <see cref="SaveDayAsync"/>.</summary>
+    /// <param name="Errors">Row id → why it is invalid; <see cref="DayError"/> for the day as a whole. Empty when saved.</param>
+    /// <param name="SyncFailures">Rows saved here that Jira did not get (yet).</param>
+    public record DayResult(IReadOnlyDictionary<string, string> Errors, int SyncFailures)
+    {
+        public const string DayError = "";
+        public bool Saved => Errors.Count == 0;
+    }
+
+    /// <summary>
+    /// Makes the day's work match <paramref name="rows"/>: new rows are created, changed rows updated,
+    /// and saved entries missing from the rows removed, each in Jira too. Every row is validated
+    /// first; if any is invalid nothing is written.
+    /// </summary>
+    public async Task<DayResult> SaveDayAsync(JiraConnection c, DateOnly date, IReadOnlyList<TimeEntry> rows, CancellationToken ct = default)
+    {
+        var errors = new Dictionary<string, string>();
+        foreach (var r in rows)
+        {
+            r.Date = date;
+            if (TimeEntryService.Validate(r) is { } error) errors[r.Id] = error;
+        }
+        if (rows.Aggregate(TimeSpan.Zero, (t, r) => t + r.Duration) > TimeEntry.MaxDuration)
+            errors[DayResult.DayError] = TimeEntryService.TooManyHours;
+        if (errors.Count > 0) return new DayResult(errors, 0);
+
+        var saved = (await entries.GetRangeAsync(date, date)).ToDictionary(e => e.Id);
+        var failures = 0;
+
+        foreach (var gone in saved.Values.Where(e => rows.All(r => r.Id != e.Id)))
+            if (await DeleteAsync(c, gone, ct) is not null) failures++;
+
+        foreach (var row in rows)
+        {
+            if (saved.TryGetValue(row.Id, out var old))
+            {
+                if (old.IsSynced && old.IssueKey == row.IssueKey && old.Duration == row.Duration && old.Description == row.Description)
+                    continue; // unchanged
+                // Jira bookkeeping comes from what is stored, not from the edited copy.
+                row.JiraWorklogId = old.JiraWorklogId;
+                row.JiraWorklogIssueKey = old.JiraWorklogIssueKey;
+                row.CreatedUtc = old.CreatedUtc;
+            }
+            await entries.SaveAsync(row, checkDayTotal: false);
+            if (await SyncAsync(c, row, ct) is not null) failures++;
+        }
+        return new DayResult(errors, failures);
+    }
+
     /// <summary>Validates and saves the entry locally, then sends it to Jira.</summary>
     public async Task<SaveResult> SaveAsync(JiraConnection c, TimeEntry entry, CancellationToken ct = default)
     {

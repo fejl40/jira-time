@@ -77,6 +77,9 @@ public class TimeEntry : IDocument
     [JsonInclude, JsonPropertyName("end"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TimeOnly? LegacyEnd { get => null; set { _legacyEnd = value; FromLegacy(); } }
 
+    /// <summary>A separate copy to edit without touching this one.</summary>
+    public TimeEntry Copy() => (TimeEntry)MemberwiseClone();
+
     private void FromLegacy()
     {
         if (Duration == TimeSpan.Zero && _legacyStart is { } a && _legacyEnd is { } b && b > a) Duration = b - a;

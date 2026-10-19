@@ -26,16 +26,30 @@ public class TimeEntryService(IDocumentStore store)
             .ToList();
     }
 
-    /// <returns>An error message, or null when saved.</returns>
-    public async Task<string?> SaveAsync(TimeEntry entry)
+    public const string TooManyHours = "A day can't have more than 24 hours.";
+
+    /// <summary>Rules for a single entry, without looking at the rest of its day.</summary>
+    /// <returns>An error message, or null when the entry is fine.</returns>
+    public static string? Validate(TimeEntry entry)
     {
         if (string.IsNullOrWhiteSpace(entry.IssueKey)) return "Pick a Jira issue.";
         if (entry.Duration <= TimeSpan.Zero) return "Enter the hours, e.g. 1.5.";
         if (entry.Duration.Ticks % TimeSpan.TicksPerMinute != 0) return "Hours must be whole minutes.";
+        if (entry.Duration > TimeEntry.MaxDuration) return TooManyHours;
+        return null;
+    }
 
-        var sameDay = await _docs.QueryAsync(e => e.Date == entry.Date && e.Id != entry.Id && !e.DeletePending);
-        var dayTotal = sameDay.Aggregate(entry.Duration, (t, e) => t + e.Duration);
-        if (dayTotal > TimeEntry.MaxDuration) return "A day can't have more than 24 hours.";
+    /// <param name="checkDayTotal">False when the caller already checked the whole day (saving a day at once).</param>
+    /// <returns>An error message, or null when saved.</returns>
+    public async Task<string?> SaveAsync(TimeEntry entry, bool checkDayTotal = true)
+    {
+        if (Validate(entry) is { } error) return error;
+
+        if (checkDayTotal)
+        {
+            var sameDay = await _docs.QueryAsync(e => e.Date == entry.Date && e.Id != entry.Id && !e.DeletePending);
+            if (sameDay.Aggregate(entry.Duration, (t, e) => t + e.Duration) > TimeEntry.MaxDuration) return TooManyHours;
+        }
 
         entry.UpdatedUtc = DateTime.UtcNow;
         entry.SyncPending = true;

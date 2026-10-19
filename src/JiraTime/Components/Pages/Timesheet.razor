@@ -31,15 +31,15 @@
             {
                 <span class="mr-3 text-sm text-amber-700 dark:text-amber-400" title="Hours missing on workdays up to today">@Format.Hours(PeriodMissing) h missing</span>
             }
-            @if (_proposals.Count > 0)
+            @if (_period.Days.Any(d => CanFill(d) && !DraftDays.Contains(d)))
             {
-                <span class="text-sm text-blue-700 dark:text-blue-300">@Format.Hours(DraftTotal(_proposals.Values.SelectMany(l => l))) h suggested on @(_proposals.Count == 1 ? "1 day" : $"{_proposals.Count} days")</span>
-                <button class="btn-secondary" disabled="@_accepting" @onclick="DiscardAll">Discard all</button>
-                <button class="btn-primary mr-3" disabled="@_accepting" @onclick="() => AcceptAsync(_proposals.Keys)">@(_accepting ? "Saving…" : "Accept all")</button>
+                <button class="btn-secondary mr-1" title="Suggest work for every workday so far that is short of 8 hours" @onclick="FillPeriod">Fill period</button>
             }
-            else if (PeriodMissing > TimeSpan.Zero)
+            @if (DraftDays.Count > 0)
             {
-                <button class="btn-secondary mr-3" title="Suggest entries for every workday so far that is short of 8 hours" @onclick="FillPeriodAsync">Fill period</button>
+                <span class="text-sm text-blue-700 dark:text-blue-300">@Format.Hours(DraftTotal(_proposals.Values.SelectMany(l => l))) h unsaved on @(DraftDays.Count == 1 ? "1 day" : $"{DraftDays.Count} days")</span>
+                <button class="btn-secondary" disabled="@_accepting" @onclick="DiscardAll">Discard all</button>
+                <button class="btn-primary mr-3" disabled="@_accepting" @onclick="() => AcceptAsync(DraftDays)">@(_accepting ? "Saving…" : "Save all")</button>
             }
             <a class="btn-secondary px-3" href="@Link(_period.Previous)" title="Previous period">‹</a>
             <a class="btn-secondary" href="">Today</a>
@@ -74,7 +74,7 @@
                                 <span class="size-2.5 flex-none rounded-full @IssueColors.For(row.Key)"></span>
                                 @if (row.Key == "")
                                 {
-                                    <span class="italic text-slate-500 dark:text-slate-400">No issue guessed yet</span>
+                                    <span class="italic text-slate-500 dark:text-slate-400">No issue chosen yet</span>
                                 }
                                 else
                                 {
@@ -90,7 +90,7 @@
                                 @Format.Hours(Total(row.Entries.Where(e => e.Date == day)))
                                 @if (DraftTotal(row.Drafts.Where(d => d.Date == day)) is { } draft && draft > TimeSpan.Zero)
                                 {
-                                    <span class="ml-0.5 inline-block rounded border border-dashed border-blue-400 px-1 text-xs text-blue-700 dark:border-blue-600 dark:text-blue-300" title="Suggested, not saved" data-draft-cell>@Format.Hours(draft)</span>
+                                    <span class="ml-0.5 inline-block rounded border border-dashed border-blue-400 px-1 text-xs text-blue-700 dark:border-blue-600 dark:text-blue-300" title="Not saved yet" data-draft-cell>@Format.Hours(draft)</span>
                                 }
                             </td>
                         }
@@ -113,10 +113,10 @@
                     }
                     <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(Total(_entries))</td>
                 </tr>
-                @if (_proposals.Count > 0)
+                @if (DraftDays.Count > 0)
                 {
                     <tr class="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold text-blue-700 dark:text-blue-300">
-                        <td class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-4 py-2">Suggested</td>
+                        <td class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-4 py-2">Unsaved</td>
                         @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
                         {
                             <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@Format.Hours(DraftTotal(_proposals.GetValueOrDefault(day) ?? []))</td>
@@ -167,66 +167,20 @@
                     }
                 </select>
             }
-            @if (_draft is null)
-            {
-                <div class="ml-auto flex gap-2">
-                    @if (CanFill(_selectedDay) && !_proposals.ContainsKey(_selectedDay))
-                    {
-                        <button class="btn-secondary" title="Suggest entries for the missing hours" @onclick="FillDayAsync">Fill day</button>
-                    }
-                    <button class="btn-primary" @onclick="NewEntry">+ Add entry</button>
-                </div>
-            }
         </div>
 
-
-        @if (_proposals.TryGetValue(_selectedDay, out var proposals))
+        @if (_acceptNotice is not null)
         {
-            <div class="mt-5">
-                <DraftList Drafts="proposals" Choices="Choices" Errors="_proposalErrors" Busy="_accepting"
-                           OnAccept="() => AcceptAsync([_selectedDay])" OnDiscard="() => Discard(_selectedDay)" OnChanged="ProposalsChanged" />
+            <div class="mt-3 text-sm text-amber-700 dark:text-amber-400" role="status">@_acceptNotice</div>
+        }
+        @if (Conn.Connection is { } connection)
+        {
+            <div class="mt-4">
+                <DayEditor Date="_selectedDay" Saved="DayEntries" Drafts="DraftsFor(_selectedDay)" SuggestedIds="_suggested"
+                           Choices="Choices" Sprint="_sprint" Connection="connection" Expected="@(SelectedDay?.Expected ?? TimeSpan.Zero)"
+                           OnChanged="DraftsChanged" OnSaved="DaySavedAsync" OnDiscard="() => Discard(_selectedDay)" />
             </div>
         }
-
-        @if (_draft is not null && Conn.Connection is { } connection)
-        {
-            <div class="mt-5">
-                <EntryEditor Entry="_draft" IsNew="_draftIsNew" Connection="connection" Recent="_recent" Sprint="_sprint" OnDone="EditorDoneAsync" />
-            </div>
-        }
-
-        <ul class="mt-5 divide-y divide-slate-100 dark:divide-slate-800">
-            @foreach (var e in DayEntries)
-            {
-                <li class="flex items-start gap-4 py-3 @(e.Id == _draft?.Id ? "opacity-40" : "")">
-                    <span class="mt-1.5 size-2.5 flex-none rounded-full @IssueColors.For(e.IssueKey)"></span>
-                    <div class="min-w-0 flex-1">
-                        <div class="text-sm"><span class="font-semibold">@e.IssueKey</span> <span class="text-slate-600 dark:text-slate-300">@e.IssueSummary</span></div>
-                        @if (e.Description is not null)
-                        {
-                            <div class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">@e.Description</div>
-                        }
-                        @if (!e.IsSynced && e.SyncError is not null)
-                        {
-                            <div class="mt-0.5 text-xs text-amber-700 dark:text-amber-400">Jira: @e.SyncError</div>
-                        }
-                    </div>
-                    <div class="w-12 text-right text-sm font-medium tabular-nums">@Format.Hours(e.Duration)</div>
-                    <div class="w-28 text-right text-xs">
-                        @if (e.IsSynced)
-                        {
-                            <span class="text-emerald-700 dark:text-emerald-400" title="Logged in Jira">✓ In Jira</span>
-                        }
-                        else
-                        {
-                            <button class="font-medium text-amber-700 hover:underline dark:text-amber-400" title="@(e.SyncError ?? "Not sent to Jira yet")"
-                                    disabled="@_syncing" @onclick="() => RetryAsync(e)">Not in Jira · Retry</button>
-                        }
-                    </div>
-                    <button class="btn-ghost text-xs" @onclick="() => Edit(e)">Edit</button>
-                </li>
-            }
-        </ul>
     </section>
 </div>
 
@@ -242,8 +196,7 @@
     private IReadOnlyList<JiraIssue> _recent = [];
     private IReadOnlyList<SprintIssue> _sprint = [];
     private DateOnly _selectedDay;
-    private TimeEntry? _draft;
-    private bool _draftIsNew, _loaded, _syncing;
+    private bool _loaded, _syncing;
     private int _unsynced;
 
     private record IssueRow(string Key, string Summary, List<TimeEntry> Entries, List<TimeEntry> Drafts);
@@ -262,10 +215,19 @@
 
     private IReadOnlyDictionary<DateOnly, DayInfo> _days = new Dictionary<DateOnly, DayInfo>();
 
-    /// <summary>Suggested entries per day, not saved yet.</summary>
+    /// <summary>New rows per day that are not saved yet (suggestions and added issues).</summary>
     private readonly Dictionary<DateOnly, List<TimeEntry>> _proposals = [];
-    private Dictionary<string, string> _proposalErrors = [];
+    /// <summary>Ids of unsaved rows that came from a suggestion.</summary>
+    private readonly HashSet<string> _suggested = [];
+    /// <summary>Days the user saved or discarded; they are not suggested again until the page reloads.</summary>
+    private readonly HashSet<DateOnly> _dismissed = [];
     private bool _accepting;
+    private string? _acceptNotice;
+
+    private List<DateOnly> DraftDays => _proposals.Where(p => p.Value.Count > 0).Select(p => p.Key).Order().ToList();
+
+    private List<TimeEntry> DraftsFor(DateOnly day) =>
+        _proposals.TryGetValue(day, out var list) ? list : _proposals[day] = [];
 
     private IReadOnlyList<TimeEntry> DayEntries => _entries.Where(e => e.Date == _selectedDay).ToList();
     private DayInfo? SelectedDay => _days.GetValueOrDefault(_selectedDay);
@@ -290,10 +252,12 @@
         var date = DateOnly.TryParseExact(StartText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : _today;
         _period = Period.For(date);
         _selectedDay = _period.Contains(_today) ? _today : _period.Start;
-        _draft = null;
         _proposals.Clear();
-        _proposalErrors.Clear();
+        _suggested.Clear();
+        _dismissed.Clear();
+        _acceptNotice = null;
         await ReloadAsync();
+        Suggest(_selectedDay);
         _loaded = true;
     }
 
@@ -327,61 +291,74 @@
     /// <summary>Only workdays up to today with hours missing can be filled.</summary>
     private bool CanFill(DateOnly day) => day <= _today && Missing(day) > TimeSpan.Zero;
 
-    private async Task FillDayAsync()
+    /// <summary>Puts a suggestion for the missing hours on a short workday, unless the user already saved or discarded that day.</summary>
+    private void Suggest(DateOnly day)
     {
-        if (_days.GetValueOrDefault(_selectedDay) is not { } info) return;
-        var drafts = DayFiller.Propose(info, DayEntries, _sprint);
-        if (drafts.Count > 0) _proposals[_selectedDay] = drafts.ToList();
+        if (!CanFill(day) || DraftDays.Contains(day) || _dismissed.Contains(day) || !_days.TryGetValue(day, out var info)) return;
+        var drafts = DayFiller.Propose(info, _entries.Where(e => e.Date == day).ToList(), _sprint);
+        foreach (var d in drafts) _suggested.Add(d.Id);
+        DraftsFor(day).AddRange(drafts);
     }
 
-    private async Task FillPeriodAsync()
+    private void FillPeriod()
     {
-        foreach (var (day, drafts) in DayFiller.ProposePeriod(_days.Values, _today, _entries, _sprint))
-            _proposals[day] = drafts.ToList();
+        foreach (var day in _period.Days)
+        {
+            _dismissed.Remove(day);
+            Suggest(day);
+        }
     }
 
     private void DiscardAll()
     {
-        _proposals.Clear();
-        _proposalErrors.Clear();
+        foreach (var day in DraftDays) Discard(day);
+        _acceptNotice = null;
     }
 
     private static TimeSpan DraftTotal(IEnumerable<TimeEntry> drafts) =>
         drafts.Aggregate(TimeSpan.Zero, (t, d) => t + d.Duration);
 
-    private void ProposalsChanged()
-    {
-        foreach (var (day, list) in _proposals.Where(p => p.Value.Count == 0).ToList()) _proposals.Remove(day);
-    }
-
     private void Discard(DateOnly day)
     {
-        if (_proposals.Remove(day, out var list))
-            foreach (var d in list) _proposalErrors.Remove(d.Id);
+        _proposals.Remove(day);
+        _dismissed.Add(day);
     }
 
-    /// <summary>Saves the suggestions for <paramref name="days"/> (each then syncs to Jira). Ones that fail validation stay as drafts with the reason.</summary>
+    /// <summary>The day editor changed unsaved rows; re-rendering updates the grid's unsaved hours.</summary>
+    private void DraftsChanged() { }
+
+    private async Task DaySavedAsync()
+    {
+        _dismissed.Add(_selectedDay);
+        await ReloadAsync();
+    }
+
+    /// <summary>Saves every listed day's unsaved rows together with its saved work. Days with an invalid row are left for the user to finish.</summary>
     private async Task AcceptAsync(IEnumerable<DateOnly> days)
     {
         if (Conn.Connection is not { } c) return;
         _accepting = true;
+        _acceptNotice = null;
+        var needsWork = new List<DateOnly>();
         foreach (var day in days.ToList())
         {
-            if (!_proposals.TryGetValue(day, out var list)) continue;
-            foreach (var d in list.ToList())
+            if (!_proposals.TryGetValue(day, out var drafts) || drafts.Count == 0) continue;
+            var rows = _entries.Where(e => e.Date == day).Select(e => e.Copy()).Concat(drafts).ToList();
+            var result = await Sync.SaveDayAsync(c, day, rows);
+            if (result.Saved)
             {
-                var result = await Sync.SaveAsync(c, d);
-                if (result.Saved)
-                {
-                    list.Remove(d);
-                    _proposalErrors.Remove(d.Id);
-                }
-                else _proposalErrors[d.Id] = result.ValidationError!;
+                _proposals.Remove(day);
+                _dismissed.Add(day);
             }
-            if (list.Count == 0) _proposals.Remove(day);
+            else needsWork.Add(day);
         }
         _accepting = false;
         await ReloadAsync();
+        if (needsWork.Count > 0)
+        {
+            _selectedDay = needsWork[0];
+            _acceptNotice = $"{needsWork.Count} {(needsWork.Count == 1 ? "day was" : "days were")} not saved because a row needs an issue or hours. Finish it below and press Save day.";
+        }
     }
 
     private async Task MarkDayOffAsync(ChangeEventArgs e)
@@ -396,15 +373,8 @@
     {
         await Calendar.UnmarkDayOffAsync(_selectedDay);
         await ReloadAsync();
-    }
-
-    private async Task RetryAsync(TimeEntry e)
-    {
-        if (Conn.Connection is not { } c) return;
-        _syncing = true;
-        await Sync.SyncAsync(c, e);
-        _syncing = false;
-        await ReloadAsync();
+        _dismissed.Remove(_selectedDay);
+        Suggest(_selectedDay);
     }
 
     private async Task SyncPeriodAsync()
@@ -419,31 +389,8 @@
     private void SelectDay(DateOnly day)
     {
         _selectedDay = day;
-        _draft = null;
-    }
-
-    private void NewEntry()
-    {
-        // Default to what the day is still missing, so one entry can finish it.
-        var missing = Missing(_selectedDay);
-        _draft = new TimeEntry { IssueKey = "", Date = _selectedDay, Duration = missing > TimeSpan.Zero ? missing : TimeSpan.Zero };
-        _draftIsNew = true;
-    }
-
-    private void Edit(TimeEntry e)
-    {
-        _draft = e;
-        _draftIsNew = false;
-    }
-
-    private async Task EditorDoneAsync()
-    {
-        var saved = _draft;
-        _draft = null;
-        await ReloadAsync();
-        // Follow the entry if its date was moved to another day in this period.
-        if (saved is not null && _entries.FirstOrDefault(e => e.Id == saved.Id) is { } moved && moved.Date != _selectedDay)
-            _selectedDay = moved.Date;
+        _acceptNotice = null;
+        Suggest(day);
     }
 
     private static TimeSpan Total(IEnumerable<TimeEntry> entries) => entries.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
