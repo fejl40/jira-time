@@ -159,4 +159,13 @@ public class WorklogImportTests : IDisposable
     [InlineData("\"  \"", null)]
     public void Comments_are_read_from_text_and_document_format(string json, string? expected) =>
         Assert.Equal(expected, JiraClient.CommentText(JsonDocument.Parse(json).RootElement));
+
+    [Theory]
+    [InlineData(3600, 60)]
+    [InlineData(5400, 90)]
+    [InlineData(89, 1)]
+    [InlineData(91, 2)]
+    [InlineData(10, 1)]
+    public void Imported_time_is_in_whole_minutes(int seconds, int minutes) =>
+        Assert.Equal(TimeSpan.FromMinutes(minutes), JiraClient.WholeMinutes(seconds));
 }

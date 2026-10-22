@@ -83,7 +83,7 @@ public class JiraClient(HttpClient http)
                     if (w.Id is null || !IsAuthor(w.Author, profile) || ParseStarted(w.Started) is not { } date) continue;
                     if (date < from || date > to) continue;
                     result.Add(new JiraWorklog(w.Id, issue.Key, issue.Fields?.Summary ?? "", date,
-                        TimeSpan.FromSeconds(w.TimeSpentSeconds), CommentText(w.Comment)));
+                        WholeMinutes(w.TimeSpentSeconds), CommentText(w.Comment)));
                 }
                 startAt += page.Worklogs.Count;
                 if (page.Worklogs.Count == 0 || startAt >= page.Total) break;
@@ -100,7 +100,7 @@ public class JiraClient(HttpClient http)
             var w = await GetAsync<RawJiraWorklog>(c,
                 $"{Api(c)}/issue/{Uri.EscapeDataString(issueKey)}/worklog/{Uri.EscapeDataString(worklogId)}", ct);
             return ParseStarted(w.Started) is { } date
-                ? new JiraWorklog(w.Id ?? worklogId, issueKey, "", date, TimeSpan.FromSeconds(w.TimeSpentSeconds), CommentText(w.Comment))
+                ? new JiraWorklog(w.Id ?? worklogId, issueKey, "", date, WholeMinutes(w.TimeSpentSeconds), CommentText(w.Comment))
                 : null;
         }
         catch (JiraException ex) when (ex.Status == HttpStatusCode.NotFound)
@@ -108,6 +108,9 @@ public class JiraClient(HttpClient http)
             return null;
         }
     }
+
+    /// <summary>Worklog time in whole minutes (at least one), the unit entries are kept in.</summary>
+    public static TimeSpan WholeMinutes(int seconds) => TimeSpan.FromMinutes(Math.Max(1, Math.Round(seconds / 60.0)));
 
     private static bool IsAuthor(RawUser? author, JiraProfile profile) =>
         author is not null && (author.AccountId == profile.Id || author.Key == profile.Id
