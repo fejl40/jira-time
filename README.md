@@ -84,9 +84,12 @@ optional comment. When during the day you did it doesn't matter. Jira needs a st
 worklog, so the app uses 09:00 on the row's day.
 
 Pick a day in the grid to edit it; the day is kept in the URL (`?day=2026-10-21`), so reload and
-back/forward keep it. A workday up to today that is short of its hours opens with a suggested row
-for the missing hours, on a best-guess issue: the one you last logged that day, then your In Progress
-sprint issue, then any sprint issue. Change the issue, hours or comment, **+ Add issue** for more rows
+back/forward keep it. A workday up to today that is short of its hours opens with suggested rows
+for the missing hours. An empty day copies the previous day with work (up to two weeks back): same
+issues and split, scaled to the missing hours in quarter hours, without comments. A partly logged day,
+or one with nothing to copy, gets the rest on a best-guess issue: the one you last logged that day,
+then your In Progress sprint issue, then any sprint issue. **Copy Mon 19 Oct** in the day view does
+the copy on demand. Change the issue, hours or comment, **+ Add issue** for more rows
 (or **Search Jira…** in the issue list), remove rows, then **Save day**. A removed row stays visible,
 struck through, with **Undo** until you save; saving deletes its worklog in Jira. Saving creates,
 updates and removes the day's worklogs in Jira to match. An added row left without hours or comment
@@ -99,7 +102,7 @@ Changing period, going to Settings, reloading or closing the tab asks first when
 something (untouched suggestions don't count).
 
 **Fill period** in the period header adds suggestions to every short workday so far (never future
-days). **Save all** asks for confirmation (days, hours and worklogs deleted), then saves every day
+days), in order, so each empty day copies the day before it as filled. **Save all** asks for confirmation (days, hours and worklogs deleted), then saves every day
 with unsaved changes at once; or open a day to adjust it first.
 
 ## Theme

@@ -97,6 +97,12 @@
         {
             <button type="button" class="btn-ghost" @onclick="FillRest">Fill the rest (@Format.Hours(Expected - Total) h)</button>
         }
+        @if (Previous is { } previous)
+        {
+            <button type="button" class="btn-ghost" data-copy-previous
+                    title="Same issues and split as @previous.Date.ToString("dddd d MMM", System.Globalization.CultureInfo.InvariantCulture), scaled to the hours missing"
+                    @onclick="CopyPrevious">Copy @previous.Date.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)</button>
+        }
     </div>
 
     @if (_errors.GetValueOrDefault(WorklogSync.DayResult.DayError) is { } dayError)
@@ -138,6 +144,8 @@
     [Parameter, EditorRequired] public JiraConnection Connection { get; set; } = default!;
     /// <summary>Hours the day should have (zero on weekends, holidays and days off).</summary>
     [Parameter] public TimeSpan Expected { get; set; }
+    /// <summary>The latest earlier day with work, offered to copy.</summary>
+    [Parameter] public (DateOnly Date, IReadOnlyList<TimeEntry> Rows)? Previous { get; set; }
     /// <summary>Raised after rows were added, edited or removed.</summary>
     [Parameter] public EventCallback OnChanged { get; set; }
     /// <summary>Raised after the day was saved.</summary>
@@ -257,6 +265,20 @@
         var current = Work.RowsToSave(Saved).Where(e => e.Duration > TimeSpan.Zero).ToList();
         var day = new DayInfo(Date, DayKind.Workday, null) { Hours = Expected };
         Work.Drafts.AddRange(DayFiller.Propose(day, current, Sprint));
+        return Changed();
+    }
+
+    /// <summary>
+    /// Adds the previous worked day's issues, scaled to the hours still missing (or as they were when
+    /// nothing is missing). Untouched suggestions are replaced by the copy.
+    /// </summary>
+    private Task CopyPrevious()
+    {
+        if (Previous is not { } previous) return Task.CompletedTask;
+        foreach (var d in Work.Drafts.Where(d => Work.Suggested.Contains(d.Id)).ToList()) Work.Drafts.Remove(d);
+        Work.Suggested.Clear();
+        var missing = Expected - Total;
+        Work.Drafts.AddRange(DayFiller.Copy(Date, previous.Rows, missing > TimeSpan.Zero ? missing : null));
         return Changed();
     }
 

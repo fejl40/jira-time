@@ -237,6 +237,7 @@
             <div class="mt-4">
                 <DayEditor @ref="_editor" Date="_selectedDay" Saved="DayEntries" Work="WorkFor(_selectedDay)"
                            Choices="Choices" Sprint="_sprint" Connection="connection" Expected="@(SelectedDay?.Expected ?? TimeSpan.Zero)"
+                           Previous="PreviousWorkedDay(_selectedDay)"
                            OnChanged="WorkChanged" OnSaved="DaySavedAsync" OnDiscard="() => Discard(_selectedDay)" />
             </div>
         }
@@ -254,6 +255,8 @@
 
     private Period _period;
     private IReadOnlyList<TimeEntry> _entries = [];
+    /// <summary>Saved work in the two weeks before the period, to copy from.</summary>
+    private IReadOnlyList<TimeEntry> _before = [];
     private IReadOnlyList<JiraIssue> _recent = [];
     private IReadOnlyList<SprintIssue> _sprint = [];
     private DateOnly _selectedDay;
@@ -406,6 +409,7 @@
     private async Task ReloadAsync()
     {
         _entries = await Entries.GetRangeAsync(_period.Start, _period.End);
+        _before = await Entries.GetRangeAsync(_period.Start.AddDays(-DayFiller.LookBackDays), _period.Start.AddDays(-1));
         _recent = await Entries.GetRecentIssuesAsync();
         _unsynced = (await Entries.GetUnsyncedAsync(_period.Start, _period.End)).Count;
         _days = await Calendar.GetDaysAsync(_period.Start, _period.End);
@@ -439,10 +443,19 @@
         if (!CanFill(day) || _dismissed.Contains(day) || !_days.TryGetValue(day, out var info)) return;
         var work = WorkFor(day);
         if (work.HasChanges(SavedOn(day)) || work.Drafts.Count > 0) return;
-        var drafts = DayFiller.Propose(info, SavedOn(day), _sprint);
+        var drafts = DayFiller.Propose(info, SavedOn(day), _sprint, PreviousWorkedDay(day)?.Rows);
         foreach (var d in drafts) work.Suggested.Add(d.Id);
         work.Drafts.AddRange(drafts);
     }
+
+    /// <summary>A day's rows as they will be once saved: saved work plus unsaved changes (suggestions too).</summary>
+    private IReadOnlyList<TimeEntry> RowsOn(DateOnly day) =>
+        !_period.Contains(day) ? _before.Where(e => e.Date == day).ToList()
+        : _work.TryGetValue(day, out var w) ? w.RowsToSave(SavedOn(day))
+        : SavedOn(day);
+
+    /// <summary>The latest day before this one with work, to copy.</summary>
+    private (DateOnly Date, IReadOnlyList<TimeEntry> Rows)? PreviousWorkedDay(DateOnly day) => DayFiller.PreviousWorkedDay(day, RowsOn);
 
     private void FillPeriod()
     {

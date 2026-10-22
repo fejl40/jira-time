@@ -81,8 +81,67 @@ public class DayFillerTests
         var plan = DayFiller.ProposePeriod(days, today: new DateOnly(2026, 10, 20), logged, [Doing]);
 
         Assert.Equal(new[] { "2026-10-15", "2026-10-19", "2026-10-20" }.Select(DateOnly.Parse), plan.Keys.Order());
-        Assert.Equal("XYZ-2 6h", Show(plan[Monday]));
-        Assert.Equal("ABC-1 8h", Show(plan[new DateOnly(2026, 10, 20)]));
+        Assert.Equal("ABC-1 8h", Show(plan[new DateOnly(2026, 10, 15)])); // nothing before it to copy
+        Assert.Equal("XYZ-2 6h", Show(plan[Monday]));                      // partly logged: the rest on the last issue
+        Assert.Equal("XYZ-2 8h", Show(plan[new DateOnly(2026, 10, 20)])); // copies Monday as filled
         Assert.All(plan, p => Assert.All(p.Value, d => Assert.Equal(p.Key, d.Date)));
+    }
+
+    [Fact]
+    public void An_empty_day_copies_the_previous_worked_day_scaled_to_the_missing_hours()
+    {
+        var friday = new DateOnly(2026, 10, 16);
+        var previous = new[] { E("XYZ-1", 6, friday), E("XYZ-2", 1.5, friday), E("XYZ-1", 0.5, friday) };
+        var shortDay = Workday with { Hours = TimeSpan.FromHours(4) };
+
+        Assert.Equal("XYZ-1 6.5h, XYZ-2 1.5h", Show(DayFiller.Propose(Workday, [], [Doing], previous)));
+        Assert.Equal("XYZ-1 3.25h, XYZ-2 0.75h", Show(DayFiller.Propose(shortDay, [], [Doing], previous)));
+    }
+
+    [Fact]
+    public void A_partly_logged_day_still_gets_the_rest_on_the_best_guess()
+    {
+        var previous = new[] { E("XYZ-1", 8, new DateOnly(2026, 10, 16)) };
+
+        Assert.Equal("ABC-5 6h", Show(DayFiller.Propose(Workday, [E("ABC-5", 2)], [Doing], previous)));
+    }
+
+    [Theory]
+    [InlineData(8, "XYZ-1 2.5h, XYZ-2 2.75h, XYZ-3 2.75h")]
+    [InlineData(1, "XYZ-1 0.5h, XYZ-2 0.25h, XYZ-3 0.25h")]
+    [InlineData(0.25, "XYZ-1 0.25h")]
+    public void Copies_are_in_quarter_hours_and_add_up_exactly(double target, string expected)
+    {
+        var source = new[] { E("XYZ-1", 1), E("XYZ-2", 1), E("XYZ-3", 1) };
+
+        var copy = DayFiller.Copy(Monday.AddDays(1), source, TimeSpan.FromHours(target));
+
+        Assert.Equal(expected, Show(copy));
+        Assert.Equal(TimeSpan.FromHours(target), copy.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration));
+        Assert.All(copy, e => Assert.Equal(Monday.AddDays(1), e.Date));
+    }
+
+    [Fact]
+    public void A_copy_without_target_keeps_the_hours_and_drops_comments_and_empty_rows()
+    {
+        var source = new[] { E("XYZ-1", 2), E("", 3), E("XYZ-2", 0) };
+        source[0].Description = "Standup";
+
+        var copy = DayFiller.Copy(Monday, source);
+
+        Assert.Equal("XYZ-1 2h", Show(copy));
+        Assert.Null(copy[0].Description);
+        Assert.NotEqual(source[0].Id, copy[0].Id);
+    }
+
+    [Fact]
+    public void The_previous_worked_day_is_found_within_two_weeks()
+    {
+        var thursday = new DateOnly(2026, 10, 15);
+        var rows = new Dictionary<DateOnly, IReadOnlyList<TimeEntry>> { [thursday] = [E("XYZ-1", 8, thursday)] };
+        IReadOnlyList<TimeEntry> On(DateOnly d) => rows.GetValueOrDefault(d) ?? [];
+
+        Assert.Equal(thursday, DayFiller.PreviousWorkedDay(Monday, On)?.Date);
+        Assert.Null(DayFiller.PreviousWorkedDay(thursday.AddDays(DayFiller.LookBackDays + 1), On));
     }
 }

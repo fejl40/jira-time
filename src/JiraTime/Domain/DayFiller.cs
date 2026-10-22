@@ -5,15 +5,28 @@ namespace JiraTime.Domain;
 /// </summary>
 public static class DayFiller
 {
+    /// <summary>How far back to look for a previous worked day to copy.</summary>
+    public const int LookBackDays = 14;
+
+    /// <summary>Copies are rounded to this step.</summary>
+    public static readonly TimeSpan Step = TimeSpan.FromMinutes(15);
+
     /// <summary>
-    /// One draft entry with the day's missing hours (up to <see cref="DayInfo.Target"/>) on the
+    /// Drafts for the day's missing hours (<see cref="DayInfo.Expected"/> minus what is logged).
+    /// An empty day copies <paramref name="previous"/> (the rows of the previous worked day), scaled
+    /// to the missing hours; otherwise, and when there is nothing to copy, one draft goes on the
     /// best-guess issue. Non-workdays and full days get nothing. When no issue can be guessed the
     /// draft's <see cref="TimeEntry.IssueKey"/> is empty.
     /// </summary>
-    public static IReadOnlyList<TimeEntry> Propose(DayInfo day, IReadOnlyList<TimeEntry> logged, IReadOnlyList<SprintIssue> sprint)
+    public static IReadOnlyList<TimeEntry> Propose(DayInfo day, IReadOnlyList<TimeEntry> logged, IReadOnlyList<SprintIssue> sprint,
+        IReadOnlyList<TimeEntry>? previous = null)
     {
-        var missing = day.Expected - logged.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
+        var total = logged.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
+        var missing = day.Expected - total;
         if (missing <= TimeSpan.Zero) return [];
+
+        if (total == TimeSpan.Zero && previous is not null && Copy(day.Date, previous, missing) is { Count: > 0 } copy)
+            return copy;
 
         var issue = GuessIssue(logged, sprint);
         return
@@ -29,15 +42,69 @@ public static class DayFiller
     }
 
     /// <summary>
-    /// <see cref="Propose"/> for every day up to and including <paramref name="today"/>; days that need
-    /// nothing are left out.
+    /// The issues of <paramref name="source"/> as new rows on <paramref name="date"/>, split like the
+    /// source and scaled to <paramref name="target"/> hours in quarter hours (null keeps the source hours).
+    /// Comments are not copied.
+    /// </summary>
+    public static IReadOnlyList<TimeEntry> Copy(DateOnly date, IReadOnlyList<TimeEntry> source, TimeSpan? target = null)
+    {
+        var issues = source
+            .Where(e => e.IssueKey != "" && e.Duration > TimeSpan.Zero)
+            .GroupBy(e => e.IssueKey)
+            .Select(g => (Key: g.Key, Summary: g.First().IssueSummary, Hours: g.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration)))
+            .ToList();
+        var total = issues.Aggregate(TimeSpan.Zero, (t, i) => t + i.Hours);
+        if (total == TimeSpan.Zero || target <= TimeSpan.Zero) return [];
+
+        var want = target ?? total;
+        var shares = issues.Select(i => RoundToStep(i.Hours * (want / total))).ToList();
+        // Put the rounding difference on the biggest share so the copy adds up exactly.
+        var biggest = shares.IndexOf(shares.Max());
+        shares[biggest] += want - shares.Aggregate(TimeSpan.Zero, (t, s) => t + s);
+
+        return issues.Zip(shares)
+            .Where(x => x.Second > TimeSpan.Zero)
+            .Select(x => new TimeEntry { IssueKey = x.First.Key, IssueSummary = x.First.Summary, Date = date, Duration = x.Second })
+            .ToList();
+    }
+
+    private static TimeSpan RoundToStep(TimeSpan t) =>
+        TimeSpan.FromTicks((long)Math.Round(t.Ticks / (double)Step.Ticks, MidpointRounding.AwayFromZero) * Step.Ticks);
+
+    /// <summary>
+    /// The rows of the latest day before <paramref name="date"/> (up to <see cref="LookBackDays"/> back)
+    /// that has hours, from <paramref name="rowsOn"/>; null when there is none.
+    /// </summary>
+    public static (DateOnly Date, IReadOnlyList<TimeEntry> Rows)? PreviousWorkedDay(DateOnly date, Func<DateOnly, IReadOnlyList<TimeEntry>> rowsOn)
+    {
+        for (var back = 1; back <= LookBackDays; back++)
+        {
+            var day = date.AddDays(-back);
+            var rows = rowsOn(day);
+            if (rows.Any(e => e.IssueKey != "" && e.Duration > TimeSpan.Zero)) return (day, rows);
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// <see cref="Propose"/> for every day up to and including <paramref name="today"/>, in order, each
+    /// empty day copying the day before it (with that day's suggestions); days that need nothing are left out.
     /// </summary>
     public static IReadOnlyDictionary<DateOnly, IReadOnlyList<TimeEntry>> ProposePeriod(
-        IEnumerable<DayInfo> days, DateOnly today, IReadOnlyList<TimeEntry> logged, IReadOnlyList<SprintIssue> sprint) =>
-        days.Where(d => d.Date <= today)
-            .Select(d => (d.Date, Drafts: Propose(d, logged.Where(e => e.Date == d.Date).ToList(), sprint)))
-            .Where(p => p.Drafts.Count > 0)
-            .ToDictionary(p => p.Date, p => p.Drafts);
+        IEnumerable<DayInfo> days, DateOnly today, IReadOnlyList<TimeEntry> logged, IReadOnlyList<SprintIssue> sprint)
+    {
+        var plan = new Dictionary<DateOnly, IReadOnlyList<TimeEntry>>();
+        IReadOnlyList<TimeEntry> RowsOn(DateOnly d) =>
+            logged.Where(e => e.Date == d).Concat(plan.GetValueOrDefault(d) ?? []).ToList();
+
+        foreach (var day in days.Where(d => d.Date <= today).OrderBy(d => d.Date))
+        {
+            var previous = PreviousWorkedDay(day.Date, RowsOn)?.Rows;
+            var drafts = Propose(day, logged.Where(e => e.Date == day.Date).ToList(), sprint, previous);
+            if (drafts.Count > 0) plan[day.Date] = drafts;
+        }
+        return plan;
+    }
 
     /// <summary>
     /// Best guess for the rest of a day: the issue last worked on that day, then an In Progress
