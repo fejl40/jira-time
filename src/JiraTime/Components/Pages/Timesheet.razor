@@ -236,7 +236,7 @@
         {
             <div class="mt-4">
                 <DayEditor @ref="_editor" Date="_selectedDay" Saved="DayEntries" Work="WorkFor(_selectedDay)"
-                           Choices="Choices" Sprint="_sprint" Connection="connection" Expected="@(SelectedDay?.Expected ?? TimeSpan.Zero)"
+                           Recent="_recent" Comments="_comments" Sprint="_sprint" Connection="connection" Expected="@(SelectedDay?.Expected ?? TimeSpan.Zero)"
                            Previous="PreviousWorkedDay(_selectedDay)"
                            OnChanged="WorkChanged" OnSaved="DaySavedAsync" OnDiscard="() => Discard(_selectedDay)" />
             </div>
@@ -258,6 +258,7 @@
     /// <summary>Saved work in the two weeks before the period, to copy from.</summary>
     private IReadOnlyList<TimeEntry> _before = [];
     private IReadOnlyList<JiraIssue> _recent = [];
+    private IReadOnlyDictionary<string, IReadOnlyList<string>> _comments = new Dictionary<string, IReadOnlyList<string>>();
     private IReadOnlyList<SprintIssue> _sprint = [];
     private DateOnly _selectedDay;
     private bool _loaded, _syncing;
@@ -411,6 +412,7 @@
         _entries = await Entries.GetRangeAsync(_period.Start, _period.End);
         _before = await Entries.GetRangeAsync(_period.Start.AddDays(-DayFiller.LookBackDays), _period.Start.AddDays(-1));
         _recent = await Entries.GetRecentIssuesAsync();
+        _comments = await Entries.GetRecentCommentsAsync();
         _unsynced = (await Entries.GetUnsyncedAsync(_period.Start, _period.End)).Count;
         _days = await Calendar.GetDaysAsync(_period.Start, _period.End);
         await LoadSprintAsync();
@@ -429,10 +431,6 @@
             _sprint = [];
         }
     }
-
-    /// <summary>Issues offered for suggestions: sprint first, then recent.</summary>
-    private IReadOnlyList<JiraIssue> Choices =>
-        _sprint.Select(i => i.ToIssue()).Concat(_recent).DistinctBy(i => i.Key).ToList();
 
     /// <summary>Only workdays up to today with hours missing can be filled.</summary>
     private bool CanFill(DateOnly day) => day <= _today && Missing(day) > TimeSpan.Zero;

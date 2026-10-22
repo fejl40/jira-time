@@ -73,8 +73,10 @@ local changes Jira doesn't have yet is left alone and sent to Jira instead.
 
 ## My sprint
 
-The entry editor shows the issues assigned to you in an open sprint (not Done) as
-quick picks, next to recently used issues. Tasks and stories both count. On Jira without sprints it
+The issue picker lists the issues assigned to you in an open sprint (not Done, with their status),
+then recently used issues. Typing filters both by key or summary and, from two characters, adds
+Jira search results; arrow keys, Enter and Escape work. The comment field suggests the latest
+comments you used on the row's issue. Tasks and stories both count. On Jira without sprints it
 falls back to all open issues assigned to you. The list is cached for five minutes.
 
 ## Logging a day
@@ -89,8 +91,7 @@ for the missing hours. An empty day copies the previous day with work (up to two
 issues and split, scaled to the missing hours in quarter hours, without comments. A partly logged day,
 or one with nothing to copy, gets the rest on a best-guess issue: the one you last logged that day,
 then your In Progress sprint issue, then any sprint issue. **Copy Mon 19 Oct** in the day view does
-the copy on demand. Change the issue, hours or comment, **+ Add issue** for more rows
-(or **Search Jira…** in the issue list), remove rows, then **Save day**. A removed row stays visible,
+the copy on demand. Change the issue, hours or comment, **+ Add issue** for more rows, remove rows, then **Save day**. A removed row stays visible,
 struck through, with **Undo** until you save; saving deletes its worklog in Jira. Saving creates,
 updates and removes the day's worklogs in Jira to match. An added row left without hours or comment
 is ignored. **Discard changes** drops what you haven't saved; a discarded or saved day isn't

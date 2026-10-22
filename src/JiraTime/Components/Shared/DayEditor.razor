@@ -23,30 +23,8 @@
                 else
                 {
                     <div class="min-w-56 flex-1 basis-64">
-                        @if (_searching.Contains(e.Id))
-                        {
-                            <Autocomplete TItem="JiraIssue" Id="@($"search-{e.Id}")" MinLength="1" Placeholder="Search by key or text"
-                                          Search="(q, ct) => Jira.SearchIssuesAsync(Connection, q, ct)"
-                                          TextOf="_ => string.Empty" OnSelected="i => PickIssue(row, i)">
-                                <ItemTemplate>
-                                    <div class="flex gap-2 text-sm">
-                                        <span class="flex-none font-semibold">@context.Key</span>
-                                        <span class="truncate text-slate-600 dark:text-slate-300">@context.Summary</span>
-                                    </div>
-                                </ItemTemplate>
-                            </Autocomplete>
-                        }
-                        else
-                        {
-                            <select class="field py-1.5" aria-label="Issue" value="@e.IssueKey" @onchange="ev => OnIssueSelected(row, ev)">
-                                <option value="">Choose issue…</option>
-                                @foreach (var i in ChoicesFor(e))
-                                {
-                                    <option value="@i.Key">@i.Key @i.Summary</option>
-                                }
-                                <option value="@SearchOption">Search Jira…</option>
-                            </select>
-                        }
+                        <IssuePicker Id="@($"issue-{e.Id}")" Value="new JiraIssue(e.IssueKey, e.IssueSummary)" Sprint="Sprint" Recent="Recent"
+                                     Search="(q, ct) => Jira.SearchIssuesAsync(Connection, q, ct)" OnSelected="i => PickIssue(row, i)" />
                     </div>
                     <div class="flex items-center gap-1">
                         <input type="text" inputmode="decimal" class="field w-20 py-1.5 text-right" aria-label="Hours" placeholder="h"
@@ -54,7 +32,7 @@
                         <span class="text-sm text-slate-500 dark:text-slate-400">h</span>
                     </div>
                     <input type="text" class="field min-w-40 flex-1 basis-48 py-1.5" aria-label="Comment" placeholder="Comment (optional)"
-                           data-comment value="@e.Description" @onchange="ev => SetDescription(row, ev)" />
+                           list="@CommentListId(e.IssueKey)" data-comment value="@e.Description" @onchange="ev => SetDescription(row, ev)" />
                     <span class="w-32 text-right text-xs" title="@e.SyncError">
                         @if (row.IsDraft)
                         {
@@ -90,6 +68,20 @@
             <li class="py-6 text-center text-sm text-slate-500 dark:text-slate-400">No work on this day.</li>
         }
     </ul>
+
+    @* Recent comments per issue, suggested by the comment fields. *@
+    @foreach (var key in Rows.Select(r => r.Entry.IssueKey).Where(k => k != "").Distinct())
+    {
+        @if (Comments.GetValueOrDefault(key) is { Count: > 0 } comments)
+        {
+            <datalist id="@CommentListId(key)">
+                @foreach (var c in comments)
+                {
+                    <option value="@c"></option>
+                }
+            </datalist>
+        }
+    }
 
     <div class="mt-3 flex flex-wrap items-center gap-2">
         <button type="button" class="btn-secondary" @onclick="AddRow">+ Add issue</button>
@@ -139,7 +131,10 @@
     [Parameter, EditorRequired] public IReadOnlyList<TimeEntry> Saved { get; set; } = [];
     /// <summary>The day's unsaved changes. Owned by the page, so the grid shows them and they outlive this editor.</summary>
     [Parameter, EditorRequired] public DayWork Work { get; set; } = default!;
-    [Parameter] public IReadOnlyList<JiraIssue> Choices { get; set; } = [];
+    /// <summary>Recently used issues, offered in the issue picker after the sprint.</summary>
+    [Parameter] public IReadOnlyList<JiraIssue> Recent { get; set; } = [];
+    /// <summary>Recent comments per issue key, newest first.</summary>
+    [Parameter] public IReadOnlyDictionary<string, IReadOnlyList<string>> Comments { get; set; } = new Dictionary<string, IReadOnlyList<string>>();
     [Parameter] public IReadOnlyList<SprintIssue> Sprint { get; set; } = [];
     [Parameter, EditorRequired] public JiraConnection Connection { get; set; } = default!;
     /// <summary>Hours the day should have (zero on weekends, holidays and days off).</summary>
@@ -153,8 +148,6 @@
     /// <summary>Raised when the user discards the unsaved changes.</summary>
     [Parameter] public EventCallback OnDiscard { get; set; }
 
-    private const string SearchOption = "__search";
-
     /// <param name="Saved">The stored entry for saved rows; null for new rows.</param>
     private record RowView(TimeEntry Entry, TimeEntry? Saved, bool Removed)
     {
@@ -162,7 +155,6 @@
     }
 
     private DateOnly? _loadedDate;
-    private readonly HashSet<string> _searching = [];
     private Dictionary<string, string> _errors = [];
     private string? _notice;
     private bool _busy;
@@ -189,7 +181,6 @@
         _loadedDate = Date;
         _errors = [];
         _notice = null;
-        _searching.Clear();
     }
 
     /// <summary>The entry to change for a row: the draft itself, or the copy of a saved entry.</summary>
@@ -203,28 +194,14 @@
     private string HoursText(TimeEntry e) =>
         Work.BadHours.TryGetValue(e.Id, out var text) ? text : Format.Hours(e.Duration);
 
-    private IEnumerable<JiraIssue> ChoicesFor(TimeEntry e) =>
-        e.IssueKey == "" || Choices.Any(c => c.Key == e.IssueKey)
-            ? Choices
-            : Choices.Prepend(new JiraIssue(e.IssueKey, e.IssueSummary));
-
-    private async Task OnIssueSelected(RowView row, ChangeEventArgs ev)
-    {
-        var key = ev.Value?.ToString() ?? "";
-        if (key == SearchOption)
-        {
-            _searching.Add(row.Entry.Id);
-            return;
-        }
-        await PickIssue(row, ChoicesFor(row.Entry).FirstOrDefault(c => c.Key == key) ?? new JiraIssue("", ""));
-    }
+    private static string CommentListId(string issueKey) =>
+        issueKey == "" ? "" : "comments-" + string.Concat(issueKey.Where(char.IsLetterOrDigit));
 
     private Task PickIssue(RowView row, JiraIssue issue)
     {
         var e = Editable(row);
         e.IssueKey = issue.Key;
         e.IssueSummary = issue.Summary;
-        _searching.Remove(e.Id);
         _errors.Remove(e.Id);
         return Changed();
     }
@@ -311,7 +288,6 @@
     {
         _errors = [];
         _notice = null;
-        _searching.Clear();
         await OnDiscard.InvokeAsync();
     }
 

@@ -1,0 +1,183 @@
+@implements IDisposable
+
+@* One box to choose an issue: lists sprint and recent issues on focus, filters them while typing
+   and adds Jira search results. Arrow keys, Enter and Escape work. *@
+<div class="relative" data-issue-picker>
+    <input id="@Id" type="text" class="field py-1.5" role="combobox" autocomplete="off" spellcheck="false"
+           aria-label="Issue" aria-autocomplete="list" aria-expanded="@(_open ? "true" : "false")"
+           placeholder="Choose issue…" value="@_text" onfocusin="this.select()"
+           @oninput="OnInput" @onkeydown="OnKeyDown" @onfocus="Open" @onblur="Close" />
+
+    @if (_open)
+    {
+        <ul role="listbox" class="absolute inset-x-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-lg bg-white p-1 shadow-lg ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+            @{ var index = 0; }
+            @foreach (var group in Groups)
+            {
+                <li class="px-2 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500" role="presentation">@group.Title</li>
+                @foreach (var item in group.Items)
+                {
+                    var i = index++;
+                    <li role="option" aria-selected="@(i == _active ? "true" : "false")" data-option="@item.Key"
+                        class="flex cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm @(i == _active ? "bg-blue-50 dark:bg-blue-950/60" : "")"
+                        @onmousedown="() => SelectAsync(item)" @onmousedown:preventDefault @onmouseover="() => _active = i">
+                        <span class="size-2.5 flex-none self-center rounded-full @IssueColors.For(item.Key)"></span>
+                        <span class="flex-none font-semibold">@item.Key</span>
+                        <span class="truncate text-slate-600 dark:text-slate-300">@item.Summary</span>
+                        @if (StatusOf(item.Key) is { } status)
+                        {
+                            <span class="ml-auto flex-none text-xs text-slate-400 dark:text-slate-500">@status</span>
+                        }
+                    </li>
+                }
+            }
+            @if (_searching)
+            {
+                <li class="px-2 py-1.5 text-sm text-slate-500 dark:text-slate-400">Searching Jira…</li>
+            }
+            else if (_searchError is not null)
+            {
+                <li class="px-2 py-1.5 text-sm text-red-600 dark:text-red-400">@_searchError</li>
+            }
+            else if (index == 0)
+            {
+                <li class="px-2 py-1.5 text-sm text-slate-500 dark:text-slate-400">@(IssueFilter.ShouldSearchJira(_query) ? "No matches" : "Type to search Jira")</li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    /// <summary>The chosen issue; empty key when none.</summary>
+    [Parameter] public JiraIssue Value { get; set; } = new("", "");
+    [Parameter] public IReadOnlyList<SprintIssue> Sprint { get; set; } = [];
+    [Parameter] public IReadOnlyList<JiraIssue> Recent { get; set; } = [];
+    [Parameter, EditorRequired] public Func<string, CancellationToken, Task<IReadOnlyList<JiraIssue>>> Search { get; set; } = default!;
+    [Parameter] public EventCallback<JiraIssue> OnSelected { get; set; }
+    [Parameter] public string? Id { get; set; }
+
+    private record Group(string Title, IReadOnlyList<JiraIssue> Items);
+
+    private string _text = "";
+    private string? _query;          // what the user typed; null while showing the chosen issue
+    private bool _open, _searching;
+    private string? _searchError;
+    private int _active;
+    private IReadOnlyList<JiraIssue> _jira = [];
+    private CancellationTokenSource? _cts;
+    private JiraIssue? _shown;
+
+    private static string Display(JiraIssue i) => i.Key == "" ? "" : $"{i.Key} {i.Summary}";
+
+    protected override void OnParametersSet()
+    {
+        if (_shown == Value) return;
+        _shown = Value;
+        if (!_open) _text = Display(Value);
+    }
+
+    private List<Group> Groups
+    {
+        get
+        {
+            var sprint = IssueFilter.Filter(Sprint.Select(s => s.ToIssue()), _query);
+            var recent = IssueFilter.Filter(Recent.Where(r => r.Key != "" && Sprint.All(s => s.Key != r.Key)), _query);
+            var known = sprint.Concat(recent).Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var jira = IssueFilter.ShouldSearchJira(_query) ? _jira.Where(i => !known.Contains(i.Key)).ToList() : [];
+            return new[] { new Group("My sprint", sprint), new Group("Recent", recent), new Group("Jira search", jira) }
+                .Where(g => g.Items.Count > 0).ToList();
+        }
+    }
+
+    private List<JiraIssue> Flat => Groups.SelectMany(g => g.Items).ToList();
+
+    private string? StatusOf(string key) => Sprint.FirstOrDefault(s => s.Key == key)?.Status;
+
+    private void Open()
+    {
+        _open = true;
+        _query = null;
+        _active = 0;
+    }
+
+    private void Close()
+    {
+        _cts?.Cancel();
+        _open = _searching = false;
+        _query = null;
+        _text = Display(Value);
+    }
+
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        _text = e.Value as string ?? "";
+        _query = _text;
+        _open = true;
+        _active = 0;
+        await SearchJiraAsync();
+    }
+
+    private async Task SearchJiraAsync()
+    {
+        _cts?.Cancel();
+        _searchError = null;
+        if (!IssueFilter.ShouldSearchJira(_query))
+        {
+            _jira = [];
+            _searching = false;
+            return;
+        }
+        var cts = _cts = new CancellationTokenSource();
+        var query = _query!.Trim();
+        _searching = true;
+        try
+        {
+            await Task.Delay(250, cts.Token);
+            var results = await Search(query, cts.Token);
+            if (cts.IsCancellationRequested) return;
+            _jira = results;
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _jira = [];
+            _searchError = $"Jira search failed: {ex.Message}";
+        }
+        _searching = false;
+    }
+
+    private async Task SelectAsync(JiraIssue issue)
+    {
+        _cts?.Cancel();
+        _open = _searching = false;
+        _query = null;
+        _text = Display(issue);
+        await OnSelected.InvokeAsync(issue);
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Escape":
+                Close();
+                return;
+            case "ArrowDown" or "ArrowUp" when !_open:
+                Open();
+                return;
+        }
+        var items = Flat;
+        if (!_open || items.Count == 0) return;
+        switch (e.Key)
+        {
+            case "ArrowDown": _active = (_active + 1) % items.Count; break;
+            case "ArrowUp": _active = (_active - 1 + items.Count) % items.Count; break;
+            case "Enter": await SelectAsync(items[Math.Clamp(_active, 0, items.Count - 1)]); break;
+        }
+    }
+
+    public void Dispose() => _cts?.Cancel();
+}

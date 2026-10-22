@@ -29,6 +29,27 @@ public class TimeEntryService(IDocumentStore store, CurrentUser user)
             .ToList();
     }
 
+    /// <summary>
+    /// The latest distinct comments per issue from the last 60 days, newest first, at most
+    /// <paramref name="perIssue"/> each. Offered as suggestions in the comment field.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> GetRecentCommentsAsync(int perIssue = 5)
+    {
+        var since = DateOnly.FromDateTime(DateTime.Today.AddDays(-60));
+        var owner = user.Owner;
+        var entries = await _docs.QueryAsync(e => e.Owner == owner && e.Date >= since && !e.DeletePending && e.Description != null);
+        return entries
+            .Where(e => !string.IsNullOrWhiteSpace(e.Description))
+            .GroupBy(e => e.IssueKey, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key,
+                g => (IReadOnlyList<string>)g.OrderByDescending(e => e.Date).ThenByDescending(e => e.UpdatedUtc)
+                    .Select(e => e.Description!.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Take(perIssue)
+                    .ToList(),
+                StringComparer.OrdinalIgnoreCase);
+    }
+
     public const string TooManyHours = "A day can't have more than 24 hours.";
 
     /// <summary>Rules for a single entry, without looking at the rest of its day.</summary>
