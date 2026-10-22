@@ -106,6 +106,14 @@ something (untouched suggestions don't count).
 days), in order, so each empty day copies the day before it as filled. **Save all** asks for confirmation (days, hours and worklogs deleted), then saves every day
 with unsaved changes at once; or open a day to adjust it first.
 
+### Keyboard and grid
+
+Outside a field, **←** and **→** move to the previous and next day and **N** adds a row (focused on
+its issue). **Enter** in an hours or comment field jumps to the next row's hours, **Esc** leaves a
+field, and **Ctrl+S** (**Cmd+S**) saves the day, also while typing. Picking a day in the grid header
+focuses its first hours field; clicking a cell opens that issue's row on that day, or adds an empty
+row for the issue (ignored if you leave it empty).
+
 ## Theme
 
 Light, dark or system (follows the OS). Switch with the icon in the header; the choice is kept in the browser.

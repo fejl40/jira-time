@@ -9,6 +9,7 @@
 @inject CurrentUser User
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@implements IAsyncDisposable
 
 <PageTitle>Timesheet · Jira Time</PageTitle>
 
@@ -82,7 +83,7 @@
                     @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
                     {
                         <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium" title="@DayTitle(day)">
-                            <button type="button" class="relative w-full px-1 py-2" @onclick="() => SelectDay(day)">
+                            <button type="button" class="relative w-full px-1 py-2" @onclick="() => SelectDay(day, focus: true)">
                                 <div class="uppercase">@day.ToString("ddd", CultureInfo.InvariantCulture)[..2]</div>
                                 <div class="text-sm @(day == _today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700 dark:text-slate-200")">@day.Day</div>
                                 @if (UnsavedDays.Contains(day))
@@ -117,7 +118,7 @@
                         @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
                         {
                             var saved = Total(row.Entries.Where(e => e.Date == day));
-                            <td class="@DayCellClass(day, i) cursor-pointer p-2 text-center tabular-nums" @onclick="() => SelectDay(day)">
+                            <td class="@DayCellClass(day, i) cursor-pointer p-2 text-center tabular-nums" @onclick="() => CellClicked(day, row)" title="@CellTitle(day, row)">
                                 @if (UnsavedFor(day, row.Key) is { } unsaved)
                                 {
                                     @if (saved > TimeSpan.Zero)
@@ -240,6 +241,10 @@
                            Previous="PreviousWorkedDay(_selectedDay)"
                            OnChanged="WorkChanged" OnSaved="DaySavedAsync" OnDiscard="() => Discard(_selectedDay)" />
             </div>
+            <p class="hint mt-4 hidden sm:block" data-shortcuts>
+                Keys: <kbd>←</kbd> <kbd>→</kbd> previous / next day · <kbd>N</kbd> add a row ·
+                <kbd>Enter</kbd> next row · <kbd>Esc</kbd> leave a field · <kbd>Ctrl</kbd>+<kbd>S</kbd> save the day
+            </p>
         }
     </section>
 </div>
@@ -580,10 +585,97 @@
     }
 
     /// <summary>Selects a day by putting it in the URL; <see cref="OnParametersSetAsync"/> shows it.</summary>
-    private void SelectDay(DateOnly day)
+    /// <param name="focus">Focus the day's first hours field once shown (picked with the mouse).</param>
+    private void SelectDay(DateOnly day, bool focus = false)
     {
+        if (focus) _focus = FirstHours;
         if (day == _selectedDay) return;
         Nav.NavigateTo($"{Link(Period.For(day))}?day={Format.Iso(day)}", replace: true);
+    }
+
+    private const string FirstHours = "";
+    /// <summary>Element id to focus after the next render; <see cref="FirstHours"/> for the day's first hours field.</summary>
+    private string? _focus;
+    private DotNetObjectReference<Timesheet>? _self;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_loaded) return;
+        if (_self is null)
+        {
+            _self = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("jiraKeys.attach", _self);
+        }
+        if (_focus is { } id)
+        {
+            _focus = null;
+            await JS.InvokeVoidAsync("jiraKeys.focus", id);
+        }
+    }
+
+    /// <summary>A grid cell: open the day on that issue's row, adding an empty row for it when the day has none.</summary>
+    private void CellClicked(DateOnly day, IssueRow row)
+    {
+        if (row.Key == "")
+        {
+            SelectDay(day, focus: true);
+            return;
+        }
+        Suggest(day);
+        var work = WorkFor(day);
+        var existing = SavedOn(day).Where(e => !work.IsRemoved(e)).Select(work.View)
+            .Concat(work.Drafts)
+            .FirstOrDefault(e => string.Equals(e.IssueKey, row.Key, StringComparison.OrdinalIgnoreCase));
+        if (existing is null)
+        {
+            existing = new TimeEntry { IssueKey = row.Key, IssueSummary = row.Summary, Date = day };
+            work.Drafts.Add(existing);
+        }
+        _focus = $"hours-{existing.Id}";
+        SelectDay(day);
+    }
+
+    private string CellTitle(DateOnly day, IssueRow row) =>
+        row.Key == "" ? "" : $"{row.Key} on {day.ToString("ddd d MMM", CultureInfo.InvariantCulture)}";
+
+    [JSInvokable]
+    public async Task SaveDayFromKeyboard()
+    {
+        if (_editor is null) return;
+        await InvokeAsync(async () =>
+        {
+            await _editor.SaveAsync();
+            StateHasChanged(); // shows the editor's errors when the day wasn't saved
+        });
+    }
+
+    [JSInvokable]
+    public Task MoveDay(int delta) => InvokeAsync(() => SelectDay(_selectedDay.AddDays(delta)));
+
+    [JSInvokable]
+    public async Task AddRowFromKeyboard()
+    {
+        if (_editor is null) return;
+        await InvokeAsync(async () =>
+        {
+            var row = await _editor.AddRowAsync();
+            _focus = $"issue-{row.Id}";
+            StateHasChanged();
+        });
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_self is null) return;
+        try
+        {
+            await JS.InvokeVoidAsync("jiraKeys.detach");
+        }
+        catch (JSDisconnectedException)
+        {
+            // The tab is gone; nothing to detach.
+        }
+        _self.Dispose();
     }
 
     private void ShowDay(DateOnly day)
