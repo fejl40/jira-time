@@ -18,36 +18,52 @@
 @if (_loaded)
 {
 <div class="mx-auto max-w-7xl space-y-6">
-    @* Period header *@
-    <div class="flex flex-wrap items-center gap-3">
+    @* Period header: navigation and title, one status line, one main action *@
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div class="flex items-center gap-1.5">
+            <a class="btn-secondary px-3" href="@Link(_period.Previous)" title="Previous period">‹</a>
+            <a class="btn-secondary" href="" title="Go to today">Today</a>
+            <a class="btn-secondary px-3" href="@Link(_period.Next)" title="Next period">›</a>
+        </div>
         <div>
-            <h1 class="text-xl font-semibold">Timesheet</h1>
-            <p class="text-sm text-slate-500 dark:text-slate-400">@Format.Range(_period.Start, _period.End)</p>
+            <h1 class="text-xl font-semibold leading-tight outline-none">@Format.Range(_period.Start, _period.End)</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400" data-period-status>
+                <span><span class="font-semibold text-slate-800 dark:text-slate-100">@HoursText(Summary.Logged)</span> logged</span>
+                @if (Summary.IsComplete(_unsynced, UnsavedDays.Count > 0))
+                {
+                    <span class="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" data-period-complete
+                          title="No workday up to today is short, nothing is unsaved and everything is in Jira">✓ Complete so far</span>
+                }
+                @if (Summary.Missing > TimeSpan.Zero)
+                {
+                    <span> · <span class="text-amber-700 dark:text-amber-400" title="Hours missing on workdays up to today">@Format.Hours(Summary.Missing) h missing</span></span>
+                }
+                @if (UnsavedDays.Count > 0)
+                {
+                    <span> · <span class="text-blue-700 dark:text-blue-300">unsaved on @Days(UnsavedDays.Count)</span></span>
+                }
+                @if (_unsynced > 0)
+                {
+                    <span> · <span class="text-amber-700 dark:text-amber-400" title="Saved here, but Jira doesn't have it yet">@_unsynced not in Jira</span></span>
+                }
+                <button class="btn-ghost ml-1 px-1.5 py-0.5 text-xs" disabled="@_syncing" @onclick="SyncPeriodAsync"
+                        title="Send what Jira is missing and read worklogs logged in Jira">@(_syncing ? "Syncing…" : _unsynced > 0 ? "Sync now" : "↻ Sync")</button>
+            </p>
         </div>
         <div class="ml-auto flex items-center gap-2">
-            @if (_unsynced > 0)
-            {
-                <span class="text-sm text-amber-700 dark:text-amber-400">@_unsynced not in Jira</span>
-                <button class="btn-secondary mr-3" disabled="@_syncing" @onclick="SyncPeriodAsync">@(_syncing ? "Syncing…" : "Sync now")</button>
-            }
-            <span class="mr-3 text-sm text-slate-500 dark:text-slate-400">Period total <span class="ml-1 text-base font-semibold text-slate-800 dark:text-slate-100">@(Format.Hours(Total(_entries)) is { Length: > 0 } t ? t : "0") h</span></span>
-            @if (PeriodMissing > TimeSpan.Zero)
-            {
-                <span class="mr-3 text-sm text-amber-700 dark:text-amber-400" title="Hours missing on workdays up to today">@Format.Hours(PeriodMissing) h missing</span>
-            }
-            @if (_period.Days.Any(d => CanFill(d) && !UnsavedDays.Contains(d)))
-            {
-                <button class="btn-secondary mr-1" title="Suggest work for every workday so far that is short of hours" @onclick="FillPeriod">Fill period</button>
-            }
             @if (UnsavedDays.Count > 0)
             {
-                <span class="text-sm text-blue-700 dark:text-blue-300">Unsaved changes on @Days(UnsavedDays.Count)</span>
-                <button class="btn-secondary" disabled="@_accepting" @onclick="DiscardAll">Discard all</button>
-                <button class="btn-primary mr-3" disabled="@_accepting" @onclick="AskSaveAll">@(_accepting ? "Saving…" : "Save all")</button>
+                <button class="btn-ghost" disabled="@_accepting" @onclick="DiscardAll">Discard all</button>
+                <button class="btn-primary" disabled="@_accepting" @onclick="AskSaveAll">@(_accepting ? "Saving…" : $"Save all ({Days(UnsavedDays.Count)})")</button>
             }
-            <a class="btn-secondary px-3" href="@Link(_period.Previous)" title="Previous period">‹</a>
-            <a class="btn-secondary" href="">Today</a>
-            <a class="btn-secondary px-3" href="@Link(_period.Next)" title="Next period">›</a>
+            else if (_period.Days.Any(CanFill))
+            {
+                <button class="btn-primary" title="Suggest work for every workday so far that is short of hours" @onclick="FillPeriod">Fill period</button>
+            }
+            @if (UnsavedDays.Count > 0 && _period.Days.Any(d => CanFill(d) && !UnsavedDays.Contains(d)))
+            {
+                <button class="btn-secondary order-first" title="Suggest work for every workday so far that is short of hours" @onclick="FillPeriod">Fill period</button>
+            }
         </div>
     </div>
 
@@ -65,6 +81,34 @@
         </div>
     }
 
+    @* Reminders: the end of this period, and a previous period that isn't done *@
+    @if (PeriodSummary.EndsSoon(_period, _today) && (Summary.Missing + Summary.StillToLog > TimeSpan.Zero || _unsynced > 0))
+    {
+        <div class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900" role="status" data-reminder="end">
+            The period ends @(_period.End == _today ? "today" : _period.End.ToString("dddd d MMM", CultureInfo.InvariantCulture)):
+            @string.Join(", ", new[]
+            {
+                Summary.Missing > TimeSpan.Zero ? $"{Format.Hours(Summary.Missing)} h missing so far" : null,
+                Summary.StillToLog > TimeSpan.Zero ? $"{Format.Hours(Summary.StillToLog)} h for the days left" : null,
+                _unsynced > 0 ? $"{_unsynced} not in Jira" : null,
+            }.Where(x => x is not null)).
+        </div>
+    }
+    @if (_previousOpen is { } prev && !_previousDismissed)
+    {
+        <div class="flex flex-wrap items-center gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900" role="status" data-reminder="previous">
+            <span>Last period (@Format.Range(prev.Period.Start, prev.Period.End)) isn't done:
+                @string.Join(", ", new[]
+                {
+                    prev.Missing > TimeSpan.Zero ? $"{Format.Hours(prev.Missing)} h missing" : null,
+                    prev.NotInJira > 0 ? $"{prev.NotInJira} not in Jira" : null,
+                }.Where(x => x is not null)).
+            </span>
+            <a class="btn-secondary ml-auto py-1" href="@Link(prev.Period)">Open it</a>
+            <button class="btn-ghost px-1.5" title="Hide until the page is reloaded" aria-label="Hide" @onclick="() => _previousDismissed = true">✕</button>
+        </div>
+    }
+
     @if (_importing)
     {
         <p class="-mt-3 text-xs text-slate-500 dark:text-slate-400" role="status">Checking Jira for worklogs…</p>
@@ -74,8 +118,39 @@
         <p class="-mt-3 text-xs text-slate-500 dark:text-slate-400" role="status" data-import-notice>@_importNotice</p>
     }
 
+    @* Narrow screens: a list of days instead of the grid *@
+    <ul class="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200 sm:hidden dark:divide-slate-800 dark:bg-slate-900 dark:ring-slate-700" data-day-list>
+        @foreach (var day in _period.Days)
+        {
+            var dayInfo = _days.GetValueOrDefault(day);
+            var logged = Total(SavedOn(day));
+            <li>
+                <button type="button" class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm @(day == _selectedDay ? "bg-blue-50 dark:bg-blue-950/60" : dayInfo is { IsWorkday: false } ? "bg-slate-50 dark:bg-slate-800/60" : "")"
+                        @onclick="() => SelectDay(day)">
+                    <span class="w-20 flex-none @(day == _today ? "font-semibold text-blue-700 dark:text-blue-400" : "")">@day.ToString("ddd d", CultureInfo.InvariantCulture)</span>
+                    <span class="flex-1 truncate text-xs text-slate-500 dark:text-slate-400">@(dayInfo is { IsWorkday: false } ? dayInfo.Name ?? "Weekend" : dayInfo?.HasPartialDayOff == true ? $"{dayInfo.Name} · {Format.Hours(dayInfo.Off)} h off" : "")</span>
+                    @if (HasSyncProblem(SavedOn(day)))
+                    {
+                        <span class="size-2 rounded-full bg-amber-500" title="Not in Jira"></span>
+                    }
+                    @if (UnsavedDays.Contains(day))
+                    {
+                        <span class="size-2 rounded-full bg-blue-600 dark:bg-blue-400" title="Unsaved changes"></span>
+                    }
+                    <span class="w-24 text-right tabular-nums">
+                        @(logged > TimeSpan.Zero || dayInfo is { Expected.Ticks: > 0 } ? HoursText(logged) : "")@if (dayInfo is { Expected: var exp } && exp > TimeSpan.Zero)
+                        {
+                            <span class="text-slate-400 dark:text-slate-500"> / @Format.Hours(exp)</span>
+                        }
+                    </span>
+                    <span class="w-14 text-right text-xs tabular-nums text-amber-700 dark:text-amber-400">@(Missing(day) is { } m && m > TimeSpan.Zero ? $"−{Format.Hours(m)}" : "")</span>
+                </button>
+            </li>
+        }
+    </ul>
+
     @* Period grid: issues × days *@
-    <div class="overflow-x-auto rounded-xl bg-white dark:bg-slate-900 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700">
+    <div class="hidden overflow-x-auto rounded-xl bg-white dark:bg-slate-900 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 sm:block">
         <table class="w-full border-collapse text-sm">
             <thead>
                 <tr class="border-b border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400">
@@ -117,8 +192,13 @@
                         </td>
                         @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
                         {
-                            var saved = Total(row.Entries.Where(e => e.Date == day));
-                            <td class="@DayCellClass(day, i) cursor-pointer p-2 text-center tabular-nums" @onclick="() => CellClicked(day, row)" title="@CellTitle(day, row)">
+                            var cellEntries = row.Entries.Where(e => e.Date == day).ToList();
+                            var saved = Total(cellEntries);
+                            <td class="@DayCellClass(day, i) relative cursor-pointer p-2 text-center tabular-nums" @onclick="() => CellClicked(day, row)" title="@CellTitle(day, row, cellEntries)">
+                                @if (HasSyncProblem(cellEntries))
+                                {
+                                    <span class="absolute right-1 top-1 size-1.5 rounded-full bg-amber-500" data-not-in-jira></span>
+                                }
                                 @if (UnsavedFor(day, row.Key) is { } unsaved)
                                 {
                                     @if (saved > TimeSpan.Zero)
@@ -151,6 +231,20 @@
                         <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@Format.Hours(Total(SavedOn(day)))</td>
                     }
                     <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(Total(_entries))</td>
+                </tr>
+                <tr class="bg-slate-50 dark:bg-slate-800/60 text-xs" data-week-totals>
+                    <td class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-4 py-2 font-semibold text-slate-500 dark:text-slate-400">Week</td>
+                    @foreach (var week in Summary.Weeks)
+                    {
+                        <td colspan="@week.Days" class="@(week.Start == _period.Start ? "" : "border-l-2 border-slate-300 dark:border-slate-600") px-2 py-2 text-center tabular-nums @(week.Expected > TimeSpan.Zero && week.Logged >= week.Expected ? "text-emerald-700 dark:text-emerald-400" : "text-slate-600 dark:text-slate-300")"
+                            title="Logged in the week (within this period) / hours the week needs">
+                            <span class="font-semibold">@HoursText(week.Logged)</span>@if (week.Expected > TimeSpan.Zero)
+                            {
+                                <span class="text-slate-400 dark:text-slate-500"> / @Format.Hours(week.Expected) h</span>
+                            }
+                        </td>
+                    }
+                    <td></td>
                 </tr>
                 @if (UnsavedDays.Count > 0)
                 {
@@ -291,6 +385,12 @@
 
     private IReadOnlyDictionary<DateOnly, DayInfo> _days = new Dictionary<DateOnly, DayInfo>();
 
+    private PeriodSummary Summary => PeriodSummary.For(_period, _days, _entries, _today);
+
+    /// <summary>The previous period, when this is the current one and the previous isn't done.</summary>
+    private (Period Period, TimeSpan Missing, int NotInJira)? _previousOpen;
+    private bool _previousDismissed;
+
     /// <summary>Unsaved changes per day (edits, removals, suggestions and added issues), kept while the period is open.</summary>
     private readonly Dictionary<DateOnly, DayWork> _work = [];
     /// <summary>Days the user saved or discarded; they are not suggested again until the page reloads.</summary>
@@ -335,7 +435,7 @@
             ? TimeSpan.Zero
             : WorkCalendarService.Missing(info, Total(SavedOn(day)));
 
-    private TimeSpan PeriodMissing => _period.Days.Aggregate(TimeSpan.Zero, (t, d) => t + Missing(d));
+    private TimeSpan PeriodMissing => Summary.Missing;
 
     private string? DayTitle(DateOnly day) => _days.GetValueOrDefault(day) switch
     {
@@ -420,7 +520,19 @@
         _comments = await Entries.GetRecentCommentsAsync();
         _unsynced = (await Entries.GetUnsyncedAsync(_period.Start, _period.End)).Count;
         _days = await Calendar.GetDaysAsync(_period.Start, _period.End);
+        await LoadPreviousAsync();
         await LoadSprintAsync();
+    }
+
+    /// <summary>Checks the period before the current one for missing hours or work not in Jira.</summary>
+    private async Task LoadPreviousAsync()
+    {
+        _previousOpen = null;
+        if (!_period.Contains(_today)) return;
+        var prev = _period.Previous;
+        var summary = PeriodSummary.For(prev, await Calendar.GetDaysAsync(prev.Start, prev.End), await Entries.GetRangeAsync(prev.Start, prev.End), _today);
+        var notInJira = (await Entries.GetUnsyncedAsync(prev.Start, prev.End)).Count;
+        if (summary.Missing > TimeSpan.Zero || notInJira > 0) _previousOpen = (prev, summary.Missing, notInJira);
     }
 
     /// <summary>Active-sprint issues for quick picks and suggestions. Jira being down just means no picks.</summary>
@@ -635,8 +747,17 @@
         SelectDay(day);
     }
 
-    private string CellTitle(DateOnly day, IssueRow row) =>
-        row.Key == "" ? "" : $"{row.Key} on {day.ToString("ddd d MMM", CultureInfo.InvariantCulture)}";
+    private static string CellTitle(DateOnly day, IssueRow row, IReadOnlyList<TimeEntry> entries)
+    {
+        if (row.Key == "") return "";
+        var title = $"{row.Key} on {day.ToString("ddd d MMM", CultureInfo.InvariantCulture)}";
+        var problems = entries.Where(e => !e.IsSynced).Select(e => e.SyncError ?? "Not sent to Jira yet").Distinct().ToList();
+        return problems.Count == 0 ? title : $"{title}\nNot in Jira: {string.Join("; ", problems)}";
+    }
+
+    private static bool HasSyncProblem(IEnumerable<TimeEntry> entries) => entries.Any(e => !e.IsSynced);
+
+    private static string HoursText(TimeSpan t) => $"{(Format.Hours(t) is { Length: > 0 } h ? h : "0")} h";
 
     [JSInvokable]
     public async Task SaveDayFromKeyboard()

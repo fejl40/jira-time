@@ -12,7 +12,7 @@
         @if (User.IsSignedIn)
         {
             <nav class="flex gap-1 text-sm">
-                <NavLink href="" Match="NavLinkMatch.All" class="rounded-md px-3 py-1.5 text-slate-300 hover:bg-white/10 hover:text-white" ActiveClass="!bg-white/15 !text-white">Timesheet</NavLink>
+                <a href="" class="rounded-md px-3 py-1.5 hover:bg-white/10 hover:text-white @(OnTimesheet ? "bg-white/15 text-white" : "text-slate-300")">Timesheet</a>
                 <NavLink href="settings" class="rounded-md px-3 py-1.5 text-slate-300 hover:bg-white/10 hover:text-white" ActiveClass="!bg-white/15 !text-white">Settings</NavLink>
             </nav>
         }
@@ -62,6 +62,15 @@
     private bool _ready, _verifying;
     private string? _verifyError;
 
+    private bool OnTimesheet
+    {
+        get
+        {
+            var path = Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0];
+            return path == "" || path.StartsWith("period/", StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
     private bool OnSetup => Nav.ToBaseRelativePath(Nav.Uri).StartsWith("setup", StringComparison.OrdinalIgnoreCase);
 
     protected override async Task OnInitializedAsync()
@@ -110,7 +119,7 @@
 
     private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
     {
-        if (_ready) return;
+        // The first navigation (to setup, when not signed in) ends the wait; every one moves the active nav link.
         _ready = true;
         InvokeAsync(StateHasChanged);
     }

@@ -106,6 +106,17 @@ something (untouched suggestions don't count).
 days), in order, so each empty day copies the day before it as filled. **Save all** asks for confirmation (days, hours and worklogs deleted), then saves every day
 with unsaved changes at once; or open a day to adjust it first.
 
+### Period header, grid and reminders
+
+The header has ‹ **Today** › next to the period, one status line (hours logged, missing, unsaved,
+not in Jira, with **Sync**) and one main action: **Save all** when something is unsaved, otherwise
+**Fill period** when days are short. When nothing up to today is short, nothing is unsaved and
+everything is in Jira, it says **Complete so far**. The grid marks cells whose work isn't in Jira
+with an amber dot (the reason is in the tooltip) and shows each week's hours against what the week
+needs. In the last three days of a period a banner sums up what is left, and when the previous
+period still has missing hours or work not in Jira a banner links to it. On narrow screens a list of
+days replaces the grid.
+
 ### Keyboard and grid
 
 Outside a field, **←** and **→** move to the previous and next day and **N** adds a row (focused on
