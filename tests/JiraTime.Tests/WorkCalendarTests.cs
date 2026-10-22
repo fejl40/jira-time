@@ -80,4 +80,113 @@ public class WorkCalendarTests
         await calendar.UnmarkDayOffAsync(day);
         Assert.Equal(DayKind.Workday, (await calendar.GetDayAsync(day)).Kind);
     }
+
+    private static (TempDir, FileDocumentStore, WorkCalendarService) Calendar()
+    {
+        var dir = new TempDir();
+        var store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = dir.Path });
+        return (dir, store, new WorkCalendarService(store, TestUsers.SignedIn()));
+    }
+
+    [Fact]
+    public async Task A_partial_day_off_lowers_the_expected_hours()
+    {
+        var (dir, store, calendar) = Calendar();
+        using var _ = dir; using var __ = store;
+        var day = D("2026-10-20");
+
+        await calendar.MarkDayOffAsync(day, DayOffReason.Other, TimeSpan.FromHours(3));
+        var partial = await calendar.GetDayAsync(day);
+        Assert.Equal(DayKind.Workday, partial.Kind);
+        Assert.True(partial.HasPartialDayOff);
+        Assert.Equal("Other", partial.Name);
+        Assert.Equal(TimeSpan.FromHours(5), partial.Expected);
+        Assert.Equal(TimeSpan.FromHours(1), WorkCalendarService.Missing(partial, TimeSpan.FromHours(4)));
+        Assert.Equal(TimeSpan.FromHours(5), DayFiller.Propose(partial, [], []).Single().Duration);
+
+        await calendar.UnmarkDayOffAsync(day);
+        Assert.Equal(TimeSpan.FromHours(8), (await calendar.GetDayAsync(day)).Expected);
+    }
+
+    [Theory]
+    [InlineData(8)]
+    [InlineData(10)]
+    public async Task Time_off_of_the_whole_day_or_more_is_a_day_off(double hours)
+    {
+        var (dir, store, calendar) = Calendar();
+        using var _ = dir; using var __ = store;
+        var day = D("2026-10-20");
+
+        await calendar.MarkDayOffAsync(day, DayOffReason.Sick, TimeSpan.FromHours(hours));
+
+        var info = await calendar.GetDayAsync(day);
+        Assert.Equal(DayKind.DayOff, info.Kind);
+        Assert.Equal(TimeSpan.Zero, info.Expected);
+    }
+
+    [Fact]
+    public async Task Work_hours_per_weekday_are_saved_per_user_and_used_for_every_day()
+    {
+        var (dir, store, calendar) = Calendar();
+        using var _ = dir; using var __ = store;
+        var week = UserSettings.StandardWeek();
+        week[DayOfWeek.Friday] = TimeSpan.FromHours(5);
+        week[DayOfWeek.Monday] = TimeSpan.FromHours(7.5);
+        week[DayOfWeek.Saturday] = TimeSpan.FromHours(2);
+        week[DayOfWeek.Wednesday] = TimeSpan.Zero;
+
+        Assert.Null(await calendar.SaveWorkHoursAsync(week));
+        var days = await calendar.GetDaysAsync(D("2026-10-19"), D("2026-10-25"));
+
+        Assert.Equal(TimeSpan.FromHours(7.5), days[D("2026-10-19")].Expected); // Monday
+        Assert.Equal(DayKind.Weekend, days[D("2026-10-21")].Kind);             // Wednesday, no hours
+        Assert.Equal(TimeSpan.FromHours(5), days[D("2026-10-23")].Expected);   // Friday
+        Assert.Equal(DayKind.Workday, days[D("2026-10-24")].Kind);             // Saturday with hours
+        Assert.Equal(TimeSpan.FromHours(2), days[D("2026-10-24")].Expected);
+        Assert.Equal(TimeSpan.Zero, days[D("2026-10-25")].Expected);           // Sunday
+
+        var anna = new WorkCalendarService(store, TestUsers.SignedIn(TestUsers.Anna));
+        Assert.Equal(TimeSpan.FromHours(8), (await anna.GetDayAsync(D("2026-10-23"))).Expected);
+    }
+
+    [Fact]
+    public async Task Partial_time_off_is_taken_from_the_users_hours_for_that_day()
+    {
+        var (dir, store, calendar) = Calendar();
+        using var _ = dir; using var __ = store;
+        var week = UserSettings.StandardWeek();
+        week[DayOfWeek.Friday] = TimeSpan.FromHours(6);
+        await calendar.SaveWorkHoursAsync(week);
+
+        await calendar.MarkDayOffAsync(D("2026-10-23"), DayOffReason.Other, TimeSpan.FromHours(2));
+
+        Assert.Equal(TimeSpan.FromHours(4), (await calendar.GetDayAsync(D("2026-10-23"))).Expected);
+    }
+
+    [Fact]
+    public async Task Holidays_need_no_hours_whatever_the_work_hours()
+    {
+        var (dir, store, calendar) = Calendar();
+        using var _ = dir; using var __ = store;
+
+        var goodFriday = await calendar.GetDayAsync(D("2026-04-03"));
+
+        Assert.Equal(DayKind.Holiday, goodFriday.Kind);
+        Assert.Equal(TimeSpan.Zero, goodFriday.Expected);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(25)]
+    [InlineData(7.501)]
+    public async Task Invalid_work_hours_are_not_saved(double hours)
+    {
+        var (dir, store, calendar) = Calendar();
+        using var _ = dir; using var __ = store;
+        var week = UserSettings.StandardWeek();
+        week[DayOfWeek.Monday] = TimeSpan.FromHours(hours);
+
+        Assert.NotNull(await calendar.SaveWorkHoursAsync(week));
+        Assert.Equal(TimeSpan.FromHours(8), (await calendar.GetDayAsync(D("2026-10-19"))).Expected);
+    }
 }

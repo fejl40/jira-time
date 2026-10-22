@@ -3,6 +3,7 @@
 @inject JiraIdentity Identity
 @inject ConnectionState Conn
 @inject NavigationManager Nav
+@inject WorkCalendarService Calendar
 
 <PageTitle>Settings · Jira Time</PageTitle>
 
@@ -38,9 +39,28 @@
         }
     </section>
 
-    <section class="card p-6">
-        <h2 class="font-semibold">Workdays</h2>
-        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Monday to Friday need 8 hours, except Danish public holidays and days you mark off.</p>
+    <section class="card p-6" data-work-hours>
+        <h2 class="font-semibold">Work hours</h2>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Hours each weekday needs. Danish public holidays and time you mark off are left out. A day with 0 hours is not a workday.</p>
+        <div class="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-7">
+            @foreach (var day in Week)
+            {
+                <label class="text-xs text-slate-500 dark:text-slate-400">
+                    @day.ToString()[..3]
+                    <input type="text" inputmode="decimal" class="field mt-1 py-1.5 text-right text-sm" aria-label="@day hours"
+                           value="@_hours.GetValueOrDefault(day)" @onchange="e => SetHours(day, e)" />
+                </label>
+            }
+        </div>
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+            <span class="text-sm text-slate-600 dark:text-slate-300">@(WeekTotal is { } t ? $"{Format.Hours(t)} h a week" : "")</span>
+            @if (_hoursMessage is not null)
+            {
+                <span class="text-sm @(_hoursSaved ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400")" role="status">@_hoursMessage</span>
+            }
+            <button class="btn-ghost ml-auto" @onclick="StandardWeek">8 h Monday to Friday</button>
+            <button class="btn-primary" @onclick="SaveHoursAsync">Save hours</button>
+        </div>
     </section>
 
     <section class="card p-6">
@@ -51,6 +71,54 @@
 </div>
 
 @code {
+    private static readonly DayOfWeek[] Week =
+        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+
+    private Dictionary<DayOfWeek, string> _hours = [];
+    private string? _hoursMessage;
+    private bool _hoursSaved;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!User.IsSignedIn) return;
+        Show((await Calendar.GetSettingsAsync()).WorkHours);
+    }
+
+    private void Show(IReadOnlyDictionary<DayOfWeek, TimeSpan> hours) =>
+        _hours = Week.ToDictionary(d => d, d => hours.GetValueOrDefault(d) is var h && h > TimeSpan.Zero ? Format.Hours(h) : "0");
+
+    private static TimeSpan? Read(string text) => text.Trim() is "" or "0" ? TimeSpan.Zero : Format.ParseHours(text);
+
+    private TimeSpan? WeekTotal => _hours.Values.Select(Read).Aggregate((TimeSpan?)TimeSpan.Zero, (t, h) => t + h);
+
+    private void SetHours(DayOfWeek day, ChangeEventArgs e)
+    {
+        _hours[day] = e.Value?.ToString() ?? "";
+        _hoursMessage = null;
+    }
+
+    private void StandardWeek()
+    {
+        Show(UserSettings.StandardWeek());
+        _hoursMessage = null;
+    }
+
+    private async Task SaveHoursAsync()
+    {
+        var parsed = new Dictionary<DayOfWeek, TimeSpan>();
+        foreach (var day in Week)
+        {
+            if (Read(_hours[day]) is not { } h)
+            {
+                (_hoursMessage, _hoursSaved) = ($"{day}: enter hours like 7.5 or 7:30.", false);
+                return;
+            }
+            parsed[day] = h;
+        }
+        var error = await Calendar.SaveWorkHoursAsync(parsed);
+        (_hoursMessage, _hoursSaved) = (error ?? "Saved.", error is null);
+        if (error is null) Show(parsed);
+    }
 
     private async Task DisconnectAsync()
     {

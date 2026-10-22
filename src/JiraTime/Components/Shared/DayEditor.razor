@@ -235,7 +235,7 @@
     private Task FillRest()
     {
         var current = Rows.Select(r => r.Entry).Where(e => e.Duration > TimeSpan.Zero).ToList();
-        var day = new DayInfo(Date, DayKind.Workday, null);
+        var day = new DayInfo(Date, DayKind.Workday, null) { Hours = Expected };
         Drafts.AddRange(DayFiller.Propose(day, current, Sprint));
         return Changed();
     }

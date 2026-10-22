@@ -1,9 +1,10 @@
 ---
 id: TASK-29
 title: Configurable workday hours
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-22T19:36:00Z'
+updated_date: '2026-10-22T19:39:00Z'
 labels: []
 dependencies: []
 priority: low
@@ -18,7 +19,13 @@ Hours per weekday are fixed at 8 Monday to Friday. Let each user set them, e.g. 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Settings has hours per weekday, saved per user
-- [ ] #2 Missing hours, suggestions and Fill period use them
-- [ ] #3 Covered by tests
+- [x] #1 Settings has hours per weekday, saved per user
+- [x] #2 Missing hours, suggestions and Fill period use them
+- [x] #3 Covered by tests
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+UserSettings document per user (user-settings collection) holds hours per weekday, default 8 h Monday to Friday. DanishHolidays.Classify takes the settings: a weekday with 0 hours is not a workday, a weekend day with hours is. DayInfo got Hours and Off; Expected = Hours - Off, so missing hours, suggestions and Fill period follow. Settings page has a Work hours card (7 inputs, weekly total, reset to standard, validation 0-24 h in whole minutes). Tests in WorkCalendarTests.
+<!-- SECTION:FINAL_SUMMARY:END -->

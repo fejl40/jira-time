@@ -44,7 +44,8 @@ in `data/documents/backups/` first, and nothing is deleted.
 | Jira URL, auth type, email, **token** | Browser `localStorage` (`jira-time.connection`), encrypted by the server |
 | Encryption keys | `data/keys/` on the server (DPAPI-protected on Windows) |
 | Users Jira confirmed (profile, hashes of confirmed tokens) | `data/documents/users/<owner>.json` |
-| Days off | `data/documents/days-off/<owner>-<date>.json` |
+| Days off (whole or partial) | `data/documents/days-off/<owner>-<date>.json` |
+| Work hours per weekday | `data/documents/user-settings/<owner>.json` |
 | Time entries | `data/documents/time-entries/<id>.json`, one file per entry, with its owner |
 | Copy of the data from before multi-user support | `data/documents/backups/` |
 
@@ -108,9 +109,10 @@ Periods are semi-monthly: the 1st to the 15th, and the 16th to the last day of t
 
 ## Workdays
 
-Monday to Friday need 8 hours. Danish public holidays are skipped automatically, and you can mark
-a day off (vacation, sick, other) from the day view. The grid shows the hours still missing on each
-workday up to today.
+Monday to Friday need 8 hours by default; set your own hours per weekday under **Settings → Work
+hours** (a day with 0 hours is not a workday). Danish public holidays are skipped automatically.
+**Time off…** in the day view marks a whole day or part of it off (vacation, sick, other); part of a
+day lowers the hours that day needs. The grid shows the hours still missing on each workday up to today.
 
 ## Tests
 

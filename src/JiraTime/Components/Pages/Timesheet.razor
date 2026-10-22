@@ -150,22 +150,43 @@
             }
             else if (SelectedDay is { Kind: DayKind.DayOff } off)
             {
-                <span class="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs text-slate-600 dark:text-slate-300">Day off · @off.Name</span>
+                <span class="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs text-slate-600 dark:text-slate-300" data-time-off>Day off · @off.Name</span>
                 <button class="btn-ghost text-xs" @onclick="UnmarkDayOffAsync">Undo</button>
             }
-            else if (SelectedDay is { Kind: DayKind.Workday })
+            else if (SelectedDay is { Kind: DayKind.Workday } work)
             {
                 @if (Missing(_selectedDay) is { } miss && miss > TimeSpan.Zero && _selectedDay <= _today)
                 {
                     <span class="text-sm text-amber-700 dark:text-amber-400">@Format.Hours(miss) h missing</span>
                 }
-                <select class="field w-auto py-1 text-xs" aria-label="Mark day off" value="" @onchange="MarkDayOffAsync">
-                    <option value="">Mark day off…</option>
-                    @foreach (var r in Enum.GetValues<DayOffReason>())
-                    {
-                        <option value="@r">@r</option>
-                    }
-                </select>
+                @if (work.HasPartialDayOff)
+                {
+                    <span class="rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs text-slate-600 dark:text-slate-300" data-time-off>@work.Name · @Format.Hours(work.Off) h off</span>
+                    <button class="btn-ghost text-xs" @onclick="UnmarkDayOffAsync">Undo</button>
+                }
+                else if (!_timeOffOpen)
+                {
+                    <button class="btn-ghost text-xs" @onclick="OpenTimeOff">Time off…</button>
+                }
+                @if (_timeOffOpen && !work.HasPartialDayOff)
+                {
+                    <span class="flex flex-wrap items-center gap-1.5 text-xs" data-time-off-form>
+                        <select class="field w-auto py-1 text-xs" aria-label="Reason" @bind="_timeOffReason">
+                            @foreach (var r in Enum.GetValues<DayOffReason>())
+                            {
+                                <option value="@r">@r</option>
+                            }
+                        </select>
+                        <input type="text" inputmode="decimal" class="field w-16 py-1 text-right text-xs" aria-label="Hours off" @bind="_timeOffHours" />
+                        <span class="text-slate-500 dark:text-slate-400">h of @Format.Hours(work.Hours) h</span>
+                        <button class="btn-secondary py-1 text-xs" @onclick="MarkDayOffAsync">Mark off</button>
+                        <button class="btn-ghost text-xs" @onclick="() => _timeOffOpen = false">Cancel</button>
+                        @if (_timeOffError is not null)
+                        {
+                            <span class="text-red-700 dark:text-red-400" role="alert">@_timeOffError</span>
+                        }
+                    </span>
+                }
             }
         </div>
 
@@ -361,12 +382,39 @@
         }
     }
 
-    private async Task MarkDayOffAsync(ChangeEventArgs e)
+    private bool _timeOffOpen;
+    private DayOffReason _timeOffReason = DayOffReason.Vacation;
+    private string _timeOffHours = "";
+    private string? _timeOffError;
+
+    private void OpenTimeOff()
     {
-        if (!Enum.TryParse<DayOffReason>(e.Value?.ToString(), out var reason)) return;
-        Discard(_selectedDay);
-        await Calendar.MarkDayOffAsync(_selectedDay, reason);
+        _timeOffOpen = true;
+        _timeOffError = null;
+        _timeOffHours = Format.Hours(SelectedDay?.Hours ?? DayInfo.Target);
+    }
+
+    /// <summary>Marks the selected day (or part of it) off. Hours equal to the whole day make it a day off.</summary>
+    private async Task MarkDayOffAsync()
+    {
+        if (SelectedDay is not { } day) return;
+        if (Format.ParseHours(_timeOffHours) is not { } hours)
+        {
+            _timeOffError = "Enter the hours off, e.g. 4.";
+            return;
+        }
+        _timeOffOpen = false;
+        var whole = hours >= day.Hours;
+        // A suggestion for the old hours no longer fits; rows the user added are kept.
+        var onlySuggested = DraftsFor(_selectedDay).All(d => _suggested.Contains(d.Id));
+        if (whole || onlySuggested) Discard(_selectedDay);
+        await Calendar.MarkDayOffAsync(_selectedDay, _timeOffReason, whole ? null : hours);
         await ReloadAsync();
+        if (!whole && onlySuggested)
+        {
+            _dismissed.Remove(_selectedDay);
+            Suggest(_selectedDay);
+        }
     }
 
     private async Task UnmarkDayOffAsync()
@@ -389,6 +437,7 @@
     private void SelectDay(DateOnly day)
     {
         _selectedDay = day;
+        _timeOffOpen = false;
         _acceptNotice = null;
         Suggest(day);
     }

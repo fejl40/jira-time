@@ -14,19 +14,60 @@ public class DayOff : IDocument
     public DateOnly Date { get; set; }
     public DayOffReason Reason { get; set; }
 
+    /// <summary>Hours off. Null (or at least the day's hours) means the whole day.</summary>
+    public TimeSpan? Hours { get; set; }
+
     public static string IdFor(string owner, DateOnly date) => $"{owner}-{date:yyyy-MM-dd}";
 }
 
 public enum DayKind { Workday, Weekend, Holiday, DayOff }
 
 /// <summary>What kind of day a date is and how many hours it should have.</summary>
+/// <param name="Name">Holiday name, or the reason for time off.</param>
 public record DayInfo(DateOnly Date, DayKind Kind, string? Name)
 {
-    /// <summary>Hours each workday should have.</summary>
+    /// <summary>Hours a workday has unless the user set other hours.</summary>
     public static readonly TimeSpan Target = TimeSpan.FromHours(8);
 
+    /// <summary>Hours this weekday has for the user, before time off.</summary>
+    public TimeSpan Hours { get; init; } = Target;
+
+    /// <summary>Part of a workday taken off (a partial day off). Zero otherwise.</summary>
+    public TimeSpan Off { get; init; }
+
     public bool IsWorkday => Kind == DayKind.Workday;
-    public TimeSpan Expected => IsWorkday ? Target : TimeSpan.Zero;
+    public bool HasPartialDayOff => IsWorkday && Off > TimeSpan.Zero;
+
+    /// <summary>Hours to log: the day's hours minus time off, zero on non-workdays.</summary>
+    public TimeSpan Expected => IsWorkday && Hours > Off ? Hours - Off : TimeSpan.Zero;
+}
+
+/// <summary>Hours each weekday needs, per user (id = owner).</summary>
+[DocumentCollection("user-settings")]
+public class UserSettings : IDocument
+{
+    public string Id { get; set; } = "";
+    public string? Owner { get; set; }
+
+    public Dictionary<DayOfWeek, TimeSpan> WorkHours { get; set; } = StandardWeek();
+
+    public TimeSpan HoursOn(DayOfWeek day) => WorkHours.GetValueOrDefault(day);
+
+    /// <summary>8 hours Monday to Friday.</summary>
+    public static Dictionary<DayOfWeek, TimeSpan> StandardWeek() =>
+        Enum.GetValues<DayOfWeek>().ToDictionary(d => d,
+            d => d is DayOfWeek.Saturday or DayOfWeek.Sunday ? TimeSpan.Zero : DayInfo.Target);
+
+    /// <returns>Why the hours can't be used, or null.</returns>
+    public static string? Validate(IReadOnlyDictionary<DayOfWeek, TimeSpan> hours)
+    {
+        foreach (var (day, h) in hours)
+        {
+            if (h < TimeSpan.Zero || h > TimeEntry.MaxDuration) return $"{day}: hours must be between 0 and 24.";
+            if (h.Ticks % TimeSpan.TicksPerMinute != 0) return $"{day}: hours must be whole minutes.";
+        }
+        return null;
+    }
 }
 
 /// <summary>Official Danish public holidays (helligdage).</summary>
@@ -66,12 +107,19 @@ public static class DanishHolidays
         return new DateOnly(year, month, day);
     }
 
-    /// <summary>The kind of day, given the days the user marked off.</summary>
-    public static DayInfo Classify(DateOnly date, IReadOnlyDictionary<DateOnly, DayOff> daysOff)
+    /// <summary>The kind of day and its hours, given the user's days off and work hours (default: 8 h Monday to Friday).</summary>
+    public static DayInfo Classify(DateOnly date, IReadOnlyDictionary<DateOnly, DayOff> daysOff, UserSettings? settings = null)
     {
-        if (NameOf(date) is { } holiday) return new DayInfo(date, DayKind.Holiday, holiday);
-        if (date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) return new DayInfo(date, DayKind.Weekend, null);
-        if (daysOff.TryGetValue(date, out var off)) return new DayInfo(date, DayKind.DayOff, off.Reason.ToString());
-        return new DayInfo(date, DayKind.Workday, null);
+        if (NameOf(date) is { } holiday) return new DayInfo(date, DayKind.Holiday, holiday) { Hours = TimeSpan.Zero };
+        var hours = (settings ?? new UserSettings()).HoursOn(date.DayOfWeek);
+        if (hours <= TimeSpan.Zero)
+            return new DayInfo(date, DayKind.Weekend, date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? null : "No work hours") { Hours = TimeSpan.Zero };
+        if (daysOff.TryGetValue(date, out var off))
+        {
+            if (off.Hours is not { } partial || partial >= hours)
+                return new DayInfo(date, DayKind.DayOff, off.Reason.ToString()) { Hours = hours, Off = hours };
+            return new DayInfo(date, DayKind.Workday, off.Reason.ToString()) { Hours = hours, Off = partial };
+        }
+        return new DayInfo(date, DayKind.Workday, null) { Hours = hours };
     }
 }
