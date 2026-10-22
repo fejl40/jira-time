@@ -29,6 +29,25 @@ public sealed class FakeJira : HttpMessageHandler
     /// <summary>Extra GET handlers: path (without query) → JSON response.</summary>
     public Dictionary<string, Func<Uri, object>> Gets { get; } = new();
 
+    /// <summary>Author put on worklogs that don't name one.</summary>
+    public JsonObject DefaultAuthor { get; set; } = new() { ["key"] = "JIRAUSER1", ["name"] = "carl" };
+
+    /// <summary>Issues the worklog search does not return yet (Jira's search index lagging behind).</summary>
+    public HashSet<string> NotIndexed { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Adds a worklog as if someone logged it in Jira directly.</summary>
+    public string AddWorklog(string issueKey, string started, int seconds, string? comment = null, JsonObject? author = null)
+    {
+        var id = (_nextId++).ToString();
+        var logs = Worklogs.TryGetValue(issueKey, out var l) ? l : Worklogs[issueKey] = [];
+        logs[id] = new JsonObject
+        {
+            ["started"] = started, ["timeSpentSeconds"] = seconds, ["comment"] = comment,
+            ["author"] = author ?? DefaultAuthor.DeepClone(),
+        };
+        return id;
+    }
+
     private int _nextId = 10000;
 
     public HttpClient Client() => new(this);
@@ -47,6 +66,17 @@ public sealed class FakeJira : HttpMessageHandler
         if (req.Method == HttpMethod.Get && Gets.TryGetValue(path, out var get))
             return Json(HttpStatusCode.OK, get(req.RequestUri));
 
+        // Worklog search: issues that have worklogs.
+        if (req.Method == HttpMethod.Get && (path.EndsWith("/search") || path.EndsWith("/search/jql")))
+        {
+            var keys = Worklogs.Where(w => w.Value.Count > 0 && !NotIndexed.Contains(w.Key)).Select(w => w.Key).ToList();
+            return Json(HttpStatusCode.OK, new
+            {
+                startAt = 0, total = keys.Count,
+                issues = keys.Select(k => new { key = k, fields = new { summary = $"Summary of {k}" } }),
+            });
+        }
+
         var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         // rest/api/{v}/issue/{key}/worklog[/{id}]
         if (parts.Length >= 6 && parts[3] == "issue" && parts[5] == "worklog")
@@ -61,8 +91,16 @@ public sealed class FakeJira : HttpMessageHandler
                 logs[newId] = body!;
                 return Json(HttpStatusCode.Created, new { id = newId });
             }
+            if (req.Method == HttpMethod.Get && id is null)
+                return Json(HttpStatusCode.OK, new JsonObject
+                {
+                    ["startAt"] = 0, ["total"] = logs.Count,
+                    ["worklogs"] = new JsonArray(logs.Select(w => (JsonNode)WithIdAndAuthor(w.Key, w.Value)).ToArray()),
+                });
             if (id is null || !logs.ContainsKey(id))
                 return Json(HttpStatusCode.NotFound, new { errorMessages = new[] { "Worklog not found" } });
+            if (req.Method == HttpMethod.Get)
+                return Json(HttpStatusCode.OK, WithIdAndAuthor(id, logs[id]));
             if (req.Method == HttpMethod.Put)
             {
                 logs[id] = body!;
@@ -75,6 +113,14 @@ public sealed class FakeJira : HttpMessageHandler
             }
         }
         return Json(HttpStatusCode.NotFound, new { errorMessages = new[] { "No such endpoint" } });
+    }
+
+    private JsonObject WithIdAndAuthor(string id, JsonNode body)
+    {
+        var o = body.DeepClone().AsObject();
+        o["id"] = id;
+        o["author"] ??= DefaultAuthor.DeepClone();
+        return o;
     }
 
     private static HttpResponseMessage Json(HttpStatusCode status, object body) =>

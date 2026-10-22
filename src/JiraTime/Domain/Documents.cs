@@ -59,6 +59,9 @@ public class TimeEntry : IDocument
     /// <summary>The issue the worklog lives on. Differs from <see cref="IssueKey"/> after the entry moved to another issue.</summary>
     public string? JiraWorklogIssueKey { get; set; }
 
+    /// <summary>The worklog was logged in Jira (not in this app) and imported.</summary>
+    public bool FromJira { get; set; }
+
     /// <summary>True when the entry changed locally and Jira has not caught up yet.</summary>
     public bool SyncPending { get; set; } = true;
 
@@ -117,6 +120,9 @@ public record JiraProfile(string Id, string? Username, string DisplayName, strin
 }
 
 public record JiraIssue(string Key, string Summary);
+
+/// <summary>A worklog as Jira has it, read back for import.</summary>
+public record JiraWorklog(string Id, string IssueKey, string IssueSummary, DateOnly Date, TimeSpan Duration, string? Comment);
 
 /// <summary>An issue assigned to the user in an open sprint.</summary>
 /// <param name="StatusCategory">Jira's status category key: "new", "indeterminate" (in progress) or "done".</param>

@@ -53,7 +53,7 @@
                     }
                     else if (e.IsSynced)
                     {
-                        <span class="text-emerald-700 dark:text-emerald-400">✓ In Jira</span>
+                        <span class="text-emerald-700 dark:text-emerald-400" title="@(e.FromJira ? "Logged in Jira and imported" : null)">✓ @(e.FromJira ? "From Jira" : "In Jira")</span>
                     }
                     else
                     {

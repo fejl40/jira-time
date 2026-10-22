@@ -63,6 +63,107 @@ public class JiraClient(HttpClient http)
             .ToList();
     }
 
+    /// <summary>
+    /// Worklogs <paramref name="profile"/> logged on days from <paramref name="from"/> to <paramref name="to"/>,
+    /// on any issue, however they were logged.
+    /// </summary>
+    public async Task<IReadOnlyList<JiraWorklog>> GetMyWorklogsAsync(JiraConnection c, JiraProfile profile, DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        var author = (profile.Username ?? profile.Id).Replace("\"", "\\\"");
+        var jql = $"worklogAuthor = \"{author}\" AND worklogDate >= \"{from:yyyy-MM-dd}\" AND worklogDate <= \"{to:yyyy-MM-dd}\"";
+        var result = new List<JiraWorklog>();
+        foreach (var issue in await SearchAllAsync(c, jql, ct))
+        {
+            for (var startAt = 0; ; )
+            {
+                var page = await GetAsync<WorklogPage>(c,
+                    $"{Api(c)}/issue/{Uri.EscapeDataString(issue.Key)}/worklog?startAt={startAt}&maxResults=1000", ct);
+                foreach (var w in page.Worklogs)
+                {
+                    if (w.Id is null || !IsAuthor(w.Author, profile) || ParseStarted(w.Started) is not { } date) continue;
+                    if (date < from || date > to) continue;
+                    result.Add(new JiraWorklog(w.Id, issue.Key, issue.Fields?.Summary ?? "", date,
+                        TimeSpan.FromSeconds(w.TimeSpentSeconds), CommentText(w.Comment)));
+                }
+                startAt += page.Worklogs.Count;
+                if (page.Worklogs.Count == 0 || startAt >= page.Total) break;
+            }
+        }
+        return result;
+    }
+
+    /// <summary>One worklog, or null when Jira no longer has it.</summary>
+    public async Task<JiraWorklog?> GetWorklogAsync(JiraConnection c, string issueKey, string worklogId, CancellationToken ct = default)
+    {
+        try
+        {
+            var w = await GetAsync<RawJiraWorklog>(c,
+                $"{Api(c)}/issue/{Uri.EscapeDataString(issueKey)}/worklog/{Uri.EscapeDataString(worklogId)}", ct);
+            return ParseStarted(w.Started) is { } date
+                ? new JiraWorklog(w.Id ?? worklogId, issueKey, "", date, TimeSpan.FromSeconds(w.TimeSpentSeconds), CommentText(w.Comment))
+                : null;
+        }
+        catch (JiraException ex) when (ex.Status == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsAuthor(RawUser? author, JiraProfile profile) =>
+        author is not null && (author.AccountId == profile.Id || author.Key == profile.Id
+                               || (profile.Username is not null && author.Name == profile.Username));
+
+    /// <summary>The day of a worklog's "started" value, as Jira wrote it (2026-10-19T09:00:00.000+0200).</summary>
+    public static DateOnly? ParseStarted(string? started) =>
+        started is { Length: >= 10 } && DateOnly.TryParseExact(started[..10], "yyyy-MM-dd", out var d) ? d : null;
+
+    /// <summary>Plain text of a worklog comment: a string on Server/DC, Atlassian Document Format on Cloud.</summary>
+    public static string? CommentText(JsonElement? comment)
+    {
+        if (comment is not { } c) return null;
+        string? text = c.ValueKind switch
+        {
+            JsonValueKind.String => c.GetString(),
+            JsonValueKind.Object => string.Join("\n", Paragraphs(c)),
+            _ => null,
+        };
+        return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+
+        static IEnumerable<string> Paragraphs(JsonElement doc) =>
+            doc.TryGetProperty("content", out var blocks) && blocks.ValueKind == JsonValueKind.Array
+                ? blocks.EnumerateArray().Select(b => string.Concat(Texts(b))).Where(t => t.Length > 0)
+                : [];
+
+        static IEnumerable<string> Texts(JsonElement node)
+        {
+            if (node.TryGetProperty("text", out var t) && t.ValueKind == JsonValueKind.String) yield return t.GetString()!;
+            if (node.TryGetProperty("content", out var kids) && kids.ValueKind == JsonValueKind.Array)
+                foreach (var kid in kids.EnumerateArray())
+                foreach (var s in Texts(kid))
+                    yield return s;
+        }
+    }
+
+    /// <summary>Every issue matching <paramref name="jql"/>, page by page.</summary>
+    private async Task<List<SearchIssue>> SearchAllAsync(JiraConnection c, string jql, CancellationToken ct)
+    {
+        var all = new List<SearchIssue>();
+        var path = c.IsCloud ? "/rest/api/3/search/jql" : "/rest/api/2/search";
+        string? token = null;
+        for (var page = 0; page < 50; page++)
+        {
+            var paging = c.IsCloud
+                ? (token is null ? "" : $"&nextPageToken={Uri.EscapeDataString(token)}")
+                : $"&startAt={all.Count}";
+            var result = await GetAsync<SearchResult>(c, $"{path}?jql={Uri.EscapeDataString(jql)}&fields=summary&maxResults=100{paging}", ct);
+            all.AddRange(result.Issues);
+            token = result.NextPageToken;
+            var more = c.IsCloud ? token is not null && result.IsLast != true : result.Total is { } total && all.Count < total;
+            if (!more || result.Issues.Count == 0) break;
+        }
+        return all;
+    }
+
     /// <summary>Creates a worklog for <paramref name="entry"/> on its issue.</summary>
     /// <returns>The new worklog id.</returns>
     public async Task<string> AddWorklogAsync(JiraConnection c, TimeEntry entry, CancellationToken ct = default)
@@ -183,7 +284,9 @@ public class JiraClient(HttpClient http)
     private record PickerSection(List<PickerIssue> Issues);
     private record PickerIssue(string Key, string? SummaryText);
     private record RawWorklog(string? Id);
-    private record SearchResult(List<SearchIssue> Issues);
+    private record SearchResult(List<SearchIssue> Issues, int? Total = null, string? NextPageToken = null, bool? IsLast = null);
+    private record WorklogPage(List<RawJiraWorklog> Worklogs, int Total);
+    private record RawJiraWorklog(string? Id, string? Started, int TimeSpentSeconds, JsonElement? Comment, RawUser? Author);
     private record SearchIssue(string Key, SearchFields? Fields);
     private record SearchFields(string? Summary, NamedField? IssueType, StatusField? Status);
     private record NamedField(string? Name);

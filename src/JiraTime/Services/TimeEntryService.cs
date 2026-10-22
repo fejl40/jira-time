@@ -85,6 +85,19 @@ public class TimeEntryService(IDocumentStore store, CurrentUser user)
     public async Task<IReadOnlyList<TimeEntry>> GetUnsyncedAsync(DateOnly from, DateOnly to) =>
         (await QueryMineAsync(from, to)).Where(e => !e.IsSynced).OrderBy(e => e.Date).ToList();
 
+    /// <summary>Every entry in the range, including removed work whose worklog delete is still pending.</summary>
+    public Task<IReadOnlyList<TimeEntry>> GetRangeWithRemovedAsync(DateOnly from, DateOnly to) => QueryMineAsync(from, to);
+
+    /// <summary>The user's entries linked to any of these Jira worklogs, on any day.</summary>
+    public async Task<IReadOnlyList<TimeEntry>> GetByWorklogIdsAsync(IReadOnlyCollection<string> worklogIds)
+    {
+        if (worklogIds.Count == 0) return [];
+        var owner = user.Owner;
+        var ids = worklogIds.ToHashSet();
+        return (await _docs.QueryAsync(e => e.Owner == owner && e.JiraWorklogId != null))
+            .Where(e => ids.Contains(e.JiraWorklogId!)).ToList();
+    }
+
     private Task<IReadOnlyList<TimeEntry>> QueryMineAsync(DateOnly from, DateOnly to)
     {
         var owner = user.Owner;

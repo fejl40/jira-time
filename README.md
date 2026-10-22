@@ -65,6 +65,12 @@ day view or use **Sync now** in the period header. Removing work deletes its wor
 logged hours go down. If Jira can't be reached then, the removal is remembered, counted under
 "not in Jira" and retried by **Sync now**.
 
+Worklogs you log in Jira directly (or with another tool) are imported when a period opens and with
+**Sync now**: they show as **From Jira** and count in totals, missing hours and suggestions. For work
+Jira already has, Jira wins: edits made there are copied here, and work deleted there is removed
+here (after checking the worklog itself, so a slow Jira search index can't drop anything). Work with
+local changes Jira doesn't have yet is left alone and sent to Jira instead.
+
 ## My sprint
 
 The entry editor shows the issues assigned to you in an open sprint (not Done) as
@@ -120,7 +126,7 @@ day lowers the hours that day needs. The grid shows the hours still missing on e
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the file document store, time entry rules, workdays, worklog sync, sprint issues and fill suggestions.
+xUnit tests in `tests/JiraTime.Tests` cover periods, the file document store, time entry rules, workdays, worklog sync and import, sprint issues and fill suggestions.
 
 ## Contributing
 

@@ -47,6 +47,15 @@
         </div>
     </div>
 
+    @if (_importing)
+    {
+        <p class="-mt-3 text-xs text-slate-500 dark:text-slate-400" role="status">Checking Jira for worklogs…</p>
+    }
+    else if (_importNotice is not null)
+    {
+        <p class="-mt-3 text-xs text-slate-500 dark:text-slate-400" role="status" data-import-notice>@_importNotice</p>
+    }
+
     @* Period grid: issues × days *@
     <div class="overflow-x-auto rounded-xl bg-white dark:bg-slate-900 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700">
         <table class="w-full border-collapse text-sm">
@@ -278,9 +287,49 @@
         _dismissed.Clear();
         _acceptNotice = null;
         await ReloadAsync();
-        Suggest(_selectedDay);
         _loaded = true;
+        await ImportAsync(); // renders the local hours first, then adds what Jira has
+        Suggest(_selectedDay);
     }
+
+    private bool _importing;
+    private string? _importNotice;
+
+    /// <summary>Brings in worklogs logged in Jira for the period. Jira being down only shows a notice.</summary>
+    private async Task ImportAsync()
+    {
+        _importNotice = null;
+        if (User is not { Connection: { } c, Profile: { } profile } || User.VerifiedOffline) return;
+        _importing = true;
+        StateHasChanged();
+        var period = _period;
+        try
+        {
+            var result = await Sync.ImportAsync(c, profile, period.Start, period.End);
+            if (period != _period) return; // moved on to another period meanwhile
+            if (result.Changes > 0)
+            {
+                await ReloadAsync();
+                _importNotice = ImportSummary(result);
+            }
+        }
+        catch (JiraException ex)
+        {
+            _importNotice = $"Couldn't read your worklogs from Jira: {ex.Message}";
+        }
+        finally
+        {
+            _importing = false;
+        }
+    }
+
+    private static string ImportSummary(WorklogSync.ImportResult r) =>
+        "From Jira: " + string.Join(", ", new[]
+        {
+            r.Added > 0 ? $"{r.Added} new {(r.Added == 1 ? "worklog" : "worklogs")}" : null,
+            r.Updated > 0 ? $"{r.Updated} changed" : null,
+            r.Removed > 0 ? $"{r.Removed} deleted" : null,
+        }.Where(x => x is not null)) + ".";
 
     private async Task ReloadAsync()
     {
@@ -430,6 +479,7 @@
         if (Conn.Connection is not { } c) return;
         _syncing = true;
         await Sync.SyncRangeAsync(c, _period.Start, _period.End);
+        await ImportAsync();
         _syncing = false;
         await ReloadAsync();
     }

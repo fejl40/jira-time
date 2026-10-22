@@ -118,6 +118,87 @@ public class WorklogSync(JiraClient jira, TimeEntryService entries)
         return entry.SyncError;
     }
 
+    /// <summary>What <see cref="ImportAsync"/> changed locally.</summary>
+    public record ImportResult(int Added, int Updated, int Removed)
+    {
+        public int Changes => Added + Updated + Removed;
+    }
+
+    /// <summary>
+    /// Brings the user's worklogs in Jira for the range into the timesheet. Worklogs logged elsewhere
+    /// are added (marked <see cref="TimeEntry.FromJira"/>); entries Jira already has take Jira's issue,
+    /// day, hours and comment; entries whose worklog is gone from Jira are removed. Entries with
+    /// local changes Jira doesn't have yet are left alone: they are sent to Jira instead.
+    /// </summary>
+    public async Task<ImportResult> ImportAsync(JiraConnection c, JiraProfile profile, DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        var remote = await jira.GetMyWorklogsAsync(c, profile, from, to, ct);
+        var remoteIds = remote.Select(w => w.Id).ToHashSet();
+        var inRange = await entries.GetRangeWithRemovedAsync(from, to);
+        var linked = inRange.Concat(await entries.GetByWorklogIdsAsync(remoteIds))
+            .Where(e => e.JiraWorklogId is not null)
+            .DistinctBy(e => e.Id)
+            .GroupBy(e => e.JiraWorklogId!)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        int added = 0, updated = 0, removed = 0;
+        foreach (var w in remote)
+        {
+            if (linked.TryGetValue(w.Id, out var e))
+            {
+                if (e.SyncPending || e.DeletePending) continue; // ours is newer; Sync sends it
+                if (string.Equals(e.IssueKey, w.IssueKey, StringComparison.OrdinalIgnoreCase) && e.Date == w.Date
+                    && e.Duration == w.Duration && (e.Description ?? "") == (w.Comment ?? "")) continue;
+                e.IssueKey = e.JiraWorklogIssueKey = w.IssueKey;
+                e.IssueSummary = w.IssueSummary;
+                e.Date = w.Date;
+                e.Duration = w.Duration;
+                e.Description = w.Comment;
+                e.UpdatedUtc = DateTime.UtcNow;
+                await entries.SaveSyncStateAsync(e);
+                updated++;
+            }
+            else
+            {
+                await entries.SaveSyncStateAsync(new TimeEntry
+                {
+                    IssueKey = w.IssueKey,
+                    IssueSummary = w.IssueSummary,
+                    Date = w.Date,
+                    Duration = w.Duration,
+                    Description = w.Comment,
+                    JiraWorklogId = w.Id,
+                    JiraWorklogIssueKey = w.IssueKey,
+                    SyncPending = false,
+                    FromJira = true,
+                });
+                added++;
+            }
+        }
+
+        // Not found by the search: deleted in Jira, moved to another day there, or Jira's search index
+        // hasn't caught up yet. Ask for the worklog itself before dropping anything.
+        foreach (var e in inRange.Where(e => e.IsSynced && !e.DeletePending && !remoteIds.Contains(e.JiraWorklogId!)))
+        {
+            var w = await jira.GetWorklogAsync(c, e.JiraWorklogIssueKey ?? e.IssueKey, e.JiraWorklogId!, ct);
+            if (w is null)
+            {
+                await entries.DeleteAsync(e.Id);
+                removed++;
+            }
+            else if (w.Date != e.Date || w.Duration != e.Duration || (w.Comment ?? "") != (e.Description ?? ""))
+            {
+                e.Date = w.Date;
+                e.Duration = w.Duration;
+                e.Description = w.Comment;
+                e.UpdatedUtc = DateTime.UtcNow;
+                await entries.SaveSyncStateAsync(e);
+                updated++;
+            }
+        }
+        return new ImportResult(added, updated, removed);
+    }
+
     /// <summary>Retries every entry in the range that Jira doesn't have yet.</summary>
     /// <returns>How many entries are still not synced afterwards.</returns>
     public async Task<int> SyncRangeAsync(JiraConnection c, DateOnly from, DateOnly to, CancellationToken ct = default)
