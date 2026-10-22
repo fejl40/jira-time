@@ -1,4 +1,5 @@
-@* One day's work as editable rows. Nothing is written until Save day, which also updates Jira. *@
+@* One day's work as editable rows. Nothing is written until Save day, which also updates Jira.
+   The unsaved changes live in a DayWork owned by the page, so they survive picking another day. *@
 @inject JiraClient Jira
 @inject WorklogSync Sync
 
@@ -7,65 +8,78 @@
         @foreach (var row in Rows)
         {
             var e = row.Entry;
-            <li class="flex flex-wrap items-center gap-2 py-2.5 @(row.IsDraft ? "-mx-2 rounded-md bg-blue-50/60 px-2 dark:bg-blue-950/30" : "")" data-row="@(row.IsDraft ? "draft" : "saved")">
+            <li class="flex flex-wrap items-center gap-2 py-2.5 @RowClass(row)" data-row="@(row.Removed ? "removed" : row.IsDraft ? "draft" : "saved")">
                 <span class="size-2.5 flex-none rounded-full @(e.IssueKey == "" ? "bg-slate-300" : IssueColors.For(e.IssueKey))"></span>
-                <div class="min-w-56 flex-1 basis-64">
-                    @if (_searching.Contains(e.Id))
-                    {
-                        <Autocomplete TItem="JiraIssue" Id="@($"search-{e.Id}")" MinLength="1" Placeholder="Search by key or text"
-                                      Search="(q, ct) => Jira.SearchIssuesAsync(Connection, q, ct)"
-                                      TextOf="_ => string.Empty" OnSelected="i => PickIssue(e, i)">
-                            <ItemTemplate>
-                                <div class="flex gap-2 text-sm">
-                                    <span class="flex-none font-semibold">@context.Key</span>
-                                    <span class="truncate text-slate-600 dark:text-slate-300">@context.Summary</span>
-                                </div>
-                            </ItemTemplate>
-                        </Autocomplete>
-                    }
-                    else
-                    {
-                        <select class="field py-1.5" aria-label="Issue" value="@e.IssueKey" @onchange="ev => OnIssueSelected(e, ev)">
-                            <option value="">Choose issue…</option>
-                            @foreach (var i in ChoicesFor(e))
-                            {
-                                <option value="@i.Key">@i.Key @i.Summary</option>
-                            }
-                            <option value="@SearchOption">Search Jira…</option>
-                        </select>
-                    }
-                </div>
-                <div class="flex items-center gap-1">
-                    <input type="text" inputmode="decimal" class="field w-20 py-1.5 text-right" aria-label="Hours" placeholder="h"
-                           value="@HoursText(e)" @onchange="ev => SetHours(e, ev)" />
-                    <span class="text-sm text-slate-500 dark:text-slate-400">h</span>
-                </div>
-                <input type="text" class="field min-w-40 flex-1 basis-48 py-1.5" aria-label="Comment" placeholder="Comment (optional)"
-                       value="@e.Description" @onchange="ev => SetDescription(e, ev)" />
-                <span class="w-24 text-right text-xs" title="@e.SyncError">
-                    @if (row.IsDraft)
-                    {
-                        <span class="font-medium text-blue-700 dark:text-blue-300">@(row.Suggested ? "Suggested" : "New")</span>
-                    }
-                    else if (IsChanged(e))
-                    {
-                        <span class="font-medium text-blue-700 dark:text-blue-300">Changed</span>
-                    }
-                    else if (e.IsSynced)
-                    {
-                        <span class="text-emerald-700 dark:text-emerald-400" title="@(e.FromJira ? "Logged in Jira and imported" : null)">✓ @(e.FromJira ? "From Jira" : "In Jira")</span>
-                    }
-                    else
-                    {
-                        <span class="font-medium text-amber-700 dark:text-amber-400">Not in Jira</span>
-                    }
-                </span>
-                <button type="button" class="btn-ghost" title="Remove" aria-label="Remove" @onclick="() => Remove(row)">✕</button>
+                @if (row.Removed)
+                {
+                    <div class="min-w-56 flex-1 basis-64 truncate text-sm text-slate-500 line-through dark:text-slate-400">
+                        <span class="font-semibold">@e.IssueKey</span> @e.IssueSummary
+                    </div>
+                    <span class="w-20 text-right text-sm tabular-nums text-slate-500 line-through dark:text-slate-400">@Format.Hours(e.Duration) h</span>
+                    <span class="min-w-40 flex-1 basis-48 truncate text-sm text-slate-500 line-through dark:text-slate-400">@e.Description</span>
+                    <span class="w-48 text-right text-xs font-medium text-red-700 dark:text-red-400">@(e.JiraWorklogId is null ? "Removed" : "Deletes the worklog in Jira")</span>
+                    <button type="button" class="btn-ghost text-xs" title="Keep this row" @onclick="() => Restore(row)">Undo</button>
+                }
+                else
+                {
+                    <div class="min-w-56 flex-1 basis-64">
+                        @if (_searching.Contains(e.Id))
+                        {
+                            <Autocomplete TItem="JiraIssue" Id="@($"search-{e.Id}")" MinLength="1" Placeholder="Search by key or text"
+                                          Search="(q, ct) => Jira.SearchIssuesAsync(Connection, q, ct)"
+                                          TextOf="_ => string.Empty" OnSelected="i => PickIssue(row, i)">
+                                <ItemTemplate>
+                                    <div class="flex gap-2 text-sm">
+                                        <span class="flex-none font-semibold">@context.Key</span>
+                                        <span class="truncate text-slate-600 dark:text-slate-300">@context.Summary</span>
+                                    </div>
+                                </ItemTemplate>
+                            </Autocomplete>
+                        }
+                        else
+                        {
+                            <select class="field py-1.5" aria-label="Issue" value="@e.IssueKey" @onchange="ev => OnIssueSelected(row, ev)">
+                                <option value="">Choose issue…</option>
+                                @foreach (var i in ChoicesFor(e))
+                                {
+                                    <option value="@i.Key">@i.Key @i.Summary</option>
+                                }
+                                <option value="@SearchOption">Search Jira…</option>
+                            </select>
+                        }
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <input type="text" inputmode="decimal" class="field w-20 py-1.5 text-right" aria-label="Hours" placeholder="h"
+                               id="hours-@e.Id" data-hours value="@HoursText(e)" @onchange="ev => SetHours(row, ev)" />
+                        <span class="text-sm text-slate-500 dark:text-slate-400">h</span>
+                    </div>
+                    <input type="text" class="field min-w-40 flex-1 basis-48 py-1.5" aria-label="Comment" placeholder="Comment (optional)"
+                           data-comment value="@e.Description" @onchange="ev => SetDescription(row, ev)" />
+                    <span class="w-32 text-right text-xs" title="@e.SyncError">
+                        @if (row.IsDraft)
+                        {
+                            <span class="font-medium text-blue-700 dark:text-blue-300">@(Work.Suggested.Contains(e.Id) ? "Suggested" : "New")</span>
+                        }
+                        else if (Work.IsChanged(row.Saved!))
+                        {
+                            <span class="font-medium text-blue-700 dark:text-blue-300">Changed</span>
+                        }
+                        else if (e.IsSynced)
+                        {
+                            <span class="text-emerald-700 dark:text-emerald-400" title="@(e.FromJira ? "Logged in Jira and imported" : null)">✓ @(e.FromJira ? "From Jira" : "In Jira")</span>
+                        }
+                        else
+                        {
+                            <span class="font-medium text-amber-700 dark:text-amber-400">Not in Jira</span>
+                        }
+                    </span>
+                    <button type="button" class="btn-ghost" title="Remove" aria-label="Remove" @onclick="() => Remove(row)">✕</button>
+                }
                 @if (_errors.GetValueOrDefault(e.Id) is { } error)
                 {
                     <span class="basis-full pl-5 text-xs text-red-700 dark:text-red-400" role="alert">@error</span>
                 }
-                else if (!row.IsDraft && !e.IsSynced && e.SyncError is not null && !IsChanged(e))
+                else if (!row.IsDraft && !row.Removed && !e.IsSynced && e.SyncError is not null && !Work.IsChanged(row.Saved!))
                 {
                     <span class="basis-full pl-5 text-xs text-amber-700 dark:text-amber-400">Jira: @e.SyncError</span>
                 }
@@ -102,12 +116,12 @@
                 <span class="text-slate-500 dark:text-slate-400"> of @Format.Hours(Expected) h</span>
             }
         </span>
-        @if (IsDirty)
+        @if (HasChanges)
         {
             <span class="text-xs text-blue-700 dark:text-blue-300">Unsaved changes</span>
             <button type="button" class="btn-secondary ml-auto" disabled="@_busy" @onclick="ResetAsync">Discard changes</button>
         }
-        <button type="button" class="btn-primary @(IsDirty ? "" : "ml-auto")" disabled="@(_busy || !IsDirty)" @onclick="SaveAsync">
+        <button type="button" class="btn-primary @(HasChanges ? "" : "ml-auto")" disabled="@(_busy || !CanSave)" @onclick="SaveAsync" data-save-day>
             @(_busy ? "Saving…" : "Save day")
         </button>
     </div>
@@ -117,16 +131,14 @@
     [Parameter, EditorRequired] public DateOnly Date { get; set; }
     /// <summary>The day's saved entries.</summary>
     [Parameter, EditorRequired] public IReadOnlyList<TimeEntry> Saved { get; set; } = [];
-    /// <summary>Unsaved new rows for the day (suggestions and added issues). Shared with the page so the grid shows them.</summary>
-    [Parameter, EditorRequired] public List<TimeEntry> Drafts { get; set; } = [];
-    /// <summary>Ids of drafts that came from a suggestion rather than + Add issue.</summary>
-    [Parameter] public IReadOnlySet<string> SuggestedIds { get; set; } = new HashSet<string>();
+    /// <summary>The day's unsaved changes. Owned by the page, so the grid shows them and they outlive this editor.</summary>
+    [Parameter, EditorRequired] public DayWork Work { get; set; } = default!;
     [Parameter] public IReadOnlyList<JiraIssue> Choices { get; set; } = [];
     [Parameter] public IReadOnlyList<SprintIssue> Sprint { get; set; } = [];
     [Parameter, EditorRequired] public JiraConnection Connection { get; set; } = default!;
     /// <summary>Hours the day should have (zero on weekends, holidays and days off).</summary>
     [Parameter] public TimeSpan Expected { get; set; }
-    /// <summary>Raised after drafts were added, edited or removed.</summary>
+    /// <summary>Raised after rows were added, edited or removed.</summary>
     [Parameter] public EventCallback OnChanged { get; set; }
     /// <summary>Raised after the day was saved.</summary>
     [Parameter] public EventCallback<WorklogSync.DayResult> OnSaved { get; set; }
@@ -135,71 +147,73 @@
 
     private const string SearchOption = "__search";
 
-    private record RowView(TimeEntry Entry, bool IsDraft, bool Suggested);
+    /// <param name="Saved">The stored entry for saved rows; null for new rows.</param>
+    private record RowView(TimeEntry Entry, TimeEntry? Saved, bool Removed)
+    {
+        public bool IsDraft => Saved is null;
+    }
 
-    private string? _loadedKey;
     private DateOnly? _loadedDate;
-    private List<TimeEntry> _copies = [];
     private readonly HashSet<string> _searching = [];
-    private readonly Dictionary<string, string> _hoursText = [];
     private Dictionary<string, string> _errors = [];
     private string? _notice;
     private bool _busy;
 
     private List<RowView> Rows =>
-        _copies.Select(c => new RowView(c, false, false))
-            .Concat(Drafts.Select(d => new RowView(d, true, SuggestedIds.Contains(d.Id))))
+        Saved.Select(s => new RowView(Work.View(s), s, Work.IsRemoved(s)))
+            .Concat(Work.Drafts.Select(d => new RowView(d, null, false)))
             .ToList();
 
-    private TimeSpan Total => Rows.Aggregate(TimeSpan.Zero, (t, r) => t + r.Entry.Duration);
+    private TimeSpan Total => Work.Total(Saved);
 
-    private bool IsChanged(TimeEntry copy) =>
-        Saved.FirstOrDefault(s => s.Id == copy.Id) is { } s
-        && (s.IssueKey != copy.IssueKey || s.Duration != copy.Duration || s.Description != copy.Description);
+    private bool HasChanges => Work.HasChanges(Saved);
 
-    private bool IsDirty =>
-        Drafts.Count > 0 || _copies.Count != Saved.Count || _copies.Any(IsChanged) || Saved.Any(s => !s.IsSynced);
+    /// <summary>Save day also retries saved work that Jira doesn't have yet.</summary>
+    private bool CanSave => HasChanges || Saved.Any(s => !s.IsSynced);
+
+    private static string RowClass(RowView row) =>
+        row.Removed ? "-mx-2 rounded-md bg-red-50/60 px-2 dark:bg-red-950/20"
+        : row.IsDraft ? "-mx-2 rounded-md bg-blue-50/60 px-2 dark:bg-blue-950/30" : "";
 
     protected override void OnParametersSet()
     {
-        // Reload the working copies when the day or its saved entries change, not on every re-render.
-        var key = $"{Date}|{string.Join(',', Saved.Select(s => $"{s.Id}:{s.UpdatedUtc.Ticks}:{s.IsSynced}"))}";
-        if (key == _loadedKey) return;
-        _loadedKey = key;
-        LoadCopies();
-        _errors = [];
-        if (_loadedDate != Date) _notice = null; // keep "saved, but…" after a save
+        if (_loadedDate == Date) return;
         _loadedDate = Date;
-    }
-
-    private void LoadCopies()
-    {
-        _copies = Saved.Select(s => s.Copy()).ToList();
-        _hoursText.Clear();
+        _errors = [];
+        _notice = null;
         _searching.Clear();
     }
 
+    /// <summary>The entry to change for a row: the draft itself, or the copy of a saved entry.</summary>
+    private TimeEntry Editable(RowView row)
+    {
+        if (row.Saved is { } s) return Work.Edit(s);
+        Work.Touched(row.Entry);
+        return row.Entry;
+    }
+
     private string HoursText(TimeEntry e) =>
-        _hoursText.TryGetValue(e.Id, out var text) ? text : Format.Hours(e.Duration);
+        Work.BadHours.TryGetValue(e.Id, out var text) ? text : Format.Hours(e.Duration);
 
     private IEnumerable<JiraIssue> ChoicesFor(TimeEntry e) =>
         e.IssueKey == "" || Choices.Any(c => c.Key == e.IssueKey)
             ? Choices
             : Choices.Prepend(new JiraIssue(e.IssueKey, e.IssueSummary));
 
-    private async Task OnIssueSelected(TimeEntry e, ChangeEventArgs ev)
+    private async Task OnIssueSelected(RowView row, ChangeEventArgs ev)
     {
         var key = ev.Value?.ToString() ?? "";
         if (key == SearchOption)
         {
-            _searching.Add(e.Id);
+            _searching.Add(row.Entry.Id);
             return;
         }
-        await PickIssue(e, ChoicesFor(e).FirstOrDefault(c => c.Key == key) ?? new JiraIssue("", ""));
+        await PickIssue(row, ChoicesFor(row.Entry).FirstOrDefault(c => c.Key == key) ?? new JiraIssue("", ""));
     }
 
-    private Task PickIssue(TimeEntry e, JiraIssue issue)
+    private Task PickIssue(RowView row, JiraIssue issue)
     {
+        var e = Editable(row);
         e.IssueKey = issue.Key;
         e.IssueSummary = issue.Summary;
         _searching.Remove(e.Id);
@@ -207,44 +221,61 @@
         return Changed();
     }
 
-    private Task SetHours(TimeEntry e, ChangeEventArgs ev)
+    private Task SetHours(RowView row, ChangeEventArgs ev)
     {
+        var e = Editable(row);
         var text = ev.Value?.ToString() ?? "";
         var hours = Format.ParseHours(text);
         // Keep what was typed when it can't be read; Save day reports it.
-        if (hours is null && text.Trim() != "") _hoursText[e.Id] = text;
-        else _hoursText.Remove(e.Id);
+        if (hours is null && text.Trim() != "") Work.BadHours[e.Id] = text;
+        else Work.BadHours.Remove(e.Id);
         e.Duration = hours ?? TimeSpan.Zero;
         _errors.Remove(e.Id);
         return Changed();
     }
 
-    private Task SetDescription(TimeEntry e, ChangeEventArgs ev)
+    private Task SetDescription(RowView row, ChangeEventArgs ev)
     {
         var text = ev.Value?.ToString()?.Trim();
-        e.Description = string.IsNullOrEmpty(text) ? null : text;
+        Editable(row).Description = string.IsNullOrEmpty(text) ? null : text;
         return Changed();
     }
 
-    private Task AddRow()
+    /// <summary>Adds an empty row, optionally on an issue. Returns it so the caller can focus it.</summary>
+    public async Task<TimeEntry> AddRowAsync(JiraIssue? issue = null)
     {
-        Drafts.Add(new TimeEntry { IssueKey = "", Date = Date });
-        return Changed();
+        var draft = new TimeEntry { IssueKey = issue?.Key ?? "", IssueSummary = issue?.Summary ?? "", Date = Date };
+        Work.Drafts.Add(draft);
+        await Changed();
+        return draft;
     }
+
+    private Task AddRow() => AddRowAsync();
 
     private Task FillRest()
     {
-        var current = Rows.Select(r => r.Entry).Where(e => e.Duration > TimeSpan.Zero).ToList();
+        var current = Work.RowsToSave(Saved).Where(e => e.Duration > TimeSpan.Zero).ToList();
         var day = new DayInfo(Date, DayKind.Workday, null) { Hours = Expected };
-        Drafts.AddRange(DayFiller.Propose(day, current, Sprint));
+        Work.Drafts.AddRange(DayFiller.Propose(day, current, Sprint));
         return Changed();
     }
 
     private Task Remove(RowView row)
     {
-        if (row.IsDraft) Drafts.Remove(row.Entry);
-        else _copies.Remove(row.Entry);
+        if (row.Saved is { } s) Work.Removed.Add(s.Id);
+        else
+        {
+            Work.Drafts.Remove(row.Entry);
+            Work.Suggested.Remove(row.Entry.Id);
+            Work.BadHours.Remove(row.Entry.Id);
+        }
         _errors.Remove(row.Entry.Id);
+        return Changed();
+    }
+
+    private Task Restore(RowView row)
+    {
+        Work.Removed.Remove(row.Saved!.Id);
         return Changed();
     }
 
@@ -256,29 +287,28 @@
 
     private async Task ResetAsync()
     {
-        LoadCopies();
         _errors = [];
         _notice = null;
+        _searching.Clear();
         await OnDiscard.InvokeAsync();
     }
 
-    private async Task SaveAsync()
+    /// <summary>Saves the day's rows and updates Jira. Public for the Ctrl+S shortcut.</summary>
+    public async Task SaveAsync()
     {
-        foreach (var (id, _) in _hoursText) _errors[id] = "Enter the hours, e.g. 1.5 or 1:30.";
-        if (_hoursText.Count > 0) return;
+        if (_busy || !CanSave) return;
+        foreach (var (id, _) in Work.BadHours) _errors[id] = "Enter the hours, e.g. 1.5 or 1:30.";
+        if (Work.BadHours.Count > 0) return;
 
         _busy = true;
-        var rows = Rows.Select(r => r.Entry).ToList();
-        var result = await Sync.SaveDayAsync(Connection, Date, rows);
+        var result = await Sync.SaveDayAsync(Connection, Date, Work.RowsToSave(Saved));
         _busy = false;
         _errors = result.Errors.ToDictionary();
         if (!result.Saved) return;
 
-        Drafts.Clear();
         _notice = result.SyncFailures > 0
             ? $"Saved, but {result.SyncFailures} {(result.SyncFailures == 1 ? "change" : "changes")} could not be sent to Jira yet. Use Sync now to retry."
             : null;
-        _loadedKey = null; // reload copies from the fresh saved entries
         await OnSaved.InvokeAsync(result);
     }
 }

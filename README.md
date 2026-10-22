@@ -83,16 +83,24 @@ Time is logged per day: each row is an issue, a number of hours (`1.5`, `1,5` or
 optional comment. When during the day you did it doesn't matter. Jira needs a start time on each
 worklog, so the app uses 09:00 on the row's day.
 
-Pick a day in the grid to edit it. A workday up to today that is short of 8 h opens with a
-suggested row for the missing hours, on a best-guess issue: the one you last logged that day, then
-your In Progress sprint issue, then any sprint issue. Change the issue, hours or comment, **+ Add
-issue** for more rows (or **Search Jira…** in the issue list), remove rows, then **Save day**. Saving
-creates, updates and removes the day's worklogs in Jira to match. **Discard changes** drops what you
-haven't saved; a discarded or saved day isn't suggested again until you reload.
+Pick a day in the grid to edit it; the day is kept in the URL (`?day=2026-10-21`), so reload and
+back/forward keep it. A workday up to today that is short of its hours opens with a suggested row
+for the missing hours, on a best-guess issue: the one you last logged that day, then your In Progress
+sprint issue, then any sprint issue. Change the issue, hours or comment, **+ Add issue** for more rows
+(or **Search Jira…** in the issue list), remove rows, then **Save day**. A removed row stays visible,
+struck through, with **Undo** until you save; saving deletes its worklog in Jira. Saving creates,
+updates and removes the day's worklogs in Jira to match. An added row left without hours or comment
+is ignored. **Discard changes** drops what you haven't saved; a discarded or saved day isn't
+suggested again until you reload.
+
+Unsaved changes are kept per day while the period is open, so you can move between days and come
+back to them. Days with unsaved changes get a blue dot in the grid, and changed hours show dashed.
+Changing period, going to Settings, reloading or closing the tab asks first when you changed
+something (untouched suggestions don't count).
 
 **Fill period** in the period header adds suggestions to every short workday so far (never future
-days). Unsaved hours show dashed in the grid with an **Unsaved** row; **Save all** saves every day
-at once, or open a day to adjust it first.
+days). **Save all** asks for confirmation (days, hours and worklogs deleted), then saves every day
+with unsaved changes at once; or open a day to adjust it first.
 
 ## Theme
 

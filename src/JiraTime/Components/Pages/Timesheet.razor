@@ -8,8 +8,11 @@
 @inject SprintIssues Sprint
 @inject CurrentUser User
 @inject NavigationManager Nav
+@inject IJSRuntime JS
 
 <PageTitle>Timesheet · Jira Time</PageTitle>
+
+<NavigationLock ConfirmExternalNavigation="@HasUnsaved" OnBeforeInternalNavigation="ConfirmLeaveAsync" />
 
 @if (_loaded)
 {
@@ -31,21 +34,35 @@
             {
                 <span class="mr-3 text-sm text-amber-700 dark:text-amber-400" title="Hours missing on workdays up to today">@Format.Hours(PeriodMissing) h missing</span>
             }
-            @if (_period.Days.Any(d => CanFill(d) && !DraftDays.Contains(d)))
+            @if (_period.Days.Any(d => CanFill(d) && !UnsavedDays.Contains(d)))
             {
-                <button class="btn-secondary mr-1" title="Suggest work for every workday so far that is short of 8 hours" @onclick="FillPeriod">Fill period</button>
+                <button class="btn-secondary mr-1" title="Suggest work for every workday so far that is short of hours" @onclick="FillPeriod">Fill period</button>
             }
-            @if (DraftDays.Count > 0)
+            @if (UnsavedDays.Count > 0)
             {
-                <span class="text-sm text-blue-700 dark:text-blue-300">@Format.Hours(DraftTotal(_proposals.Values.SelectMany(l => l))) h unsaved on @(DraftDays.Count == 1 ? "1 day" : $"{DraftDays.Count} days")</span>
+                <span class="text-sm text-blue-700 dark:text-blue-300">Unsaved changes on @Days(UnsavedDays.Count)</span>
                 <button class="btn-secondary" disabled="@_accepting" @onclick="DiscardAll">Discard all</button>
-                <button class="btn-primary mr-3" disabled="@_accepting" @onclick="() => AcceptAsync(DraftDays)">@(_accepting ? "Saving…" : "Save all")</button>
+                <button class="btn-primary mr-3" disabled="@_accepting" @onclick="AskSaveAll">@(_accepting ? "Saving…" : "Save all")</button>
             }
             <a class="btn-secondary px-3" href="@Link(_period.Previous)" title="Previous period">‹</a>
             <a class="btn-secondary" href="">Today</a>
             <a class="btn-secondary px-3" href="@Link(_period.Next)" title="Next period">›</a>
         </div>
     </div>
+
+    @if (_confirmSaveAll && UnsavedDays.Count > 0)
+    {
+        <div class="flex flex-wrap items-center gap-3 rounded-lg bg-blue-50 px-4 py-3 text-sm ring-1 ring-blue-200 dark:bg-blue-950/40 dark:ring-blue-900" role="alertdialog" data-confirm-save-all>
+            <span>Save @Days(UnsavedDays.Count) (@Format.Hours(UnsavedTotal) h) and update Jira to match?
+                @if (UnsavedRemovals > 0)
+                {
+                    <span class="text-red-700 dark:text-red-400">@UnsavedRemovals @(UnsavedRemovals == 1 ? "worklog is" : "worklogs are") deleted.</span>
+                }
+            </span>
+            <button class="btn-secondary ml-auto" @onclick="() => _confirmSaveAll = false">Cancel</button>
+            <button class="btn-primary" @onclick="SaveAllAsync">Save @Days(UnsavedDays.Count)</button>
+        </div>
+    }
 
     @if (_importing)
     {
@@ -65,9 +82,13 @@
                     @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
                     {
                         <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium" title="@DayTitle(day)">
-                            <button type="button" class="w-full px-1 py-2" @onclick="() => SelectDay(day)">
+                            <button type="button" class="relative w-full px-1 py-2" @onclick="() => SelectDay(day)">
                                 <div class="uppercase">@day.ToString("ddd", CultureInfo.InvariantCulture)[..2]</div>
                                 <div class="text-sm @(day == _today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700 dark:text-slate-200")">@day.Day</div>
+                                @if (UnsavedDays.Contains(day))
+                                {
+                                    <span class="absolute right-1 top-1 size-1.5 rounded-full bg-blue-600 dark:bg-blue-400" title="Unsaved changes" data-unsaved-day></span>
+                                }
                             </button>
                         </th>
                     }
@@ -95,11 +116,19 @@
                         </td>
                         @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
                         {
+                            var saved = Total(row.Entries.Where(e => e.Date == day));
                             <td class="@DayCellClass(day, i) cursor-pointer p-2 text-center tabular-nums" @onclick="() => SelectDay(day)">
-                                @Format.Hours(Total(row.Entries.Where(e => e.Date == day)))
-                                @if (DraftTotal(row.Drafts.Where(d => d.Date == day)) is { } draft && draft > TimeSpan.Zero)
+                                @if (UnsavedFor(day, row.Key) is { } unsaved)
                                 {
-                                    <span class="ml-0.5 inline-block rounded border border-dashed border-blue-400 px-1 text-xs text-blue-700 dark:border-blue-600 dark:text-blue-300" title="Not saved yet" data-draft-cell>@Format.Hours(draft)</span>
+                                    @if (saved > TimeSpan.Zero)
+                                    {
+                                        <span class="text-slate-400 line-through dark:text-slate-500">@Format.Hours(saved)</span>
+                                    }
+                                    <span class="ml-0.5 inline-block rounded border border-dashed border-blue-400 px-1 text-xs text-blue-700 dark:border-blue-600 dark:text-blue-300" title="Not saved yet" data-draft-cell>@(unsaved > TimeSpan.Zero ? Format.Hours(unsaved) : "0")</span>
+                                }
+                                else
+                                {
+                                    @Format.Hours(saved)
                                 }
                             </td>
                         }
@@ -118,19 +147,19 @@
                     <td class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-4 py-2 text-slate-500 dark:text-slate-400">Day total</td>
                     @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
                     {
-                        <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@Format.Hours(Total(_entries.Where(e => e.Date == day)))</td>
+                        <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@Format.Hours(Total(SavedOn(day)))</td>
                     }
                     <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(Total(_entries))</td>
                 </tr>
-                @if (DraftDays.Count > 0)
+                @if (UnsavedDays.Count > 0)
                 {
                     <tr class="bg-slate-50 dark:bg-slate-800/60 text-xs font-semibold text-blue-700 dark:text-blue-300">
-                        <td class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-4 py-2">Unsaved</td>
+                        <td class="sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-4 py-2" title="Day totals once the unsaved changes are saved">Unsaved</td>
                         @foreach (var (day, i) in _period.Days.Select((d, i) => (d, i)))
                         {
-                            <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@Format.Hours(DraftTotal(_proposals.GetValueOrDefault(day) ?? []))</td>
+                            <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@(UnsavedDays.Contains(day) ? Format.Hours(_work[day].Total(SavedOn(day))) is { Length: > 0 } uh ? uh : "0" : "")</td>
                         }
-                        <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(DraftTotal(_proposals.Values.SelectMany(l => l)))</td>
+                        <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(UnsavedTotal)</td>
                     </tr>
                 }
                 @if (PeriodMissing > TimeSpan.Zero)
@@ -206,9 +235,9 @@
         @if (Conn.Connection is { } connection)
         {
             <div class="mt-4">
-                <DayEditor Date="_selectedDay" Saved="DayEntries" Drafts="DraftsFor(_selectedDay)" SuggestedIds="_suggested"
+                <DayEditor @ref="_editor" Date="_selectedDay" Saved="DayEntries" Work="WorkFor(_selectedDay)"
                            Choices="Choices" Sprint="_sprint" Connection="connection" Expected="@(SelectedDay?.Expected ?? TimeSpan.Zero)"
-                           OnChanged="DraftsChanged" OnSaved="DaySavedAsync" OnDiscard="() => Discard(_selectedDay)" />
+                           OnChanged="WorkChanged" OnSaved="DaySavedAsync" OnDiscard="() => Discard(_selectedDay)" />
             </div>
         }
     </section>
@@ -218,6 +247,8 @@
 
 @code {
     [Parameter] public string? StartText { get; set; }
+    /// <summary>The selected day, kept in the URL so reload and back/forward keep it.</summary>
+    [SupplyParameterFromQuery(Name = "day")] public string? DayText { get; set; }
 
     private static readonly DateOnly _today = DateOnly.FromDateTime(DateTime.Today);
 
@@ -228,45 +259,72 @@
     private DateOnly _selectedDay;
     private bool _loaded, _syncing;
     private int _unsynced;
+    private DayEditor? _editor;
 
-    private record IssueRow(string Key, string Summary, List<TimeEntry> Entries, List<TimeEntry> Drafts);
+    private record IssueRow(string Key, string Summary, List<TimeEntry> Entries);
 
-    /// <summary>One row per issue with saved or suggested time in the period.</summary>
-    private List<IssueRow> Rows =>
-        _entries.Select(e => (Entry: e, Draft: false))
-            .Concat(_proposals.Values.SelectMany(l => l).Select(d => (Entry: d, Draft: true)))
-            .GroupBy(x => x.Entry.IssueKey)
-            .Select(g => new IssueRow(g.Key,
-                g.OrderBy(x => x.Draft).ThenByDescending(x => x.Entry.UpdatedUtc).First().Entry.IssueSummary,
-                g.Where(x => !x.Draft).Select(x => x.Entry).ToList(),
-                g.Where(x => x.Draft).Select(x => x.Entry).ToList()))
-            .OrderBy(r => r.Key == "").ThenBy(r => r.Key, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+    /// <summary>One row per issue with saved or unsaved time in the period.</summary>
+    private List<IssueRow> Rows
+    {
+        get
+        {
+            var unsaved = _work.Values.SelectMany(w => w.RowsToSave(SavedOn(w.Date)));
+            return _entries.Select(e => (Entry: e, Saved: true))
+                .Concat(unsaved.Select(e => (Entry: e, Saved: false)))
+                .GroupBy(x => x.Entry.IssueKey)
+                .Select(g => new IssueRow(g.Key,
+                    g.OrderByDescending(x => x.Saved).ThenByDescending(x => x.Entry.UpdatedUtc).First().Entry.IssueSummary,
+                    g.Where(x => x.Saved).Select(x => x.Entry).ToList()))
+                .OrderBy(r => r.Key == "").ThenBy(r => r.Key, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+    }
 
     private IReadOnlyDictionary<DateOnly, DayInfo> _days = new Dictionary<DateOnly, DayInfo>();
 
-    /// <summary>New rows per day that are not saved yet (suggestions and added issues).</summary>
-    private readonly Dictionary<DateOnly, List<TimeEntry>> _proposals = [];
-    /// <summary>Ids of unsaved rows that came from a suggestion.</summary>
-    private readonly HashSet<string> _suggested = [];
+    /// <summary>Unsaved changes per day (edits, removals, suggestions and added issues), kept while the period is open.</summary>
+    private readonly Dictionary<DateOnly, DayWork> _work = [];
     /// <summary>Days the user saved or discarded; they are not suggested again until the page reloads.</summary>
     private readonly HashSet<DateOnly> _dismissed = [];
-    private bool _accepting;
+    private bool _accepting, _confirmSaveAll;
     private string? _acceptNotice;
 
-    private List<DateOnly> DraftDays => _proposals.Where(p => p.Value.Count > 0).Select(p => p.Key).Order().ToList();
+    private DayWork WorkFor(DateOnly day) => _work.TryGetValue(day, out var w) ? w : _work[day] = new DayWork(day);
 
-    private List<TimeEntry> DraftsFor(DateOnly day) =>
-        _proposals.TryGetValue(day, out var list) ? list : _proposals[day] = [];
+    private IReadOnlyList<TimeEntry> SavedOn(DateOnly day) => _entries.Where(e => e.Date == day).ToList();
 
-    private IReadOnlyList<TimeEntry> DayEntries => _entries.Where(e => e.Date == _selectedDay).ToList();
+    /// <summary>Days with changes that are not saved, in order.</summary>
+    private List<DateOnly> UnsavedDays => _work.Where(w => w.Value.HasChanges(SavedOn(w.Key))).Select(w => w.Key).Order().ToList();
+
+    /// <summary>Days with changes the user made (untouched suggestions don't count).</summary>
+    private List<DateOnly> OwnChangeDays => _work.Where(w => w.Value.HasOwnChanges(SavedOn(w.Key))).Select(w => w.Key).ToList();
+
+    private bool HasUnsaved => OwnChangeDays.Count > 0;
+
+    private TimeSpan UnsavedTotal => UnsavedDays.Aggregate(TimeSpan.Zero, (t, d) => t + _work[d].Total(SavedOn(d)));
+
+    private int UnsavedRemovals => UnsavedDays.Sum(d => SavedOn(d).Count(e => _work[d].IsRemoved(e) && e.JiraWorklogId is not null));
+
+    /// <summary>Hours an issue will have on a day once saved, when the day has unsaved changes for it; otherwise null.</summary>
+    private TimeSpan? UnsavedFor(DateOnly day, string issueKey)
+    {
+        if (!_work.TryGetValue(day, out var work)) return null;
+        var saved = SavedOn(day);
+        if (!work.HasChanges(saved)) return null;
+        var after = work.TotalFor(saved, issueKey);
+        return after == Total(saved.Where(e => e.IssueKey == issueKey)) ? null : after;
+    }
+
+    private static string Days(int n) => n == 1 ? "1 day" : $"{n} days";
+
+    private IReadOnlyList<TimeEntry> DayEntries => SavedOn(_selectedDay);
     private DayInfo? SelectedDay => _days.GetValueOrDefault(_selectedDay);
 
     /// <summary>Missing hours on a day; only counted up to today.</summary>
     private TimeSpan Missing(DateOnly day) =>
         day > _today || !_days.TryGetValue(day, out var info)
             ? TimeSpan.Zero
-            : WorkCalendarService.Missing(info, Total(_entries.Where(e => e.Date == day)));
+            : WorkCalendarService.Missing(info, Total(SavedOn(day)));
 
     private TimeSpan PeriodMissing => _period.Days.Aggregate(TimeSpan.Zero, (t, d) => t + Missing(d));
 
@@ -274,18 +332,32 @@
     {
         { Kind: DayKind.Holiday, Name: var n } => n,
         { Kind: DayKind.DayOff, Name: var n } => $"Day off ({n})",
+        { HasPartialDayOff: true } d => $"{d.Name}: {Format.Hours(d.Off)} h off",
         _ => null,
     };
 
+    private static DateOnly? ParseDate(string? text) =>
+        DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
+
     protected override async Task OnParametersSetAsync()
     {
-        var date = DateOnly.TryParseExact(StartText, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : _today;
-        _period = Period.For(date);
-        _selectedDay = _period.Contains(_today) ? _today : _period.Start;
-        _proposals.Clear();
-        _suggested.Clear();
+        var day = ParseDate(DayText);
+        var period = Period.For(ParseDate(StartText) ?? day ?? _today);
+        var selected = day is { } d && period.Contains(d) ? d : period.Contains(_today) ? _today : period.Start;
+
+        // Same period, other day (a day picked in the grid, Today, back/forward): keep everything.
+        if (_loaded && period == _period)
+        {
+            ShowDay(selected);
+            return;
+        }
+
+        _period = period;
+        _selectedDay = selected;
+        _work.Clear();
         _dismissed.Clear();
         _acceptNotice = null;
+        _confirmSaveAll = false;
         await ReloadAsync();
         _loaded = true;
         await ImportAsync(); // renders the local hours first, then adds what Jira has
@@ -361,13 +433,15 @@
     /// <summary>Only workdays up to today with hours missing can be filled.</summary>
     private bool CanFill(DateOnly day) => day <= _today && Missing(day) > TimeSpan.Zero;
 
-    /// <summary>Puts a suggestion for the missing hours on a short workday, unless the user already saved or discarded that day.</summary>
+    /// <summary>Puts a suggestion for the missing hours on a short workday, unless it has unsaved changes or the user saved or discarded it.</summary>
     private void Suggest(DateOnly day)
     {
-        if (!CanFill(day) || DraftDays.Contains(day) || _dismissed.Contains(day) || !_days.TryGetValue(day, out var info)) return;
-        var drafts = DayFiller.Propose(info, _entries.Where(e => e.Date == day).ToList(), _sprint);
-        foreach (var d in drafts) _suggested.Add(d.Id);
-        DraftsFor(day).AddRange(drafts);
+        if (!CanFill(day) || _dismissed.Contains(day) || !_days.TryGetValue(day, out var info)) return;
+        var work = WorkFor(day);
+        if (work.HasChanges(SavedOn(day)) || work.Drafts.Count > 0) return;
+        var drafts = DayFiller.Propose(info, SavedOn(day), _sprint);
+        foreach (var d in drafts) work.Suggested.Add(d.Id);
+        work.Drafts.AddRange(drafts);
     }
 
     private void FillPeriod()
@@ -381,43 +455,51 @@
 
     private void DiscardAll()
     {
-        foreach (var day in DraftDays) Discard(day);
+        foreach (var day in UnsavedDays) Discard(day);
         _acceptNotice = null;
+        _confirmSaveAll = false;
     }
 
-    private static TimeSpan DraftTotal(IEnumerable<TimeEntry> drafts) =>
-        drafts.Aggregate(TimeSpan.Zero, (t, d) => t + d.Duration);
+    private static TimeSpan Total(IEnumerable<TimeEntry> entries) => entries.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
 
     private void Discard(DateOnly day)
     {
-        _proposals.Remove(day);
+        _work.Remove(day);
         _dismissed.Add(day);
     }
 
-    /// <summary>The day editor changed unsaved rows; re-rendering updates the grid's unsaved hours.</summary>
-    private void DraftsChanged() { }
+    /// <summary>The day editor changed unsaved rows; re-rendering updates the grid.</summary>
+    private void WorkChanged() { }
 
     private async Task DaySavedAsync()
     {
+        _work.Remove(_selectedDay);
         _dismissed.Add(_selectedDay);
         await ReloadAsync();
     }
 
-    /// <summary>Saves every listed day's unsaved rows together with its saved work. Days with an invalid row are left for the user to finish.</summary>
-    private async Task AcceptAsync(IEnumerable<DateOnly> days)
+    private void AskSaveAll() => _confirmSaveAll = true;
+
+    /// <summary>Saves every day with unsaved changes. Days with an invalid row are left for the user to finish.</summary>
+    private async Task SaveAllAsync()
     {
+        _confirmSaveAll = false;
         if (Conn.Connection is not { } c) return;
         _accepting = true;
         _acceptNotice = null;
         var needsWork = new List<DateOnly>();
-        foreach (var day in days.ToList())
+        foreach (var day in UnsavedDays)
         {
-            if (!_proposals.TryGetValue(day, out var drafts) || drafts.Count == 0) continue;
-            var rows = _entries.Where(e => e.Date == day).Select(e => e.Copy()).Concat(drafts).ToList();
-            var result = await Sync.SaveDayAsync(c, day, rows);
+            var work = _work[day];
+            if (work.BadHours.Count > 0)
+            {
+                needsWork.Add(day);
+                continue;
+            }
+            var result = await Sync.SaveDayAsync(c, day, work.RowsToSave(SavedOn(day)));
             if (result.Saved)
             {
-                _proposals.Remove(day);
+                _work.Remove(day);
                 _dismissed.Add(day);
             }
             else needsWork.Add(day);
@@ -426,8 +508,8 @@
         await ReloadAsync();
         if (needsWork.Count > 0)
         {
-            _selectedDay = needsWork[0];
-            _acceptNotice = $"{needsWork.Count} {(needsWork.Count == 1 ? "day was" : "days were")} not saved because a row needs an issue or hours. Finish it below and press Save day.";
+            SelectDay(needsWork[0]);
+            _acceptNotice = $"{Days(needsWork.Count)} not saved because a row needs an issue or hours. Finish it below and press Save day.";
         }
     }
 
@@ -454,8 +536,9 @@
         }
         _timeOffOpen = false;
         var whole = hours >= day.Hours;
-        // A suggestion for the old hours no longer fits; rows the user added are kept.
-        var onlySuggested = DraftsFor(_selectedDay).All(d => _suggested.Contains(d.Id));
+        // A suggestion for the old hours no longer fits; changes the user made are kept.
+        var work = WorkFor(_selectedDay);
+        var onlySuggested = work.Drafts.All(d => work.Suggested.Contains(d.Id)) && !SavedOn(_selectedDay).Any(work.IsChanged) && work.Removed.Count == 0;
         if (whole || onlySuggested) Discard(_selectedDay);
         await Calendar.MarkDayOffAsync(_selectedDay, _timeOffReason, whole ? null : hours);
         await ReloadAsync();
@@ -470,6 +553,7 @@
     {
         await Calendar.UnmarkDayOffAsync(_selectedDay);
         await ReloadAsync();
+        _work.Remove(_selectedDay);
         _dismissed.Remove(_selectedDay);
         Suggest(_selectedDay);
     }
@@ -484,15 +568,39 @@
         await ReloadAsync();
     }
 
+    /// <summary>Selects a day by putting it in the URL; <see cref="OnParametersSetAsync"/> shows it.</summary>
     private void SelectDay(DateOnly day)
     {
+        if (day == _selectedDay) return;
+        Nav.NavigateTo($"{Link(Period.For(day))}?day={Format.Iso(day)}", replace: true);
+    }
+
+    private void ShowDay(DateOnly day)
+    {
+        if (day == _selectedDay) return;
         _selectedDay = day;
         _timeOffOpen = false;
         _acceptNotice = null;
         Suggest(day);
     }
 
-    private static TimeSpan Total(IEnumerable<TimeEntry> entries) => entries.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
+    /// <summary>Asks before leaving the period (or the page) with unsaved changes. Picking another day of the period is fine.</summary>
+    private async Task ConfirmLeaveAsync(LocationChangingContext context)
+    {
+        if (!HasUnsaved) return;
+        var target = Nav.ToBaseRelativePath(Nav.ToAbsoluteUri(context.TargetLocation).ToString());
+        var path = target.Split('?', '#')[0].TrimEnd('/');
+        var query = target.Contains('?') ? target[(target.IndexOf('?') + 1)..] : "";
+        var day = ParseDate(System.Web.HttpUtility.ParseQueryString(query)["day"]);
+        Period? to = path == "" ? Period.For(day ?? _today)
+            : path.StartsWith("period/") && ParseDate(path["period/".Length..]) is { } start ? Period.For(start)
+            : null;
+        if (to == _period) return;
+
+        var n = OwnChangeDays.Count;
+        if (!await JS.InvokeAsync<bool>("confirm", $"You have unsaved changes on {Days(n)}. Leave without saving them?"))
+            context.PreventNavigation();
+    }
 
     private static string Link(Period p) => $"period/{Format.Iso(p.Start)}";
 
