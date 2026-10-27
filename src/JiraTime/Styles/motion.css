@@ -39,3 +39,21 @@
   100% { transform: scale(1); }
 }
 .motion-ready .motion-pop:not([data-settled]) { animation: motion-pop var(--motion) var(--motion-ease); }
+
+/* Settle: a cell that was just saved goes from a draft blue to plain. */
+@keyframes motion-settle {
+  from { background-color: rgb(59 130 246 / 0.25); transform: scale(0.9); }
+  to { background-color: transparent; transform: none; }
+}
+.motion-ready .motion-settle:not([data-settled]) { animation: motion-settle var(--motion) var(--motion-ease); }
+
+/* The check mark that flies from saved cells to the period status (wwwroot/motion.js). */
+.motion-tick {
+  position: fixed; z-index: 60; pointer-events: none;
+  font-size: 0.75rem; font-weight: 700; color: var(--color-emerald-600);
+}
+/* The period status when the ticks arrive. */
+@keyframes motion-received {
+  50% { color: var(--color-emerald-600); }
+}
+.motion-received { animation: motion-received var(--motion) var(--motion-ease); }

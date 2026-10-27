@@ -56,5 +56,36 @@
   };
   if (document.body) start(); else addEventListener('DOMContentLoaded', start);
 
-  window.jiraMotion = {};
+  // ---- Ticks: a small check mark flies from each saved cell to the place that says Jira has it ----
+  const flyTicks = (fromSelector, toSelector) => {
+    const target = document.querySelector(toSelector);
+    if (!target || reduced()) return;
+    const to = target.getBoundingClientRect();
+    const sources = [...document.querySelectorAll(fromSelector)].slice(0, 24);
+    sources.forEach((el, i) => {
+      const from = el.getBoundingClientRect();
+      const tick = document.createElement('span');
+      tick.className = 'motion-tick';
+      tick.textContent = '✓';
+      tick.style.left = `${from.left + from.width / 2}px`;
+      tick.style.top = `${from.top + from.height / 2}px`;
+      document.body.append(tick);
+      const dx = to.left + 12 - (from.left + from.width / 2), dy = to.top + to.height / 2 - (from.top + from.height / 2);
+      tick.animate(
+        [{ transform: 'translate(-50%, -50%) scale(0.6)', opacity: 0 },
+         { transform: 'translate(-50%, -50%) scale(1.2)', opacity: 1, offset: 0.25 },
+         { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.8)`, opacity: 0.2 }],
+        { duration: SLOW, delay: i * 15, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'both' }
+      ).finished.then(() => tick.remove());
+    });
+    if (sources.length) {
+      setTimeout(() => {
+        target.classList.remove('motion-received');
+        void target.offsetWidth; // restart the animation
+        target.classList.add('motion-received');
+      }, SLOW + sources.length * 15);
+    }
+  };
+
+  window.jiraMotion = { flyTicks };
 })();

@@ -37,7 +37,7 @@
 
     <DayList Sheet="sheet" Selected="_selectedDay" OnSelect="d => SelectDay(d)" />
 
-    <PeriodGrid Sheet="sheet" Selected="_selectedDay" JiraBaseUrl="@User.Connection?.BaseUrl" Cascade="_cascade"
+    <PeriodGrid Sheet="sheet" Selected="_selectedDay" JiraBaseUrl="@User.Connection?.BaseUrl" Cascade="_cascade" JustSaved="_justSaved" SentToJira="_sentToJira"
                 OnSelectDay="d => SelectDay(d, focus: true)" OnCellClicked="CellClicked" />
 
     @* Selected day *@
@@ -230,10 +230,32 @@
 
     // ---- Saving and syncing ----
 
-    private async Task DaySavedAsync()
+    // The last save, for its animation: days saved, and those Jira got completely.
+    private readonly HashSet<DateOnly> _justSaved = [], _sentToJira = [];
+    private bool _flyTicks;
+
+    private void Saved(DateOnly day, WorklogSync.DayResult result)
     {
-        Sheet.Finish(_selectedDay);
+        Sheet.Finish(day);
+        _justSaved.Add(day);
+        if (result.SyncFailures == 0) _sentToJira.Add(day);
+    }
+
+    /// <summary>After the saved work has reloaded, so the ticks start from the saved cells.</summary>
+    private void FinishSave() => _flyTicks = _sentToJira.Count > 0;
+
+    private void StartSave()
+    {
+        _justSaved.Clear();
+        _sentToJira.Clear();
+    }
+
+    private async Task DaySavedAsync(WorklogSync.DayResult result)
+    {
+        StartSave();
+        Saved(_selectedDay, result);
         await ReloadAsync();
+        FinishSave();
     }
 
     /// <summary>True for the render right after Fill period, so its suggestions drop in day by day.</summary>
@@ -258,16 +280,17 @@
         _savingAll = true;
         _notice = null;
         var needsWork = new List<DateOnly>();
+        StartSave();
         foreach (var day in Sheet.UnsavedDays)
         {
             var work = Sheet.WorkFor(day);
-            if (work.BadHours.Count == 0 && (await Sync.SaveDayAsync(c, day, work.RowsToSave(Sheet.SavedOn(day)))).Saved)
-                Sheet.Finish(day);
-            else
-                needsWork.Add(day);
+            var result = work.BadHours.Count == 0 ? await Sync.SaveDayAsync(c, day, work.RowsToSave(Sheet.SavedOn(day))) : null;
+            if (result is { Saved: true }) Saved(day, result);
+            else needsWork.Add(day);
         }
         _savingAll = false;
         await ReloadAsync();
+        FinishSave();
         if (needsWork.Count > 0)
         {
             SelectDay(needsWork[0]);
@@ -377,6 +400,11 @@
         {
             _focus = null;
             await JS.InvokeVoidAsync("jiraKeys.focus", id);
+        }
+        if (_flyTicks)
+        {
+            _flyTicks = false;
+            await JS.InvokeVoidAsync("jiraMotion.flyTicks", "[data-sent]", "[data-period-status]");
         }
     }
 

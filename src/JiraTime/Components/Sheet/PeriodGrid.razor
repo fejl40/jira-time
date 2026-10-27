@@ -66,9 +66,10 @@
                                 <span class="motion-drop ml-0.5 inline-block rounded border border-dashed border-blue-400 px-1 text-xs text-blue-700 dark:border-blue-600 dark:text-blue-300" title="Not saved yet"
                                       style="@(Cascade ? Motion.Order(i) : null)" data-draft-cell>@(unsaved > TimeSpan.Zero ? Format.Hours(unsaved) : "0")</span>
                             }
-                            else
+                            else if (saved > TimeSpan.Zero)
                             {
-                                @Format.Hours(saved)
+                                var justSaved = JustSaved.Contains(day);
+                                <span class="inline-block rounded px-1 @(justSaved ? "motion-settle" : "")" data-sent="@(justSaved && SentToJira.Contains(day) ? "" : null)">@Format.Hours(saved)</span>
                             }
                         </td>
                     }
@@ -136,6 +137,10 @@
     [Parameter] public DateOnly Selected { get; set; }
     /// <summary>Links on issue keys go here.</summary>
     [Parameter] public string? JiraBaseUrl { get; set; }
+    /// <summary>Days saved by the last Save day or Save all; their cells settle from draft to saved.</summary>
+    [Parameter] public IReadOnlySet<DateOnly> JustSaved { get; set; } = new HashSet<DateOnly>();
+    /// <summary>Days of <see cref="JustSaved"/> that Jira got completely; a tick flies from their cells.</summary>
+    [Parameter] public IReadOnlySet<DateOnly> SentToJira { get; set; } = new HashSet<DateOnly>();
     /// <summary>New suggestion cells drop in one day after another (right after Fill period).</summary>
     [Parameter] public bool Cascade { get; set; }
     [Parameter] public EventCallback<DateOnly> OnSelectDay { get; set; }
