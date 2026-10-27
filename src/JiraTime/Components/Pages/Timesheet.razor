@@ -22,7 +22,7 @@
 {
 <div class="mx-auto max-w-7xl space-y-6">
     <PeriodHeader Sheet="sheet" Unsynced="_unsynced" Syncing="_syncing" Saving="_savingAll"
-                  OnSync="SyncPeriodAsync" OnFillPeriod="sheet.FillPeriod" OnSaveAll="SaveAllAsync" OnDiscardAll="DiscardAll" />
+                  OnSync="SyncPeriodAsync" OnFillPeriod="FillPeriod" OnSaveAll="SaveAllAsync" OnDiscardAll="DiscardAll" />
 
     <PeriodReminders Sheet="sheet" Unsynced="_unsynced" Previous="_previousOpen" />
 
@@ -37,7 +37,7 @@
 
     <DayList Sheet="sheet" Selected="_selectedDay" OnSelect="d => SelectDay(d)" />
 
-    <PeriodGrid Sheet="sheet" Selected="_selectedDay" JiraBaseUrl="@User.Connection?.BaseUrl"
+    <PeriodGrid Sheet="sheet" Selected="_selectedDay" JiraBaseUrl="@User.Connection?.BaseUrl" Cascade="_cascade"
                 OnSelectDay="d => SelectDay(d, focus: true)" OnCellClicked="CellClicked" />
 
     @* Selected day *@
@@ -236,6 +236,15 @@
         await ReloadAsync();
     }
 
+    /// <summary>True for the render right after Fill period, so its suggestions drop in day by day.</summary>
+    private bool _cascade;
+
+    private void FillPeriod()
+    {
+        Sheet.FillPeriod();
+        _cascade = true;
+    }
+
     private void DiscardAll()
     {
         Sheet.DiscardAll();
@@ -358,6 +367,7 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_sheet is null) return;
+        _cascade = false;
         if (_self is null)
         {
             _self = DotNetObjectReference.Create(this);

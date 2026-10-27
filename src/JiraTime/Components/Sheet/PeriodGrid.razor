@@ -56,7 +56,8 @@
                                 {
                                     <span class="text-slate-400 line-through dark:text-slate-500">@Format.Hours(saved)</span>
                                 }
-                                <span class="ml-0.5 inline-block rounded border border-dashed border-blue-400 px-1 text-xs text-blue-700 dark:border-blue-600 dark:text-blue-300" title="Not saved yet" data-draft-cell>@(unsaved > TimeSpan.Zero ? Format.Hours(unsaved) : "0")</span>
+                                <span class="motion-drop ml-0.5 inline-block rounded border border-dashed border-blue-400 px-1 text-xs text-blue-700 dark:border-blue-600 dark:text-blue-300" title="Not saved yet"
+                                      style="@(Cascade ? Motion.Order(i) : null)" data-draft-cell>@(unsaved > TimeSpan.Zero ? Format.Hours(unsaved) : "0")</span>
                             }
                             else
                             {
@@ -128,6 +129,8 @@
     [Parameter] public DateOnly Selected { get; set; }
     /// <summary>Links on issue keys go here.</summary>
     [Parameter] public string? JiraBaseUrl { get; set; }
+    /// <summary>New suggestion cells drop in one day after another (right after Fill period).</summary>
+    [Parameter] public bool Cascade { get; set; }
     [Parameter] public EventCallback<DateOnly> OnSelectDay { get; set; }
     [Parameter] public EventCallback<(DateOnly Day, PeriodRow Row)> OnCellClicked { get; set; }
 
