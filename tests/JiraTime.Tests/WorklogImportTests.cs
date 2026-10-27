@@ -158,7 +158,7 @@ public class WorklogImportTests : IDisposable
     [InlineData("""{"type":"doc","version":1,"content":[]}""", null)]
     [InlineData("\"  \"", null)]
     public void Comments_are_read_from_text_and_document_format(string json, string? expected) =>
-        Assert.Equal(expected, JiraClient.CommentText(JsonDocument.Parse(json).RootElement));
+        Assert.Equal(expected, AtlassianDocument.ToPlainText(JsonDocument.Parse(json).RootElement));
 
     [Theory]
     [InlineData(3600, 60)]
