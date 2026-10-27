@@ -64,7 +64,7 @@
                             }
                         </td>
                     }
-                    <td class="px-3 py-2 text-right font-medium tabular-nums">@Format.Hours(PeriodSheet.Total(row.Entries))</td>
+                    <td class="px-3 py-2 text-right font-medium tabular-nums"><Count Value="PeriodSheet.Total(row.Entries)" /></td>
                 </tr>
             }
             @if (Rows.Count == 0)
@@ -79,9 +79,9 @@
                 <td class="@FooterLabel text-slate-500 dark:text-slate-400">Day total</td>
                 @foreach (var (day, i) in Days)
                 {
-                    <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@Format.Hours(PeriodSheet.Total(Sheet.SavedOn(day)))</td>
+                    <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums"><Count Value="PeriodSheet.Total(Sheet.SavedOn(day))" /></td>
                 }
-                <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(PeriodSheet.Total(Sheet.Entries))</td>
+                <td class="px-3 py-2 text-right tabular-nums"><Count Value="PeriodSheet.Total(Sheet.Entries)" /></td>
             </tr>
             <tr class="bg-slate-50 dark:bg-slate-800/60 text-xs" data-week-totals>
                 <td class="@FooterLabel font-semibold text-slate-500 dark:text-slate-400">Week</td>
@@ -89,7 +89,7 @@
                 {
                     <td colspan="@week.Days" class="@(week.Start == Sheet.Period.Start ? "" : "border-l-2 border-slate-300 dark:border-slate-600") px-2 py-2 text-center tabular-nums @(week.Expected > TimeSpan.Zero && week.Logged >= week.Expected ? "text-emerald-700 dark:text-emerald-400" : "text-slate-600 dark:text-slate-300")"
                         title="Logged in the week (within this period) / hours the week needs">
-                        <span class="font-semibold">@Format.HoursText(week.Logged)</span>@if (week.Expected > TimeSpan.Zero)
+                        <Count Value="week.Logged" Zero="0" Unit=" h" Class="font-semibold" />@if (week.Expected > TimeSpan.Zero)
                         {
                             <span class="text-slate-400 dark:text-slate-500"> / @Format.Hours(week.Expected) h</span>
                         }
@@ -103,9 +103,9 @@
                     <td class="@FooterLabel" title="Day totals once the unsaved changes are saved">Unsaved</td>
                     @foreach (var (day, i) in Days)
                     {
-                        <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@(Sheet.IsUnsaved(day) ? Format.Hours(Sheet.UnsavedDayTotal(day)) is { Length: > 0 } h ? h : "0" : "")</td>
+                        <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@if (Sheet.IsUnsaved(day)) { <Count Value="Sheet.UnsavedDayTotal(day)" Zero="0" /> }</td>
                     }
-                    <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(Sheet.UnsavedTotal)</td>
+                    <td class="px-3 py-2 text-right tabular-nums"><Count Value="Sheet.UnsavedTotal" /></td>
                 </tr>
             }
             @if (Sheet.Summary.Missing > TimeSpan.Zero)
@@ -114,9 +114,9 @@
                     <td class="@FooterLabel">Missing</td>
                     @foreach (var (day, i) in Days)
                     {
-                        <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@(Sheet.Missing(day) is var m && m > TimeSpan.Zero ? Format.Hours(m) : "")</td>
+                        <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums"><Count Value="Sheet.Missing(day)" /></td>
                     }
-                    <td class="px-3 py-2 text-right tabular-nums">@Format.Hours(Sheet.Summary.Missing)</td>
+                    <td class="px-3 py-2 text-right tabular-nums"><Count Value="Sheet.Summary.Missing" /></td>
                 </tr>
             }
         </tfoot>

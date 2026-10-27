@@ -115,7 +115,7 @@
 
     <div class="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
         <span class="text-sm">
-            <span class="font-semibold tabular-nums @(Expected > TimeSpan.Zero && Total != Expected ? "text-amber-700 dark:text-amber-400" : "")" data-day-total>@(Format.Hours(Total) is { Length: > 0 } t ? t : "0") h</span>
+            <Count Value="Total" Zero="0" Unit=" h" Class="@($"font-semibold tabular-nums {(Expected > TimeSpan.Zero && Total != Expected ? "text-amber-700 dark:text-amber-400" : "")}")" data-day-total />
             @if (Expected > TimeSpan.Zero)
             {
                 <span class="text-slate-500 dark:text-slate-400"> of @Format.Hours(Expected) h</span>

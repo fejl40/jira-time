@@ -3,7 +3,14 @@
 
 <div class="flex flex-wrap items-center gap-3">
     <h2 class="text-lg font-semibold">@Date.ToString("dddd d MMMM", CultureInfo.InvariantCulture)</h2>
-    <span class="text-sm text-slate-500 dark:text-slate-400">@(Logged > TimeSpan.Zero ? Format.HoursText(Logged) : "Nothing logged")</span>
+    @if (Logged > TimeSpan.Zero)
+    {
+        <Count Value="Logged" Unit=" h" Class="text-sm text-slate-500 dark:text-slate-400" />
+    }
+    else
+    {
+        <span class="text-sm text-slate-500 dark:text-slate-400">Nothing logged</span>
+    }
     @if (Info is { Kind: DayKind.Holiday or DayKind.Weekend })
     {
         <span class="@Badge">@(Info.Name ?? "Weekend")</span>
@@ -17,7 +24,7 @@
     {
         @if (Missing > TimeSpan.Zero)
         {
-            <span class="text-sm text-amber-700 dark:text-amber-400">@Format.Hours(Missing) h missing</span>
+            <span class="text-sm text-amber-700 dark:text-amber-400"><Count Value="Missing" Unit=" h" /> missing</span>
         }
         @if (work.HasPartialDayOff)
         {

@@ -26,4 +26,21 @@ public class FormatTests
     [InlineData("1:2:3")]
     public void Rejects_unreadable_or_non_positive_hours(string? text) =>
         Assert.Null(Format.ParseHours(text));
+
+    [Theory]
+    [InlineData(0, "0")]
+    [InlineData(90, "1.5")]
+    [InlineData(20, "0.3333")]
+    [InlineData(480, "8")]
+    public void Hours_for_scripts_are_never_empty_and_use_a_dot(int minutes, string expected) =>
+        Assert.Equal(expected, Format.HoursValue(TimeSpan.FromMinutes(minutes)));
+
+    [Fact]
+    public void Hours_text_and_days_read_well()
+    {
+        Assert.Equal("0 h", Format.HoursText(TimeSpan.Zero));
+        Assert.Equal("7.5 h", Format.HoursText(TimeSpan.FromHours(7.5)));
+        Assert.Equal("1 day", Format.Days(1));
+        Assert.Equal("3 days", Format.Days(3));
+    }
 }

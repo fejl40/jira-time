@@ -1,0 +1,18 @@
+/* Animations. Kept quick: 75 ms for small things, 150 ms for bigger moves. Everything here is
+   switched off when the system asks for reduced motion. Animations that should not play while the
+   page first draws are scoped to html.motion-ready, which wwwroot/motion.js sets once it has settled. */
+
+:root {
+  --motion-fast: 75ms;
+  --motion: 150ms;
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-fast: 0ms; --motion: 0ms; }
+  *, *::before, *::after {
+    animation-duration: 0ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0ms !important;
+  }
+}

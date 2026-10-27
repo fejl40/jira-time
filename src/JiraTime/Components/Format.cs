@@ -28,6 +28,9 @@ public static class Format
         return value > TimeSpan.Zero ? value : null;
     }
 
+    /// <summary>Decimal hours for scripts, e.g. "7.5": never empty, always with a dot.</summary>
+    public static string HoursValue(TimeSpan t) => t.TotalHours.ToString("0.####", CultureInfo.InvariantCulture);
+
     /// <summary>Hours with a unit, "0 h" for none: 7.5 h.</summary>
     public static string HoursText(TimeSpan t) => $"{(Hours(t) is { Length: > 0 } h ? h : "0")} h";
 

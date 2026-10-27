@@ -21,7 +21,7 @@
                     <span class="size-2 rounded-full bg-blue-600 dark:bg-blue-400" title="Unsaved changes"></span>
                 }
                 <span class="w-24 text-right tabular-nums">
-                    @(logged > TimeSpan.Zero || info is { Expected.Ticks: > 0 } ? Format.HoursText(logged) : "")@if (info?.Expected is { } exp && exp > TimeSpan.Zero)
+                    @if (logged > TimeSpan.Zero || info is { Expected.Ticks: > 0 }) { <Count Value="logged" Zero="0" Unit=" h" /> }@if (info?.Expected is { } exp && exp > TimeSpan.Zero)
                     {
                         <span class="text-slate-400 dark:text-slate-500"> / @Format.Hours(exp)</span>
                     }

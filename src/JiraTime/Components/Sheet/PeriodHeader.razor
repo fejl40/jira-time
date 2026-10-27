@@ -10,7 +10,7 @@
     <div>
         <h1 class="text-xl font-semibold leading-tight outline-none">@Format.Range(Period.Start, Period.End)</h1>
         <p class="text-sm text-slate-500 dark:text-slate-400" data-period-status>
-            <span><span class="font-semibold text-slate-800 dark:text-slate-100">@Format.HoursText(Summary.Logged)</span> logged</span>
+            <span><Count Value="Summary.Logged" Zero="0" Unit=" h" Class="font-semibold text-slate-800 dark:text-slate-100" /> logged</span>
             @if (Summary.IsComplete(Unsynced, Unsaved.Count > 0))
             {
                 <span class="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" data-period-complete
@@ -18,7 +18,7 @@
             }
             @if (Summary.Missing > TimeSpan.Zero)
             {
-                <span> · <span class="text-amber-700 dark:text-amber-400" title="Hours missing on workdays up to today">@Format.Hours(Summary.Missing) h missing</span></span>
+                <span> · <span class="text-amber-700 dark:text-amber-400" title="Hours missing on workdays up to today"><Count Value="Summary.Missing" Unit=" h" /> missing</span></span>
             }
             @if (Unsaved.Count > 0)
             {

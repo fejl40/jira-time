@@ -1,0 +1,13 @@
+@* Hours that count to their new value when they change. The script in wwwroot/motion.js writes the
+   text, so this element renders no children of its own. *@
+<span data-count="@Format.HoursValue(Value)" data-zero="@Zero" data-unit="@Unit" class="@Class" @attributes="Attributes"></span>
+
+@code {
+    [Parameter, EditorRequired] public TimeSpan Value { get; set; }
+    /// <summary>Text for zero hours, e.g. "0"; empty by default, like <see cref="Format.Hours"/>.</summary>
+    [Parameter] public string Zero { get; set; } = "";
+    /// <summary>Text after the number, e.g. " h". Not shown when the text is empty.</summary>
+    [Parameter] public string Unit { get; set; } = "";
+    [Parameter] public string? Class { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? Attributes { get; set; }
+}
