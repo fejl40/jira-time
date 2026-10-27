@@ -1,7 +1,7 @@
 @page "/"
 @page "/period/{StartText}"
 @using System.Globalization
-@inject TimeEntryService Entries
+@inject TimeLog Log
 @inject TimeProvider Clock
 @inject WorklogSync Sync
 @inject WorkCalendarService Calendar
@@ -27,13 +27,12 @@
 
     <PeriodReminders Sheet="sheet" Unsynced="_unsynced" Previous="_previousOpen" />
 
-    @if (_importing)
+    @if (_jiraError is not null)
     {
-        <p class="-mt-3 text-xs text-slate-500 dark:text-slate-400" role="status">Checking Jira for worklogs…</p>
-    }
-    else if (_importNotice is not null)
-    {
-        <p class="-mt-3 text-xs text-slate-500 dark:text-slate-400" role="status" data-import-notice>@_importNotice</p>
+        <div class="card flex flex-wrap items-center gap-3 border-amber-300 p-4 text-sm text-amber-800 dark:border-amber-700 dark:text-amber-300" role="alert" data-jira-error>
+            <span class="flex-1">Couldn't read your time from Jira: @_jiraError. Only work waiting to be sent is shown, and days can't be edited until Jira can be read.</span>
+            <button type="button" class="btn-secondary" disabled="@_loading" @onclick="RetryJiraAsync">@(_loading ? "Trying…" : "Try again")</button>
+        </div>
     }
 
     @* A new period slides in from the side it comes from. *@
@@ -54,14 +53,14 @@
         {
             <div class="mt-3 text-sm text-amber-700 dark:text-amber-400" role="status">@_notice</div>
         }
-        @if (User.Connection is { } connection)
+        @if (User.Connection is { } connection && sheet.HoursKnown)
         {
             <div class="mt-4">
                 <DayEditor @ref="_editor" Date="_selectedDay" Saved="DayEntries" Work="sheet.WorkFor(_selectedDay)"
                            Recent="_recent" Comments="_comments" Sprint="sheet.Sprint" Earlier="_earlier" Statuses="_statuses"
                            OnIssuePicked="LookUpStatusAsync" Connection="connection" Expected="@(sheet.Day(_selectedDay)?.Expected ?? TimeSpan.Zero)"
                            Previous="sheet.PreviousWorkedDay(_selectedDay)"
-                           OnChanged="StateHasChanged" OnSaved="DaySavedAsync" OnDiscard="() => sheet.Finish(_selectedDay)" />
+                           OnChanged="StateHasChanged" OnSaved="DaySavedAsync" OnChangedInJira="ReloadAsync" OnDiscard="() => sheet.Finish(_selectedDay)" />
             </div>
             <p class="hint mt-4 hidden sm:block" data-shortcuts>
                 Keys: <kbd>←</kbd> <kbd>→</kbd> previous / next day · <kbd>N</kbd> add a row ·
@@ -70,6 +69,10 @@
         }
     </section>
 </div>
+}
+else
+{
+    <p class="mx-auto max-w-7xl text-sm text-slate-500 dark:text-slate-400" role="status" data-loading>Reading your time from Jira…</p>
 }
 
 @code {
@@ -85,10 +88,11 @@
     private DateOnly _selectedDay;
     private int _unsynced;
     private PeriodReminders.OpenPeriod? _previousOpen;
-    private bool _syncing, _savingAll, _importing;
+    private bool _syncing, _savingAll, _loading;
     /// <summary>News about the selected day, such as days Save all couldn't save.</summary>
     private string? _notice;
-    private string? _importNotice;
+    /// <summary>Why Jira couldn't be read; the period then shows only work waiting for Jira and can't be edited.</summary>
+    private string? _jiraError;
     private DayEditor? _editor;
 
     // What the issue picker offers besides the sprint.
@@ -124,7 +128,6 @@
         _slide = _sheet is null ? 0 : period.Start.CompareTo(_sheet.Period.Start);
         await ReloadAsync(sheet);
         (_sheet, _selectedDay, _notice) = (sheet, selected, null);
-        await ImportAsync(); // renders the local hours first, then adds what Jira has
         sheet.Suggest(_selectedDay);
     }
 
@@ -138,62 +141,43 @@
     private async Task ReloadAsync(PeriodSheet sheet)
     {
         var p = sheet.Period;
+        // One read covers the period, the days before it to copy from, and the period before it.
+        var from = new[] { p.Start.AddDays(-DayFiller.LookBackDays), p.Previous.Start }.Min();
+        _loading = true;
+        var time = await Log.GetRangeAsync(from, p.End);
+        _loading = false;
+        _jiraError = time.JiraError;
         sheet.Load(
-            await Entries.GetRangeAsync(p.Start, p.End),
-            await Entries.GetRangeAsync(p.Start.AddDays(-DayFiller.LookBackDays), p.Start.AddDays(-1)),
-            await Calendar.GetDaysAsync(p.Start, p.End));
-        _recent = await Entries.GetRecentIssuesAsync();
-        _comments = await Entries.GetRecentCommentsAsync();
-        _unsynced = (await Entries.GetUnsyncedAsync(p.Start, p.End)).Count;
-        _previousOpen = await LoadPreviousAsync(p);
+            time.Between(p.Start, p.End),
+            time.Between(p.Start.AddDays(-DayFiller.LookBackDays), p.Start.AddDays(-1)),
+            await Calendar.GetDaysAsync(p.Start, p.End),
+            time.IsComplete);
+        _unsynced = sheet.Entries.Count(e => !e.IsSynced);
+        _previousOpen = await LoadPreviousAsync(p, time);
+        var recent = await Log.GetRecentAsync();
+        _recent = RecentWork.Issues(recent);
+        _comments = RecentWork.Comments(recent);
         await LoadIssuesAsync(sheet);
     }
 
     /// <summary>The period before the current one, when it has missing hours or work not in Jira.</summary>
-    private async Task<PeriodReminders.OpenPeriod?> LoadPreviousAsync(Period period)
+    private async Task<PeriodReminders.OpenPeriod?> LoadPreviousAsync(Period period, LoggedTime time)
     {
         if (!period.Contains(Today)) return null;
         var prev = period.Previous;
-        var summary = PeriodSummary.For(prev, await Calendar.GetDaysAsync(prev.Start, prev.End), await Entries.GetRangeAsync(prev.Start, prev.End), Today);
-        var notInJira = (await Entries.GetUnsyncedAsync(prev.Start, prev.End)).Count;
-        return summary.Missing > TimeSpan.Zero || notInJira > 0 ? new(prev, summary.Missing, notInJira) : null;
+        var entries = time.Between(prev.Start, prev.End);
+        var notInJira = entries.Count(e => !e.IsSynced);
+        // Without Jira the hours are unknown, so only work waiting for Jira is worth a reminder.
+        var missing = time.IsComplete ? PeriodSummary.For(prev, await Calendar.GetDaysAsync(prev.Start, prev.End), entries, Today).Missing : TimeSpan.Zero;
+        return missing > TimeSpan.Zero || notInJira > 0 ? new(prev, missing, notInJira) : null;
     }
 
-    /// <summary>Brings in worklogs logged in Jira for the period. Jira being down only shows a notice.</summary>
-    private async Task ImportAsync()
+    private async Task RetryJiraAsync()
     {
-        _importNotice = null;
-        if (User is not { Connection: { } c, Profile: { } profile } || User.VerifiedOffline) return;
-        _importing = true;
-        StateHasChanged();
-        var sheet = Sheet;
-        try
-        {
-            var result = await Sync.ImportAsync(c, profile, sheet.Period.Start, sheet.Period.End);
-            if (sheet != _sheet) return; // moved on to another period meanwhile
-            if (result.Changes > 0)
-            {
-                await ReloadAsync();
-                _importNotice = ImportSummary(result);
-            }
-        }
-        catch (JiraException ex)
-        {
-            _importNotice = $"Couldn't read your worklogs from Jira: {ex.Message}";
-        }
-        finally
-        {
-            _importing = false;
-        }
+        Log.Refresh();
+        await ReloadAsync();
+        Sheet.Suggest(_selectedDay);
     }
-
-    private static string ImportSummary(WorklogSync.ImportResult r) =>
-        "From Jira: " + string.Join(", ", new[]
-        {
-            r.Added > 0 ? $"{r.Added} new {(r.Added == 1 ? "worklog" : "worklogs")}" : null,
-            r.Updated > 0 ? $"{r.Updated} changed" : null,
-            r.Removed > 0 ? $"{r.Removed} deleted" : null,
-        }.Where(x => x is not null)) + ".";
 
     /// <summary>
     /// Sprint issues for picks and suggestions, issues from earlier in the period, and the current status
@@ -289,19 +273,26 @@
         _savingAll = true;
         _notice = null;
         var needsWork = new List<DateOnly>();
+        var changedInJira = new List<DateOnly>();
         StartSave();
         foreach (var day in Sheet.UnsavedDays)
         {
             var work = Sheet.WorkFor(day);
-            var result = work.BadHours.Count == 0 ? await Sync.SaveDayAsync(c, day, work.RowsToSave(Sheet.SavedOn(day))) : null;
+            var result = work.BadHours.Count == 0 ? await Sync.SaveDayAsync(c, day, work.RowsToSave(Sheet.SavedOn(day)), Sheet.SavedOn(day)) : null;
             if (result is { Saved: true }) Saved(day, result);
+            else if (result is { ChangedInJira: true }) changedInJira.Add(day);
             else needsWork.Add(day);
         }
         _savingAll = false;
         if (_justSaved.Contains(_selectedDay)) await Animations.CollapseAsync(MotionScript.RemovedRows);
         await ReloadAsync();
         FinishSave();
-        if (needsWork.Count > 0)
+        if (changedInJira.Count > 0)
+        {
+            SelectDay(changedInJira[0]);
+            _notice = $"{Format.Days(changedInJira.Count)} not saved because the worklogs were changed in Jira meanwhile. Each shows Jira's version with your changes on top; check it and press Save day.";
+        }
+        else if (needsWork.Count > 0)
         {
             SelectDay(needsWork[0]);
             _notice = $"{Format.Days(needsWork.Count)} not saved because a row needs an issue or hours. Finish it below and press Save day.";
@@ -313,9 +304,9 @@
         if (User.Connection is not { } c) return;
         _syncing = true;
         await Sync.SyncRangeAsync(c, Sheet.Period.Start, Sheet.Period.End);
-        await ImportAsync();
-        _syncing = false;
+        Log.Refresh(); // Sync now also picks up what was logged in Jira meanwhile
         await ReloadAsync();
+        _syncing = false;
     }
 
     // ---- Time off ----

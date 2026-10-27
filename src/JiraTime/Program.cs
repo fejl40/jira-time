@@ -30,6 +30,8 @@ builder.Services.AddScoped<JiraTime.Components.MotionScript>();
 builder.Services.AddSingleton<LegacyDataMigration>();
 builder.Services.AddScoped<TimeEntryService>();
 builder.Services.AddScoped<WorklogSync>();
+builder.Services.AddScoped<TimeLog>();
+builder.Services.AddSingleton<RecentWorklogIssues>();
 builder.Services.AddScoped<WorkCalendarService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<JiraIssueLookup>();

@@ -38,7 +38,7 @@
             if (!PeriodSummary.EndsSoon(Sheet.Period, Sheet.Today)) return null;
             var s = Sheet.Summary;
             var left = List(
-                s.Missing > TimeSpan.Zero ? $"{Format.Hours(s.Missing)} h missing so far" : null,
+                Sheet.HoursKnown && s.Missing > TimeSpan.Zero ? $"{Format.Hours(s.Missing)} h missing so far" : null,
                 s.StillToLog > TimeSpan.Zero ? $"{Format.Hours(s.StillToLog)} h for the days left" : null,
                 Unsynced > 0 ? $"{Unsynced} not in Jira" : null);
             return left == "" ? null : left;

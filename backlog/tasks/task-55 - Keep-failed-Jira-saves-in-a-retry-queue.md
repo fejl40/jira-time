@@ -1,9 +1,10 @@
 ---
 id: TASK-55
 title: Keep failed Jira saves in a retry queue
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-27 14:01'
+updated_date: '2026-10-27 14:28'
 labels:
   - jira-source-of-truth
 dependencies:
@@ -20,9 +21,15 @@ When Jira can't be reached, a save must not be lost. The failed creates, updates
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A save that fails is queued with its reason and the day shows the queued work as Not in Jira
-- [ ] #2 Sync now and opening the period retry the queue; done items are removed
-- [ ] #3 Queued work counts in totals and missing hours, and a queued delete hides the work
-- [ ] #4 The queue is stored per user and survives a restart
-- [ ] #5 Tests cover queueing, retry, partial failure and ordering of changes to the same worklog
+- [x] #1 A save that fails is queued with its reason and the day shows the queued work as Not in Jira
+- [x] #2 Sync now and opening the period retry the queue; done items are removed
+- [x] #3 Queued work counts in totals and missing hours, and a queued delete hides the work
+- [x] #4 The queue is stored per user and survives a restart
+- [x] #5 Tests cover queueing, retry, partial failure and ordering of changes to the same worklog
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Failed creates, updates and removals are kept in the per-user store as the retry queue (own ids), shown as Not in Jira with the reason, counted in totals, and sent by Sync now or the next save of the day; sent items leave the queue.
+<!-- SECTION:FINAL_SUMMARY:END -->

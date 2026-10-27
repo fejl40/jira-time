@@ -186,8 +186,7 @@ public class DataSeparationTests : IDisposable
 
         Assert.Equal(["ABC-1"], (await Entries(TestUsers.Carl).GetRangeAsync(Day, Day)).Select(e => e.IssueKey));
         Assert.Equal(["XYZ-1"], (await Entries(TestUsers.Anna).GetRangeAsync(Day, Day)).Select(e => e.IssueKey));
-        Assert.Equal(["XYZ-1"], (await Entries(TestUsers.Anna).GetRecentIssuesAsync()).Select(i => i.Key));
-        Assert.Single(await Entries(TestUsers.Anna).GetUnsyncedAsync(Day, Day));
+        Assert.Single(await Entries(TestUsers.Anna).GetPendingAsync(Day, Day));
     }
 
     [Fact]

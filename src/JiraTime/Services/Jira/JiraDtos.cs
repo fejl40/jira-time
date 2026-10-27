@@ -11,7 +11,7 @@ internal record PickerIssue(string Key, string? SummaryText);
 internal record RawWorklog(string? Id);
 internal record SearchResult(List<SearchIssue> Issues, int? Total = null, string? NextPageToken = null, bool? IsLast = null);
 internal record WorklogPage(List<RawJiraWorklog> Worklogs, int Total);
-internal record RawJiraWorklog(string? Id, string? Started, int TimeSpentSeconds, JsonElement? Comment, RawUser? Author);
+internal record RawJiraWorklog(string? Id, string? Started, int TimeSpentSeconds, JsonElement? Comment, RawUser? Author, string? Created = null);
 internal record SearchIssue(string Key, SearchFields? Fields);
 internal record SearchFields(string? Summary, NamedField? IssueType, StatusField? Status);
 internal record NamedField(string? Name);

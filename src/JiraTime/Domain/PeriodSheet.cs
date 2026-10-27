@@ -25,12 +25,19 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
     /// <summary>The user's sprint issues, used to guess the issue of a suggestion.</summary>
     public IReadOnlyList<IssueWithStatus> Sprint { get; set; } = [];
 
+    /// <summary>
+    /// False when Jira couldn't be read, so <see cref="Entries"/> is only the work waiting for Jira: hours
+    /// are then unknown, so nothing counts as missing and nothing is suggested.
+    /// </summary>
+    public bool HoursKnown { get; private set; } = true;
+
     /// <summary>Takes freshly loaded saved data. Unsaved changes are kept.</summary>
-    public void Load(IReadOnlyList<TimeEntry> entries, IReadOnlyList<TimeEntry> before, IReadOnlyDictionary<DateOnly, DayInfo> days)
+    public void Load(IReadOnlyList<TimeEntry> entries, IReadOnlyList<TimeEntry> before, IReadOnlyDictionary<DateOnly, DayInfo> days, bool hoursKnown = true)
     {
         Entries = entries;
         Before = before;
         Days = days;
+        HoursKnown = hoursKnown;
     }
 
     public PeriodSummary Summary => PeriodSummary.For(Period, Days, Entries, Today);
@@ -45,7 +52,7 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
 
     /// <summary>Hours missing on a day; only counted up to today.</summary>
     public TimeSpan Missing(DateOnly day) =>
-        day > Today || !Days.TryGetValue(day, out var info) ? TimeSpan.Zero : info.MissingWith(Total(SavedOn(day)));
+        !HoursKnown || day > Today || !Days.TryGetValue(day, out var info) ? TimeSpan.Zero : info.MissingWith(Total(SavedOn(day)));
 
     /// <summary>Saved hours as a share of the hours the day needs, from 0 to 1; 0 on days that need none.</summary>
     public double Progress(DateOnly day) =>

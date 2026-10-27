@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using JiraTime.Domain;
 using static JiraTime.Services.JiraHttp;
@@ -96,28 +97,51 @@ public class JiraClient(HttpClient http)
 
     /// <summary>
     /// Worklogs <paramref name="profile"/> logged on days from <paramref name="from"/> to <paramref name="to"/>,
-    /// on any issue, however they were logged.
+    /// on any issue, however they were logged. The issues in <paramref name="alsoRead"/> are read even when
+    /// Jira's search doesn't return them, which it can't for a while after a worklog was written.
     /// </summary>
-    public async Task<IReadOnlyList<JiraWorklog>> GetMyWorklogsAsync(JiraConnection c, JiraProfile profile, DateOnly from, DateOnly to, CancellationToken ct = default)
+    public async Task<IReadOnlyList<JiraWorklog>> GetMyWorklogsAsync(JiraConnection c, JiraProfile profile, DateOnly from, DateOnly to,
+        IReadOnlyCollection<JiraIssue>? alsoRead = null, CancellationToken ct = default)
     {
         var jql = $"worklogAuthor = {Jql.User(profile)} AND worklogDate >= {Jql.Date(from)} AND worklogDate <= {Jql.Date(to)}";
+        var issues = (await SearchAllAsync(c, jql, ct)).Select(i => new JiraIssue(i.Key, i.Fields?.Summary ?? "")).ToList();
+        var found = issues.Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var extra = (alsoRead ?? []).Where(i => found.Add(i.Key)).ToList();
+
         var result = new List<JiraWorklog>();
-        foreach (var issue in await SearchAllAsync(c, jql, ct))
+        foreach (var issue in issues)
+            result.AddRange(await ReadWorklogsAsync(c, issue, profile, from, to, ct));
+        foreach (var issue in extra)
         {
-            for (var startAt = 0; ; )
+            try
             {
-                var page = await _jira.GetAsync<WorklogPage>(c,
-                    $"{Api(c)}/issue/{Uri.EscapeDataString(issue.Key)}/worklog?startAt={startAt}&maxResults=1000", ct);
-                foreach (var w in page.Worklogs)
-                {
-                    if (w.Id is null || !IsAuthor(w.Author, profile) || ParseStarted(w.Started) is not { } date) continue;
-                    if (date < from || date > to) continue;
-                    result.Add(new JiraWorklog(w.Id, issue.Key, issue.Fields?.Summary ?? "", date,
-                        WholeMinutes(w.TimeSpentSeconds), AtlassianDocument.ToPlainText(w.Comment)));
-                }
-                startAt += page.Worklogs.Count;
-                if (page.Worklogs.Count == 0 || startAt >= page.Total) break;
+                result.AddRange(await ReadWorklogsAsync(c, issue, profile, from, to, ct));
             }
+            catch (JiraException ex) when (ex.Status == HttpStatusCode.NotFound)
+            {
+                // The issue is gone, and its worklogs with it.
+            }
+        }
+        return result;
+    }
+
+    /// <summary>The issue's worklogs by <paramref name="profile"/> on days from <paramref name="from"/> to <paramref name="to"/>.</summary>
+    private async Task<List<JiraWorklog>> ReadWorklogsAsync(JiraConnection c, JiraIssue issue, JiraProfile profile, DateOnly from, DateOnly to, CancellationToken ct)
+    {
+        var result = new List<JiraWorklog>();
+        for (var startAt = 0; ; )
+        {
+            var page = await _jira.GetAsync<WorklogPage>(c,
+                $"{Api(c)}/issue/{Uri.EscapeDataString(issue.Key)}/worklog?startAt={startAt}&maxResults=1000", ct);
+            foreach (var w in page.Worklogs)
+            {
+                if (w.Id is null || !IsAuthor(w.Author, profile) || ParseStarted(w.Started) is not { } date) continue;
+                if (date < from || date > to) continue;
+                result.Add(new JiraWorklog(w.Id, issue.Key, issue.Summary, date,
+                    WholeMinutes(w.TimeSpentSeconds), AtlassianDocument.ToPlainText(w.Comment), ParseCreated(w.Created)));
+            }
+            startAt += page.Worklogs.Count;
+            if (page.Worklogs.Count == 0 || startAt >= page.Total) break;
         }
         return result;
     }
@@ -130,7 +154,7 @@ public class JiraClient(HttpClient http)
             var w = await _jira.GetAsync<RawJiraWorklog>(c,
                 $"{Api(c)}/issue/{Uri.EscapeDataString(issueKey)}/worklog/{Uri.EscapeDataString(worklogId)}", ct);
             return ParseStarted(w.Started) is { } date
-                ? new JiraWorklog(w.Id ?? worklogId, issueKey, "", date, WholeMinutes(w.TimeSpentSeconds), AtlassianDocument.ToPlainText(w.Comment))
+                ? new JiraWorklog(w.Id ?? worklogId, issueKey, "", date, WholeMinutes(w.TimeSpentSeconds), AtlassianDocument.ToPlainText(w.Comment), ParseCreated(w.Created))
                 : null;
         }
         catch (JiraException ex) when (ex.Status == HttpStatusCode.NotFound)
@@ -149,6 +173,15 @@ public class JiraClient(HttpClient http)
     /// <summary>The day of a worklog's "started" value, as Jira wrote it (2026-10-19T09:00:00.000+0200).</summary>
     public static DateOnly? ParseStarted(string? started) =>
         started is { Length: >= 10 } && DateOnly.TryParseExact(started[..10], "yyyy-MM-dd", out var d) ? d : null;
+
+    /// <summary>A worklog's "created" value, e.g. 2026-10-19T09:00:00.000+0200; null when it can't be read.</summary>
+    public static DateTimeOffset? ParseCreated(string? created)
+    {
+        if (created is not { Length: > 5 }) return null;
+        // Jira writes the offset without a colon (+0200), which .NET only reads with one.
+        var text = created[^5] is '+' or '-' ? created.Insert(created.Length - 2, ":") : created;
+        return DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
+    }
 
     /// <summary>Every issue matching <paramref name="jql"/>, page by page.</summary>
     private async Task<List<SearchIssue>> SearchAllAsync(JiraConnection c, string jql, CancellationToken ct)

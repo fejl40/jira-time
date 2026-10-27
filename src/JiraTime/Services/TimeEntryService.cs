@@ -4,11 +4,8 @@ using JiraTime.Storage;
 namespace JiraTime.Services;
 
 /// <summary>The signed-in user's time entries. Every read and write is limited to <see cref="CurrentUser"/>.</summary>
-public class TimeEntryService(IDocumentStore store, CurrentUser user, TimeProvider? clock = null)
+public class TimeEntryService(IDocumentStore store, CurrentUser user)
 {
-    /// <summary>How far back recent issues and comments are taken from.</summary>
-    public const int RecentDays = 60;
-
     private readonly IDocumentCollection<TimeEntry> _docs = store.Collection<TimeEntry>();
 
     public async Task<IReadOnlyList<TimeEntry>> GetRangeAsync(DateOnly from, DateOnly to)
@@ -16,41 +13,6 @@ public class TimeEntryService(IDocumentStore store, CurrentUser user, TimeProvid
         var owner = user.Owner;
         var entries = await _docs.QueryAsync(e => e.Owner == owner && e.Date >= from && e.Date <= to && !e.DeletePending);
         return entries.OrderBy(e => e.Date).ThenBy(e => e.CreatedUtc).ToList();
-    }
-
-    /// <summary>Most recently used issues, newest first. Used as quick picks when adding an entry.</summary>
-    public async Task<IReadOnlyList<JiraIssue>> GetRecentIssuesAsync(int count = 8)
-    {
-        var since = (clock ?? TimeProvider.System).Today().AddDays(-RecentDays);
-        var owner = user.Owner;
-        var entries = await _docs.QueryAsync(e => e.Owner == owner && e.Date >= since && !e.DeletePending);
-        return entries
-            .OrderByDescending(e => e.UpdatedUtc)
-            .DistinctBy(e => e.IssueKey)
-            .Take(count)
-            .Select(e => new JiraIssue(e.IssueKey, e.IssueSummary))
-            .ToList();
-    }
-
-    /// <summary>
-    /// The latest distinct comments per issue from the last <see cref="RecentDays"/> days, newest first, at most
-    /// <paramref name="perIssue"/> each. Offered as suggestions in the comment field.
-    /// </summary>
-    public async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> GetRecentCommentsAsync(int perIssue = 5)
-    {
-        var since = (clock ?? TimeProvider.System).Today().AddDays(-RecentDays);
-        var owner = user.Owner;
-        var entries = await _docs.QueryAsync(e => e.Owner == owner && e.Date >= since && !e.DeletePending && e.Description != null);
-        return entries
-            .Where(e => !string.IsNullOrWhiteSpace(e.Description))
-            .GroupBy(e => e.IssueKey, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(g => g.Key,
-                g => (IReadOnlyList<string>)g.OrderByDescending(e => e.Date).ThenByDescending(e => e.UpdatedUtc)
-                    .Select(e => e.Description!.Trim())
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Take(perIssue)
-                    .ToList(),
-                StringComparer.OrdinalIgnoreCase);
     }
 
     public const string TooManyHours = "A day can't have more than 24 hours.";
@@ -108,6 +70,10 @@ public class TimeEntryService(IDocumentStore store, CurrentUser user, TimeProvid
     /// </summary>
     public async Task<IReadOnlyList<TimeEntry>> GetUnsyncedAsync(DateOnly from, DateOnly to) =>
         (await QueryMineAsync(from, to)).Where(e => !e.IsSynced).OrderBy(e => e.Date).ToList();
+
+    /// <summary>Work in the range that Jira doesn't have yet: new or changed work, and removals still to send.</summary>
+    public async Task<IReadOnlyList<TimeEntry>> GetPendingAsync(DateOnly from, DateOnly to) =>
+        (await QueryMineAsync(from, to)).Where(e => !e.IsSynced).OrderBy(e => e.Date).ThenBy(e => e.CreatedUtc).ToList();
 
     /// <summary>Every entry in the range, including removed work whose worklog delete is still pending.</summary>
     public Task<IReadOnlyList<TimeEntry>> GetRangeWithRemovedAsync(DateOnly from, DateOnly to) => QueryMineAsync(from, to);

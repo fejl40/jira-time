@@ -47,7 +47,7 @@
                         }
                         else if (e.IsSynced)
                         {
-                            <span class="text-emerald-700 dark:text-emerald-400" title="@(e.FromJira ? "Logged in Jira and imported" : null)">✓ @(e.FromJira ? "From Jira" : "In Jira")</span>
+                            <span class="text-emerald-700 dark:text-emerald-400">✓ In Jira</span>
                         }
                         else
                         {
@@ -160,6 +160,8 @@
     [Parameter] public EventCallback OnChanged { get; set; }
     /// <summary>Raised after the day was saved.</summary>
     [Parameter] public EventCallback<WorklogSync.DayResult> OnSaved { get; set; }
+    /// <summary>Raised when nothing was saved because Jira changed meanwhile, so the page reads the day again.</summary>
+    [Parameter] public EventCallback OnChangedInJira { get; set; }
     /// <summary>Raised when the user discards the unsaved changes.</summary>
     [Parameter] public EventCallback OnDiscard { get; set; }
 
@@ -322,13 +324,14 @@
         if (Work.BadHours.Count > 0) return;
 
         _busy = true;
-        var result = await Sync.SaveDayAsync(Connection, Date, Work.RowsToSave(Saved));
+        var result = await Sync.SaveDayAsync(Connection, Date, Work.RowsToSave(Saved), Saved);
         _busy = false;
         _errors = result.Errors.ToDictionary();
+        if (result.ChangedInJira) await OnChangedInJira.InvokeAsync();
         if (!result.Saved) return;
 
         _notice = result.SyncFailures > 0
-            ? $"Saved, but {result.SyncFailures} {(result.SyncFailures == 1 ? "change" : "changes")} could not be sent to Jira yet. Use Sync now to retry."
+            ? $"Saved, but {result.SyncFailures} {(result.SyncFailures == 1 ? "change" : "changes")} could not be sent to Jira yet. {(result.SyncFailures == 1 ? "It is" : "They are")} kept here and sent with Sync now."
             : null;
         await Animations.CollapseAsync(MotionScript.RemovedRows);
         await OnSaved.InvokeAsync(result);

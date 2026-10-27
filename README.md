@@ -1,7 +1,8 @@
 # Jira Time
 
 A local timesheet for logging hours on Jira issues, in semi-monthly periods like myTE.
-Each entry records *when* the work happened (date, from, to), not just how long.
+Jira is the source of truth for logged time: the hours are your Jira worklogs, so they show in Jira,
+WorklogPRO and any other worklog report. Days off and work hours are kept in the app.
 
 Blazor (Interactive Server, .NET 10) + Tailwind CSS v4.
 
@@ -46,7 +47,8 @@ in `data/documents/backups/` first, and nothing is deleted.
 | Users Jira confirmed (profile, hashes of confirmed tokens) | `data/documents/users/<owner>.json` |
 | Days off (whole or partial) | `data/documents/days-off/<owner>-<date>.json` |
 | Work hours per weekday | `data/documents/user-settings/<owner>.json` |
-| Time entries | `data/documents/time-entries/<id>.json`, one file per entry, with its owner |
+| Logged time | **Jira** (your worklogs) |
+| Changes Jira couldn't take yet (the retry queue) | `data/documents/time-entries/<id>.json`, one file per change, with its owner; removed once Jira has it |
 | Copy of the data from before multi-user support | `data/documents/backups/` |
 
 **Token encryption:** the server encrypts the connection with ASP.NET Core Data Protection
@@ -54,29 +56,34 @@ in `data/documents/backups/` first, and nothing is deleted.
 ciphertext; the key never leaves `data/keys`. Copying the browser's storage gives nothing usable.
 Deleting `data/keys` makes the stored token unreadable and the app asks you to connect again.
 
-`data/` is created next to the project (`src/JiraTime/data/`). **Back up** the `data/` folder to keep your history. `data/` is git-ignored.
+`data/` is created next to the project (`src/JiraTime/data/`). **Back up** the `data/` folder to keep your days off and settings. `data/` is git-ignored.
 
 ## Jira worklogs
 
-Every entry is sent to Jira as a worklog as soon as it is saved; edits update it, moving an entry
-to another issue moves the worklog, and deleting an entry deletes the worklog. If Jira can't be
-reached the entry is still saved and shown as **Not in Jira** with the reason; retry it from the
-day view or use **Sync now** in the period header. Removing work deletes its worklog in Jira, so the issue's
-logged hours go down. If Jira can't be reached then, the removal is remembered, counted under
-"not in Jira" and retried by **Sync now**.
+The timesheet shows your Jira worklogs, however they were logged: here, in Jira or in WorklogPRO.
+They are read when a period opens, reused for a minute, and read again with **Sync now** or after a save.
+Jira's search can take a while to find a new worklog, so for 15 minutes after a save the issues you
+saved on are read directly.
 
-Worklogs you log in Jira directly (or with another tool) are imported when a period opens and with
-**Sync now**: they show as **From Jira** and count in totals, missing hours and suggestions. For work
-Jira already has, Jira wins: edits made there are copied here, and work deleted there is removed
-here (after checking the worklog itself, so a slow Jira search index can't drop anything). Work with
-local changes Jira doesn't have yet is left alone and sent to Jira instead.
+Saving a day creates, updates and deletes its worklogs in Jira, then reads the day back. Moving a row
+to another issue moves its worklog; removing a row deletes it. Before changing or deleting worklogs,
+the app checks that Jira still has them as they were read. If someone changed one meanwhile nothing is
+saved: the day shows Jira's version with your changes on top, to check and save again.
+
+If Jira can't take a change, it waits in a local retry queue: it shows as **Not in Jira** with the
+reason, counts in totals (a waiting removal hides the work), and is sent by **Sync now** or the next
+save of that day. Once Jira has it, it leaves the queue.
+
+If Jira can't be read at all, the period shows only the work waiting for Jira, with a **Try again**
+button. Hours are unknown then, so nothing counts as missing, nothing is suggested and days can't be
+edited, so nothing is logged twice.
 
 ## My sprint
 
 The issue picker lists the issues assigned to you in an open sprint (not Done, with their status),
-then recently used issues. Typing filters both by key or summary and, from two characters, adds
+then issues you logged on in the last 60 days (from your Jira worklogs). Typing filters both by key or summary and, from two characters, adds
 Jira search results; arrow keys, Enter and Escape work. The comment field suggests the latest
-comments you used on the row's issue. Tasks and stories both count. On Jira without sprints it
+comments you used on the row's issue in those worklogs. Tasks and stories both count. On Jira without sprints it
 falls back to all open issues assigned to you. The list is cached for five minutes.
 
 Under **Earlier this period** it also lists issues that were assigned to you and To Do or In Progress
@@ -172,7 +179,7 @@ are quick (150–300 ms) and switch off when your system asks for reduced motion
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, worklog sync and import, Jira queries, issue lookups and the picker, and fill suggestions.
+xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, saving days to Jira and the retry queue, Jira queries, issue lookups and the picker, and fill suggestions.
 
 ## Contributing
 
@@ -193,7 +200,8 @@ Domain/DayWork.cs                  one day's unsaved changes
 Domain/DayFiller.cs                suggestions for a day's missing hours
 Domain/PeriodSummary.cs            logged, missing and weekly hours of a period
 Domain/IssueChoices.cs             what the issue picker offers, in which group
-Domain/WorklogMatching.cs          comparing entries with Jira worklogs
+Domain/WorklogMatching.cs          worklogs as entries, waiting work laid over them, comparing the two
+Domain/RecentWork.cs               recent issues and comments for quick picks
 Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work hours
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount
 Domain/LegacyData.cs               data from before multi-user support
@@ -203,11 +211,13 @@ Services/ConnectionState.cs        encrypted connection in browser localStorage 
 Services/JiraIdentity.cs           signs a tab in as the user Jira says the token belongs to
 Services/CurrentUser.cs            the verified user of this tab; data services filter by it
 Services/LegacyDataMigration.cs    gives data from before multi-user support to its owner
-Services/TimeEntryService.cs       entries: query, save (with validation), delete
+Services/TimeLog.cs                logged time: Jira worklogs plus the retry queue, cached briefly
+Services/RecentWorklogIssues.cs    issues just saved on, read directly while Jira's search catches up
+Services/TimeEntryService.cs       the retry queue: changes Jira couldn't take yet; entry rules
 Services/WorkCalendarService.cs    days and work hours of the signed-in user
 Services/JiraClient.cs             Jira REST calls (myself, issue picker, searches, worklogs)
 Services/Jira/                     HTTP transport, JQL quoting, comment format, raw JSON shapes
-Services/WorklogSync.cs            keeps Jira worklogs in step with entries
+Services/WorklogSync.cs            saves days to Jira, queues what fails, sends the queue
 Services/JiraIssueLookup.cs        sprint and period issues and issue statuses, cached briefly
 Services/ExpiringCache.cs          small cache whose values expire
 Components/Layout/MainLayout.razor header + redirect to setup when not signed in

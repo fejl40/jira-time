@@ -143,4 +143,17 @@ public class PeriodSheetTests
         Assert.False(sheet.IsComplete(Monday));
         Assert.False(sheet.IsComplete(saturday));
     }
+
+    [Fact]
+    public void Without_Jira_hours_are_unknown_so_nothing_is_missing_or_suggested()
+    {
+        var sheet = new PeriodSheet(Period, () => Tuesday) { Sprint = [Doing] };
+        var days = Period.Days.ToDictionary(d => d, d => DanishHolidays.Classify(d, new Dictionary<DateOnly, DayOff>()));
+        sheet.Load([], [], days, hoursKnown: false);
+
+        Assert.Equal(TimeSpan.Zero, sheet.Missing(Monday));
+        Assert.False(sheet.CanFill(Monday));
+        sheet.FillPeriod();
+        Assert.Empty(sheet.UnsavedDays);
+    }
 }

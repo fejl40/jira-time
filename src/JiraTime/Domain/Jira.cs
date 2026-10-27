@@ -32,8 +32,9 @@ public record JiraProfile(string Id, string? Username, string DisplayName, strin
 
 public record JiraIssue(string Key, string Summary);
 
-/// <summary>A worklog as Jira has it, read back for import.</summary>
-public record JiraWorklog(string Id, string IssueKey, string IssueSummary, DateOnly Date, TimeSpan Duration, string? Comment);
+/// <summary>A worklog as Jira has it.</summary>
+/// <param name="Created">When it was logged; orders a day's work. Null when Jira didn't say.</param>
+public record JiraWorklog(string Id, string IssueKey, string IssueSummary, DateOnly Date, TimeSpan Duration, string? Comment, DateTimeOffset? Created = null);
 
 /// <summary>An issue with its current status (from a sprint, period or status lookup).</summary>
 /// <param name="StatusCategory">Jira's status category key: "new", "indeterminate" (in progress) or "done".</param>

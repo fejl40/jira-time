@@ -80,7 +80,23 @@ public class WorklogMatchingTests
         Assert.Equal("10001", e.JiraWorklogId);
         Assert.Equal("ABC-1", e.JiraWorklogIssueKey);
         Assert.True(e.IsSynced);
-        Assert.True(e.FromJira);
+        Assert.Equal("jira-10001", e.Id); // the same on every read
+    }
+
+    [Fact]
+    public void Merge_lays_waiting_work_over_Jiras_worklogs()
+    {
+        var other = Worklog with { Id = "10002", IssueKey = "ABC-2" };
+        var gone = Worklog with { Id = "10003", IssueKey = "ABC-3" };
+        var changed = Entry();
+        changed.Duration = TimeSpan.FromHours(5);
+        changed.SyncPending = true;
+        var removed = new TimeEntry { IssueKey = "ABC-3", Date = Day, JiraWorklogId = "10003", SyncPending = true, DeletePending = true };
+        var added = new TimeEntry { IssueKey = "ABC-4", Date = Day.AddDays(-1), Duration = TimeSpan.FromHours(1), SyncPending = true };
+
+        var merged = WorklogMatching.Merge([Worklog, other, gone, Worklog], [changed, removed, added]);
+
+        Assert.Equal(["ABC-4 1", "ABC-2 2", "ABC-1 5"], merged.Select(e => $"{e.IssueKey} {e.Duration.TotalHours}"));
     }
 
     [Fact]
