@@ -50,6 +50,7 @@ in `data/documents/backups/` first, and nothing is deleted.
 | Logged time | **Jira** (your worklogs) |
 | Changes Jira couldn't take yet (the retry queue) | `data/documents/time-entries/<id>.json`, one file per change, with its owner; removed once Jira has it |
 | Copy of the data from before multi-user support | `data/documents/backups/` |
+| Copy of the time entries from before Jira became the source of truth | `data/documents/time-entry-backups/` |
 
 **Token encryption:** the server encrypts the connection with ASP.NET Core Data Protection
 (`ProtectedLocalStorage`) before handing it to the browser. The browser only ever stores
@@ -73,6 +74,10 @@ saved: the day shows Jira's version with your changes on top, to check and save 
 If Jira can't take a change, it waits in a local retry queue: it shows as **Not in Jira** with the
 reason, counts in totals (a waiting removal hides the work), and is sent by **Sync now** or the next
 save of that day. Once Jira has it, it leaves the queue.
+
+Older versions kept every entry locally as well. The first time you sign in after updating, a copy
+of your entries is stored in `data/documents/time-entry-backups/`, the entries Jira already has are
+dropped, and the ones it doesn't have stay in the retry queue for **Sync now**.
 
 If Jira can't be read at all, the period shows only the work waiting for Jira, with a **Try again**
 button. Hours are unknown then, so nothing counts as missing, nothing is suggested and days can't be

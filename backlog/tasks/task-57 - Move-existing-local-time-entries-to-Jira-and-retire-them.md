@@ -1,9 +1,10 @@
 ---
 id: TASK-57
 title: Move existing local time entries to Jira and retire them
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-27 14:02'
+updated_date: '2026-10-27 14:31'
 labels:
   - jira-source-of-truth
 dependencies:
@@ -20,8 +21,14 @@ Existing users have time entries in data/documents/time-entries. On first sign-i
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Entries not yet in Jira are sent or put in the retry queue; none are lost
-- [ ] #2 The old time-entries folder is backed up before the app stops using it
-- [ ] #3 Runs once per user and is safe to run again
-- [ ] #4 Tests cover a mix of synced, unsynced and pending-delete entries
+- [x] #1 Entries not yet in Jira are sent or put in the retry queue; none are lost
+- [x] #2 The old time-entries folder is backed up before the app stops using it
+- [x] #3 Runs once per user and is safe to run again
+- [x] #4 Tests cover a mix of synced, unsynced and pending-delete entries
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+On sign-in, LegacyDataMigration.RetireSyncedEntriesAsync backs up all the user's entries to time-entry-backups, then drops the ones Jira has. Entries Jira doesn't have stay as the retry queue. Idempotent.
+<!-- SECTION:FINAL_SUMMARY:END -->

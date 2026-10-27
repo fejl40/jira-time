@@ -26,3 +26,16 @@ public class LegacyBackup : IDocument
     public List<DayOff> DaysOff { get; set; } = [];
     public AppSettings? Settings { get; set; }
 }
+
+/// <summary>
+/// Copy of a user's time entries from when the app kept logged time itself, stored before the entries
+/// Jira already had were dropped (Jira is the source of truth now).
+/// </summary>
+[DocumentCollection("time-entry-backups")]
+public class TimeEntriesBackup : IDocument
+{
+    public string Id { get; set; } = "";
+    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
+    public string Owner { get; set; } = "";
+    public List<TimeEntry> Entries { get; set; } = [];
+}

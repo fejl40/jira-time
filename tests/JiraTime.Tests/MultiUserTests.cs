@@ -359,6 +359,8 @@ public class LegacyDataMigrationTests : IDisposable
         await new JiraIdentity(new JiraClient(jira.Client()), store, user, new LegacyDataMigration(store))
             .SignInAsync(new JiraConnection("https://jira.example.com", JiraAuthType.Pat, "t", null));
 
-        Assert.Equal(2, (await new TimeEntryService(store, user).GetRangeAsync(From, To)).Count);
+        // The entry Jira has is dropped after a backup; the one it doesn't have stays to be sent.
+        Assert.Equal(["ABC-2"], (await new TimeEntryService(store, user).GetRangeAsync(From, To)).Select(e => e.IssueKey));
+        Assert.Equal(2, Assert.Single(await store.Collection<TimeEntriesBackup>().QueryAsync(_ => true)).Entries.Count);
     }
 }

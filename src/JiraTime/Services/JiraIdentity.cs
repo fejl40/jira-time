@@ -65,6 +65,7 @@ public class JiraIdentity(JiraClient jira, IDocumentStore store, CurrentUser use
         await _accounts.UpsertAsync(account);
 
         await legacy.ClaimAsync(key);
+        await legacy.RetireSyncedEntriesAsync(key);
         user.Set(key, me, c, offline: false);
         return Result.Ok;
     }

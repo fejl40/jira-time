@@ -4,9 +4,10 @@ using JiraTime.Storage;
 namespace JiraTime.Services;
 
 /// <summary>
-/// Data saved before multi-user support has no owner. The first time its user signs in, it is given
+/// Moves data saved by older versions of the app. Data saved before multi-user support has no owner. The first time its user signs in, it is given
 /// to them, after a backup copy is stored. The user is the one recorded in the old profile setting;
-/// if none was recorded, whoever signs in first (there was only one user then).
+/// if none was recorded, whoever signs in first (there was only one user then). Time entries from
+/// before Jira became the source of truth are dropped once Jira has them (<see cref="RetireSyncedEntriesAsync"/>).
 /// </summary>
 public class LegacyDataMigration(IDocumentStore store)
 {
@@ -16,6 +17,7 @@ public class LegacyDataMigration(IDocumentStore store)
     private readonly IDocumentCollection<DayOff> _daysOff = store.Collection<DayOff>();
     private readonly IDocumentCollection<AppSettings> _settings = store.Collection<AppSettings>();
     private readonly IDocumentCollection<LegacyBackup> _backups = store.Collection<LegacyBackup>();
+    private readonly IDocumentCollection<TimeEntriesBackup> _timeBackups = store.Collection<TimeEntriesBackup>();
 
     /// <returns>True when old data was given to <paramref name="user"/>.</returns>
     public async Task<bool> ClaimAsync(UserKey user)
@@ -53,6 +55,37 @@ public class LegacyDataMigration(IDocumentStore store)
                 if (d.Id != DayOff.IdFor(user.Id, d.Date)) await _daysOff.DeleteAsync(d.Id);
             }
             return true;
+        }
+        finally
+        {
+            Gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Logged time used to be kept here as well as in Jira. Jira is the source of truth now, so the user's
+    /// entries Jira already has are dropped, after a backup copy of all their entries is stored. Entries
+    /// Jira doesn't have yet stay: they are the retry queue and are sent by Sync now. Safe to run again.
+    /// </summary>
+    /// <returns>How many entries were dropped.</returns>
+    public async Task<int> RetireSyncedEntriesAsync(UserKey user)
+    {
+        await Gate.WaitAsync();
+        try
+        {
+            var owner = user.Id;
+            var all = await _entries.QueryAsync(e => e.Owner == owner);
+            var inJira = all.Where(e => e.IsSynced && !e.DeletePending).ToList();
+            if (inJira.Count == 0) return 0;
+
+            await _timeBackups.UpsertAsync(new TimeEntriesBackup
+            {
+                Id = $"time-entries-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{owner[..8]}",
+                Owner = owner,
+                Entries = all.Select(e => e.Copy()).ToList(),
+            });
+            foreach (var e in inJira) await _entries.DeleteAsync(e.Id);
+            return inJira.Count;
         }
         finally
         {
