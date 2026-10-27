@@ -124,12 +124,16 @@ public record JiraIssue(string Key, string Summary);
 /// <summary>A worklog as Jira has it, read back for import.</summary>
 public record JiraWorklog(string Id, string IssueKey, string IssueSummary, DateOnly Date, TimeSpan Duration, string? Comment);
 
-/// <summary>An issue assigned to the user in an open sprint.</summary>
+/// <summary>An issue with its current status (from a sprint, period or status lookup).</summary>
 /// <param name="StatusCategory">Jira's status category key: "new", "indeterminate" (in progress) or "done".</param>
 public record SprintIssue(string Key, string Summary, string Type, string Status, string StatusCategory)
 {
     [JsonIgnore]
     public bool IsInProgress => StatusCategory == "indeterminate";
+
+    /// <summary>Finished in Jira (status category Done): no longer to do.</summary>
+    [JsonIgnore]
+    public bool IsDone => StatusCategory == "done";
 
     public JiraIssue ToIssue() => new(Key, Summary);
 }

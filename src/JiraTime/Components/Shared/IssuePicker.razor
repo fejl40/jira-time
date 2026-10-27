@@ -26,7 +26,7 @@
                         <span class="truncate text-slate-600 dark:text-slate-300">@item.Summary</span>
                         @if (StatusOf(item.Key) is { } status)
                         {
-                            <span class="ml-auto flex-none text-xs text-slate-400 dark:text-slate-500">@status</span>
+                            <span class="ml-auto flex-none text-xs @(status.IsDone ? "text-amber-700 dark:text-amber-400" : "text-slate-400 dark:text-slate-500")">@status.Status</span>
                         }
                     </li>
                 }
@@ -52,6 +52,10 @@
     [Parameter] public JiraIssue Value { get; set; } = new("", "");
     [Parameter] public IReadOnlyList<SprintIssue> Sprint { get; set; } = [];
     [Parameter] public IReadOnlyList<JiraIssue> Recent { get; set; } = [];
+    /// <summary>Issues assigned to the user that were to do earlier in the period, maybe Done now.</summary>
+    [Parameter] public IReadOnlyList<SprintIssue> Earlier { get; set; } = [];
+    /// <summary>Known current statuses by issue key, shown next to issues.</summary>
+    [Parameter] public IReadOnlyDictionary<string, SprintIssue> Statuses { get; set; } = new Dictionary<string, SprintIssue>();
     [Parameter, EditorRequired] public Func<string, CancellationToken, Task<IReadOnlyList<JiraIssue>>> Search { get; set; } = default!;
     [Parameter] public EventCallback<JiraIssue> OnSelected { get; set; }
     [Parameter] public string? Id { get; set; }
@@ -80,18 +84,22 @@
     {
         get
         {
+            var sprintKeys = Sprint.Select(s => s.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var sprint = IssueFilter.Filter(Sprint.Select(s => s.ToIssue()), _query);
-            var recent = IssueFilter.Filter(Recent.Where(r => r.Key != "" && Sprint.All(s => s.Key != r.Key)), _query);
-            var known = sprint.Concat(recent).Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var earlier = IssueFilter.Filter(Earlier.Where(e => !sprintKeys.Contains(e.Key)).Select(e => e.ToIssue()), _query);
+            var listed = sprintKeys.Concat(Earlier.Select(e => e.Key)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var recent = IssueFilter.Filter(Recent.Where(r => r.Key != "" && !listed.Contains(r.Key)), _query);
+            var known = sprint.Concat(earlier).Concat(recent).Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var jira = IssueFilter.ShouldSearchJira(_query) ? _jira.Where(i => !known.Contains(i.Key)).ToList() : [];
-            return new[] { new Group("My sprint", sprint), new Group("Recent", recent), new Group("Jira search", jira) }
+            return new[] { new Group("My sprint", sprint), new Group("Earlier this period", earlier), new Group("Recent", recent), new Group("Jira search", jira) }
                 .Where(g => g.Items.Count > 0).ToList();
         }
     }
 
     private List<JiraIssue> Flat => Groups.SelectMany(g => g.Items).ToList();
 
-    private string? StatusOf(string key) => Sprint.FirstOrDefault(s => s.Key == key)?.Status;
+    private SprintIssue? StatusOf(string key) =>
+        Sprint.FirstOrDefault(s => s.Key == key) ?? Earlier.FirstOrDefault(s => s.Key == key) ?? Statuses.GetValueOrDefault(key);
 
     private void Open()
     {

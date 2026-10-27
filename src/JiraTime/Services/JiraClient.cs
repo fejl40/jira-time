@@ -51,6 +51,51 @@ public class JiraClient(HttpClient http)
         }
     }
 
+    /// <summary>
+    /// Issues assigned to <paramref name="profile"/> at some time from <paramref name="from"/> to
+    /// <paramref name="to"/> that were in To Do or In Progress then, whatever their status is now.
+    /// Jira's history search needs status names; if Jira rejects them, falls back to issues assigned
+    /// during the period that weren't resolved before it.
+    /// </summary>
+    public async Task<IReadOnlyList<SprintIssue>> GetPeriodIssuesAsync(JiraConnection c, JiraProfile profile, DateOnly from, DateOnly to, CancellationToken ct = default)
+    {
+        var assignee = (profile.Username ?? profile.Id).Replace("\"", "\\\"");
+        var during = $"DURING (\"{from:yyyy-MM-dd}\", \"{to:yyyy-MM-dd}\")";
+        var assigned = $"assignee WAS \"{assignee}\" {during}";
+        try
+        {
+            return await SearchAsync(c, $"{assigned} AND status WAS IN (\"To Do\", \"In Progress\") {during} ORDER BY updated DESC", ct);
+        }
+        catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest)
+        {
+            return await SearchAsync(c, $"{assigned} AND (resolution IS EMPTY OR resolutiondate >= \"{from:yyyy-MM-dd}\") ORDER BY updated DESC", ct);
+        }
+    }
+
+    /// <summary>Current summary and status of the given issues. Keys Jira doesn't know are left out.</summary>
+    public async Task<IReadOnlyList<SprintIssue>> GetIssuesAsync(JiraConnection c, IReadOnlyCollection<string> keys, CancellationToken ct = default)
+    {
+        if (keys.Count == 0) return [];
+        try
+        {
+            return await SearchAsync(c, $"key in ({string.Join(", ", keys.Select(QuoteKey))})", ct);
+        }
+        catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest && keys.Count > 1)
+        {
+            // One unknown key fails the whole query: ask one by one.
+            var found = new List<SprintIssue>();
+            foreach (var key in keys)
+                found.AddRange(await GetIssuesAsync(c, [key], ct));
+            return found;
+        }
+        catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest)
+        {
+            return [];
+        }
+    }
+
+    private static string QuoteKey(string key) => $"\"{key.Replace("\"", "")}\"";
+
     private async Task<IReadOnlyList<SprintIssue>> SearchAsync(JiraConnection c, string jql, CancellationToken ct)
     {
         // Cloud retired GET /search in favour of /search/jql; Server/DC only has /search.

@@ -331,7 +331,7 @@
         {
             <div class="mt-4">
                 <DayEditor @ref="_editor" Date="_selectedDay" Saved="DayEntries" Work="WorkFor(_selectedDay)"
-                           Recent="_recent" Comments="_comments" Sprint="_sprint" Connection="connection" Expected="@(SelectedDay?.Expected ?? TimeSpan.Zero)"
+                           Recent="_recent" Comments="_comments" Sprint="_sprint" Earlier="_earlier" Statuses="_statuses" OnIssuePicked="LookUpStatusAsync" Connection="connection" Expected="@(SelectedDay?.Expected ?? TimeSpan.Zero)"
                            Previous="PreviousWorkedDay(_selectedDay)"
                            OnChanged="WorkChanged" OnSaved="DaySavedAsync" OnDiscard="() => Discard(_selectedDay)" />
             </div>
@@ -359,6 +359,10 @@
     private IReadOnlyList<JiraIssue> _recent = [];
     private IReadOnlyDictionary<string, IReadOnlyList<string>> _comments = new Dictionary<string, IReadOnlyList<string>>();
     private IReadOnlyList<SprintIssue> _sprint = [];
+    /// <summary>Issues assigned to the user that were to do earlier in this period (maybe Done now).</summary>
+    private IReadOnlyList<SprintIssue> _earlier = [];
+    /// <summary>Current Jira status per issue key, for the "isn't to do" note.</summary>
+    private readonly Dictionary<string, SprintIssue> _statuses = new(StringComparer.OrdinalIgnoreCase);
     private DateOnly _selectedDay;
     private bool _loaded, _syncing;
     private int _unsynced;
@@ -535,7 +539,10 @@
         if (summary.Missing > TimeSpan.Zero || notInJira > 0) _previousOpen = (prev, summary.Missing, notInJira);
     }
 
-    /// <summary>Active-sprint issues for quick picks and suggestions. Jira being down just means no picks.</summary>
+    /// <summary>
+    /// Active-sprint issues for quick picks and suggestions, issues from earlier in the period, and the
+    /// current status of every issue logged in the period. Jira being down just means fewer picks.
+    /// </summary>
     private async Task LoadSprintAsync()
     {
         if (User.Connection is not { } c || User.Profile is not { } profile) return;
@@ -546,6 +553,33 @@
         catch (JiraException)
         {
             _sprint = [];
+        }
+        try
+        {
+            _earlier = await Sprint.GetPeriodAsync(c, profile, _period);
+        }
+        catch (JiraException)
+        {
+            _earlier = [];
+        }
+        foreach (var i in _sprint.Concat(_earlier)) _statuses[i.Key] = i;
+        await LookUpStatusesAsync(_entries.Select(e => e.IssueKey));
+    }
+
+    private Task LookUpStatusAsync(string key) => LookUpStatusesAsync([key]);
+
+    private async Task LookUpStatusesAsync(IEnumerable<string> keys)
+    {
+        if (User.Connection is not { } c) return;
+        var unknown = keys.Where(k => k != "" && !_statuses.ContainsKey(k)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (unknown.Count == 0) return;
+        try
+        {
+            foreach (var (key, issue) in await Sprint.GetStatusesAsync(c, unknown)) _statuses[key] = issue;
+        }
+        catch (JiraException)
+        {
+            // No status means no note; the time can still be logged.
         }
     }
 

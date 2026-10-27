@@ -79,6 +79,12 @@ Jira search results; arrow keys, Enter and Escape work. The comment field sugges
 comments you used on the row's issue. Tasks and stories both count. On Jira without sprints it
 falls back to all open issues assigned to you. The list is cached for five minutes.
 
+Under **Earlier this period** it also lists issues that were assigned to you and To Do or In Progress
+at some point during the open period, even if they are Done now, so you can log time retroactively.
+If Jira rejects those status names, it uses issues assigned to you during the period that weren't
+resolved before it started. Any other issue can still be picked through Jira search. A row on an issue
+that is Done in Jira shows a note saying so; the day saves as usual.
+
 ## Logging a day
 
 Time is logged per day: each row is an issue, a number of hours (`1.5`, `1,5` or `1:30`) and an

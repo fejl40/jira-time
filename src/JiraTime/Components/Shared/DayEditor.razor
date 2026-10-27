@@ -24,6 +24,7 @@
                 {
                     <div class="min-w-56 flex-1 basis-64">
                         <IssuePicker Id="@($"issue-{e.Id}")" Value="new JiraIssue(e.IssueKey, e.IssueSummary)" Sprint="Sprint" Recent="Recent"
+                                     Earlier="Earlier" Statuses="Statuses"
                                      Search="(q, ct) => Jira.SearchIssuesAsync(Connection, q, ct)" OnSelected="i => PickIssue(row, i)" />
                     </div>
                     <div class="flex items-center gap-1">
@@ -60,6 +61,12 @@
                 else if (!row.IsDraft && !row.Removed && !e.IsSynced && e.SyncError is not null && !Work.IsChanged(row.Saved!))
                 {
                     <span class="basis-full pl-5 text-xs text-amber-700 dark:text-amber-400">Jira: @e.SyncError</span>
+                }
+                @if (!row.Removed && Statuses.GetValueOrDefault(e.IssueKey) is { IsDone: true } done)
+                {
+                    <span class="basis-full pl-5 text-xs text-amber-700 dark:text-amber-400" data-not-todo>
+                        @e.IssueKey is @done.Status in Jira, so this time is logged on an issue that isn't to do any more.
+                    </span>
                 }
             </li>
         }
@@ -136,6 +143,12 @@
     /// <summary>Recent comments per issue key, newest first.</summary>
     [Parameter] public IReadOnlyDictionary<string, IReadOnlyList<string>> Comments { get; set; } = new Dictionary<string, IReadOnlyList<string>>();
     [Parameter] public IReadOnlyList<SprintIssue> Sprint { get; set; } = [];
+    /// <summary>Issues that were to do earlier in the period, offered in the picker after the sprint.</summary>
+    [Parameter] public IReadOnlyList<SprintIssue> Earlier { get; set; } = [];
+    /// <summary>Current Jira status per issue key; rows on Done issues get a note.</summary>
+    [Parameter] public IReadOnlyDictionary<string, SprintIssue> Statuses { get; set; } = new Dictionary<string, SprintIssue>();
+    /// <summary>Raised with the key when an issue is picked, so the page can look up its status.</summary>
+    [Parameter] public EventCallback<string> OnIssuePicked { get; set; }
     [Parameter, EditorRequired] public JiraConnection Connection { get; set; } = default!;
     /// <summary>Hours the day should have (zero on weekends, holidays and days off).</summary>
     [Parameter] public TimeSpan Expected { get; set; }
@@ -197,13 +210,14 @@
     private static string CommentListId(string issueKey) =>
         issueKey == "" ? "" : "comments-" + string.Concat(issueKey.Where(char.IsLetterOrDigit));
 
-    private Task PickIssue(RowView row, JiraIssue issue)
+    private async Task PickIssue(RowView row, JiraIssue issue)
     {
         var e = Editable(row);
         e.IssueKey = issue.Key;
         e.IssueSummary = issue.Summary;
         _errors.Remove(e.Id);
-        return Changed();
+        await Changed();
+        if (issue.Key != "") await OnIssuePicked.InvokeAsync(issue.Key);
     }
 
     private Task SetHours(RowView row, ChangeEventArgs ev)
