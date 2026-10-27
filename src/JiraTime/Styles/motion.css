@@ -73,3 +73,14 @@
 
 /* Glide: the selected day's highlight moves across the grid (placed by wwwroot/motion.js). */
 .motion-glide[data-placed] { transition: transform var(--motion) var(--motion-ease), width var(--motion) var(--motion-ease); }
+
+/* Rise: list entries slide up into place, staggered by --motion-order (e.g. issue picker groups). */
+@keyframes motion-rise { from { opacity: 0; transform: translateY(6px); } }
+.motion-ready .motion-rise:not([data-settled]) {
+  animation: motion-rise var(--motion) var(--motion-ease) both;
+  animation-delay: calc(var(--motion-order, 0) * var(--motion-stagger) * 2);
+}
+
+/* Grow: a small dot swells for a moment, e.g. when an issue is picked. */
+@keyframes motion-grow { 50% { transform: scale(1.7); } }
+.motion-ready .motion-grow:not([data-settled]) { animation: motion-grow var(--motion) var(--motion-ease); }

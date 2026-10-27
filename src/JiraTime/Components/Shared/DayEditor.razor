@@ -10,7 +10,8 @@
         {
             var e = row.Entry;
             <li @key="e.Id" class="motion-colors flex flex-wrap items-center gap-2 py-2.5 @RowClass(row)" data-row="@(row.Removed ? "removed" : row.IsDraft ? "draft" : "saved")" data-row-id="@e.Id">
-                <span class="size-2.5 flex-none rounded-full @(e.IssueKey == "" ? "bg-slate-300" : IssueColors.For(e.IssueKey))"></span>
+                @* Keyed by issue, so picking an issue makes a new dot that can pop. *@
+                <span @key="e.IssueKey" class="size-2.5 flex-none rounded-full @(e.IssueKey == "" ? "bg-slate-300" : IssueColors.For(e.IssueKey)) @(e.Id == _picked ? "motion-grow" : "")"></span>
                 @if (row.Removed)
                 {
                     <div class="min-w-56 flex-1 basis-64 truncate text-sm text-slate-500 line-through dark:text-slate-400">
@@ -193,6 +194,7 @@
     {
         if (_loadedDate == Date) return;
         _loadedDate = Date;
+        _picked = null;
         _errors = [];
         _notice = null;
     }
@@ -211,9 +213,13 @@
     private static string CommentListId(string issueKey) =>
         issueKey == "" ? "" : "comments-" + string.Concat(issueKey.Where(char.IsLetterOrDigit));
 
+    /// <summary>The row whose issue was just picked; its dot pops.</summary>
+    private string? _picked;
+
     private async Task PickIssue(RowView row, JiraIssue issue)
     {
         var e = Editable(row);
+        _picked = e.Id;
         e.IssueKey = issue.Key;
         e.IssueSummary = issue.Summary;
         _errors.Remove(e.Id);

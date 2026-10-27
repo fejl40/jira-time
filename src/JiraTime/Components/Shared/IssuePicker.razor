@@ -12,14 +12,14 @@
     {
         <ul role="listbox" class="absolute inset-x-0 top-full z-30 mt-1 max-h-80 overflow-y-auto rounded-lg bg-white p-1 shadow-lg ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
             @{ var index = 0; var choices = Choices; }
-            @foreach (var group in choices.For(_query, _jira))
+            @foreach (var (group, g) in choices.For(_query, _jira).Select((group, g) => (group, g)))
             {
-                <li class="px-2 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500" role="presentation">@group.Title</li>
+                <li style="@Motion.Order(g)" class="motion-rise px-2 pb-0.5 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500" role="presentation">@group.Title</li>
                 @foreach (var item in group.Items)
                 {
                     var i = index++;
-                    <li role="option" aria-selected="@(i == _active ? "true" : "false")" data-option="@item.Key"
-                        class="flex cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm @(i == _active ? "bg-blue-50 dark:bg-blue-950/60" : "")"
+                    <li role="option" aria-selected="@(i == _active ? "true" : "false")" data-option="@item.Key" style="@Motion.Order(g)"
+                        class="motion-rise flex cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm @(i == _active ? "bg-blue-50 dark:bg-blue-950/60" : "")"
                         @onmousedown="() => SelectAsync(item)" @onmousedown:preventDefault @onmouseover="() => _active = i">
                         <span class="size-2.5 flex-none self-center rounded-full @IssueColors.For(item.Key)"></span>
                         <span class="flex-none font-semibold">@item.Key</span>
