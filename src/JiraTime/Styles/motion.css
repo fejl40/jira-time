@@ -1,4 +1,4 @@
-/* Animations. Quick on purpose: 75 ms for small things, 150 ms for moves. All of it is switched off
+/* Animations. Quick: 150 ms for small things, 300 ms for moves. All of it is switched off
    when the system asks for reduced motion (the speeds become 0, which wwwroot/motion.js reads too).
 
    Two kinds:
@@ -8,11 +8,11 @@
    - Transitions (motion-bar, motion-colors, motion-glide) ease a change of size, colour or place. */
 
 :root {
-  --motion-fast: 75ms;
-  --motion: 150ms;
+  --motion-fast: 150ms;
+  --motion: 300ms;
   --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   /* Delay between items of a staggered entrance; set the item's place with style="--motion-order: n". */
-  --motion-stagger: 15ms;
+  --motion-stagger: 30ms;
 }
 
 @media (prefers-reduced-motion: reduce) {

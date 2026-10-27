@@ -163,7 +163,7 @@ Totals count to their new value, Fill period suggestions drop in day by day, day
 progress bar, saved cells settle while a tick flies to the Jira status, removed rows turn red and
 collapse, periods slide, the selected day glides, picker groups slide in, reminders pulse once, time off
 fades to grey (with a sun for vacation), and a period that becomes complete gets confetti once. They
-are quick (75–150 ms) and switch off when your system asks for reduced motion. Styles and speeds are in
+are quick (150–300 ms) and switch off when your system asks for reduced motion. Styles and speeds are in
 `Styles/motion.css`, the script parts in `wwwroot/motion.js`, called through `Components/MotionScript.cs`.
 
 ## Tests
