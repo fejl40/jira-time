@@ -84,3 +84,6 @@
 /* Grow: a small dot swells for a moment, e.g. when an issue is picked. */
 @keyframes motion-grow { 50% { transform: scale(1.7); } }
 .motion-ready .motion-grow:not([data-settled]) { animation: motion-grow var(--motion) var(--motion-ease); }
+
+/* Confetti bits for a period that becomes complete (wwwroot/motion.js). */
+.motion-confetti { position: fixed; z-index: 60; width: 6px; height: 10px; border-radius: 1px; pointer-events: none; }

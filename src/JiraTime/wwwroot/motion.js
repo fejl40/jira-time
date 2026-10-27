@@ -114,5 +114,37 @@
   };
   addEventListener('resize', () => document.querySelectorAll('[data-day-glide]').forEach(h => glide(h.parentElement)));
 
-  window.jiraMotion = { flyTicks, collapse, glide };
+  // ---- Confetti: once per period and browser, from the element that says the period is complete ----
+  const celebrated = key => {
+    try {
+      const k = `jira-time.celebrated.${key}`;
+      if (localStorage.getItem(k)) return true;
+      localStorage.setItem(k, new Date().toISOString());
+    } catch { /* no storage: celebrate anyway */ }
+    return false;
+  };
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4'];
+  const celebrate = (key, fromSelector) => {
+    if (celebrated(key) || reduced()) return;
+    const from = document.querySelector(fromSelector)?.getBoundingClientRect();
+    const x = from ? from.left + from.width / 2 : innerWidth / 2, y = from ? from.top + from.height / 2 : 120;
+    for (let i = 0; i < 48; i++) {
+      const bit = document.createElement('span');
+      bit.className = 'motion-confetti';
+      bit.style.left = `${x}px`;
+      bit.style.top = `${y}px`;
+      bit.style.background = COLORS[i % COLORS.length];
+      document.body.append(bit);
+      const angle = Math.random() * Math.PI * 2, distance = 60 + Math.random() * 120;
+      const dx = Math.cos(angle) * distance, dy = Math.sin(angle) * distance - 40;
+      bit.animate(
+        [{ transform: 'translate(-50%, -50%) rotate(0deg)', opacity: 1 },
+         { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) rotate(${Math.random() * 360}deg)`, opacity: 1, offset: 0.6 },
+         { transform: `translate(calc(-50% + ${dx * 1.1}px), calc(-50% + ${dy + 80}px)) rotate(${Math.random() * 720}deg)`, opacity: 0 }],
+        { duration: SLOW * 4, easing: 'cubic-bezier(0.2, 0.8, 0.4, 1)', fill: 'forwards' }
+      ).finished.then(() => bit.remove());
+    }
+  };
+
+  window.jiraMotion = { flyTicks, collapse, glide, celebrate };
 })();

@@ -410,11 +410,26 @@
             _focus = null;
             await JS.InvokeVoidAsync("jiraKeys.focus", id);
         }
+        await CelebrateAsync();
         if (_flyTicks)
         {
             _flyTicks = false;
             await JS.InvokeVoidAsync("jiraMotion.flyTicks", "[data-sent]", "[data-period-status]");
         }
+    }
+
+    /// <summary>Notices the period becoming complete while it is shown (not one that already was).</summary>
+    private Milestones<Period> _completed = new();
+    private PeriodSheet? _completedSheet;
+
+    /// <summary>Confetti when the period becomes complete; the script makes sure each period celebrates once per browser.</summary>
+    private async Task CelebrateAsync()
+    {
+        if (_sheet is not { } sheet || User.Key is not { } user) return;
+        if (_completedSheet != sheet) (_completedSheet, _completed) = (sheet, new());
+        var complete = sheet.Summary.IsComplete(_unsynced, sheet.UnsavedDays.Count > 0);
+        if (_completed.Update(complete ? [sheet.Period] : []).Count > 0)
+            await JS.InvokeVoidAsync("jiraMotion.celebrate", $"{user.Id}:{Format.Iso(sheet.Period.Start)}", "[data-period-complete]");
     }
 
     [JSInvokable]
