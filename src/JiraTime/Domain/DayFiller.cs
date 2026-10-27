@@ -87,26 +87,6 @@ public static class DayFiller
     }
 
     /// <summary>
-    /// <see cref="Propose"/> for every day up to and including <paramref name="today"/>, in order, each
-    /// empty day copying the day before it (with that day's suggestions); days that need nothing are left out.
-    /// </summary>
-    public static IReadOnlyDictionary<DateOnly, IReadOnlyList<TimeEntry>> ProposePeriod(
-        IEnumerable<DayInfo> days, DateOnly today, IReadOnlyList<TimeEntry> logged, IReadOnlyList<SprintIssue> sprint)
-    {
-        var plan = new Dictionary<DateOnly, IReadOnlyList<TimeEntry>>();
-        IReadOnlyList<TimeEntry> RowsOn(DateOnly d) =>
-            logged.Where(e => e.Date == d).Concat(plan.GetValueOrDefault(d) ?? []).ToList();
-
-        foreach (var day in days.Where(d => d.Date <= today).OrderBy(d => d.Date))
-        {
-            var previous = PreviousWorkedDay(day.Date, RowsOn)?.Rows;
-            var drafts = Propose(day, logged.Where(e => e.Date == day.Date).ToList(), sprint, previous);
-            if (drafts.Count > 0) plan[day.Date] = drafts;
-        }
-        return plan;
-    }
-
-    /// <summary>
     /// Best guess for the rest of a day: the issue last worked on that day, then an In Progress
     /// sprint issue, then any sprint issue.
     /// </summary>

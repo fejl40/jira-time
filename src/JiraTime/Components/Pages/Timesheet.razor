@@ -2,7 +2,7 @@
 @page "/period/{StartText}"
 @using System.Globalization
 @inject TimeEntryService Entries
-@inject ConnectionState Conn
+@inject TimeProvider Clock
 @inject WorklogSync Sync
 @inject WorkCalendarService Calendar
 @inject SprintIssues Sprint
@@ -82,10 +82,10 @@
     }
 
     @* Reminders: the end of this period, and a previous period that isn't done *@
-    @if (PeriodSummary.EndsSoon(_period, _today) && (Summary.Missing + Summary.StillToLog > TimeSpan.Zero || _unsynced > 0))
+    @if (PeriodSummary.EndsSoon(_period, Today) && (Summary.Missing + Summary.StillToLog > TimeSpan.Zero || _unsynced > 0))
     {
         <div class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900" role="status" data-reminder="end">
-            The period ends @(_period.End == _today ? "today" : _period.End.ToString("dddd d MMM", CultureInfo.InvariantCulture)):
+            The period ends @(_period.End == Today ? "today" : _period.End.ToString("dddd d MMM", CultureInfo.InvariantCulture)):
             @string.Join(", ", new[]
             {
                 Summary.Missing > TimeSpan.Zero ? $"{Format.Hours(Summary.Missing)} h missing so far" : null,
@@ -127,7 +127,7 @@
             <li>
                 <button type="button" class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm @(day == _selectedDay ? "bg-blue-50 dark:bg-blue-950/60" : dayInfo is { IsWorkday: false } ? "bg-slate-50 dark:bg-slate-800/60" : "")"
                         @onclick="() => SelectDay(day)">
-                    <span class="w-20 flex-none @(day == _today ? "font-semibold text-blue-700 dark:text-blue-400" : "")">@day.ToString("ddd d", CultureInfo.InvariantCulture)</span>
+                    <span class="w-20 flex-none @(day == Today ? "font-semibold text-blue-700 dark:text-blue-400" : "")">@day.ToString("ddd d", CultureInfo.InvariantCulture)</span>
                     <span class="flex-1 truncate text-xs text-slate-500 dark:text-slate-400">@(dayInfo is { IsWorkday: false } ? dayInfo.Name ?? "Weekend" : dayInfo?.HasPartialDayOff == true ? $"{dayInfo.Name} · {Format.Hours(dayInfo.Off)} h off" : "")</span>
                     @if (HasSyncProblem(SavedOn(day)))
                     {
@@ -160,7 +160,7 @@
                         <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium" title="@DayTitle(day)">
                             <button type="button" class="relative w-full px-1 py-2" @onclick="() => SelectDay(day, focus: true)">
                                 <div class="uppercase">@day.ToString("ddd", CultureInfo.InvariantCulture)[..2]</div>
-                                <div class="text-sm @(day == _today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700 dark:text-slate-200")">@day.Day</div>
+                                <div class="text-sm @(day == Today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700 dark:text-slate-200")">@day.Day</div>
                                 @if (UnsavedDays.Contains(day))
                                 {
                                     <span class="absolute right-1 top-1 size-1.5 rounded-full bg-blue-600 dark:bg-blue-400" title="Unsaved changes" data-unsaved-day></span>
@@ -184,7 +184,7 @@
                                 }
                                 else
                                 {
-                                    <a href="@($"{Conn.Connection?.BaseUrl}/browse/{row.Key}")" target="_blank" rel="noopener"
+                                    <a href="@($"{User.Connection?.BaseUrl}/browse/{row.Key}")" target="_blank" rel="noopener"
                                        class="font-semibold text-blue-700 dark:text-blue-400 hover:underline">@row.Key</a>
                                 }
                                 <span class="truncate text-slate-600 dark:text-slate-300" title="@row.Summary">@row.Summary</span>
@@ -288,7 +288,7 @@
             }
             else if (SelectedDay is { Kind: DayKind.Workday } work)
             {
-                @if (Missing(_selectedDay) is { } miss && miss > TimeSpan.Zero && _selectedDay <= _today)
+                @if (Missing(_selectedDay) is { } miss && miss > TimeSpan.Zero && _selectedDay <= Today)
                 {
                     <span class="text-sm text-amber-700 dark:text-amber-400">@Format.Hours(miss) h missing</span>
                 }
@@ -327,7 +327,7 @@
         {
             <div class="mt-3 text-sm text-amber-700 dark:text-amber-400" role="status">@_acceptNotice</div>
         }
-        @if (Conn.Connection is { } connection)
+        @if (User.Connection is { } connection)
         {
             <div class="mt-4">
                 <DayEditor @ref="_editor" Date="_selectedDay" Saved="DayEntries" Work="WorkFor(_selectedDay)"
@@ -350,7 +350,8 @@
     /// <summary>The selected day, kept in the URL so reload and back/forward keep it.</summary>
     [SupplyParameterFromQuery(Name = "day")] public string? DayText { get; set; }
 
-    private static readonly DateOnly _today = DateOnly.FromDateTime(DateTime.Today);
+    /// <summary>Read on each use, so a tab left open overnight moves on to the new day.</summary>
+    private DateOnly Today => Clock.Today();
 
     private Period _period;
     private IReadOnlyList<TimeEntry> _entries = [];
@@ -389,7 +390,7 @@
 
     private IReadOnlyDictionary<DateOnly, DayInfo> _days = new Dictionary<DateOnly, DayInfo>();
 
-    private PeriodSummary Summary => PeriodSummary.For(_period, _days, _entries, _today);
+    private PeriodSummary Summary => PeriodSummary.For(_period, _days, _entries, Today);
 
     /// <summary>The previous period, when this is the current one and the previous isn't done.</summary>
     private (Period Period, TimeSpan Missing, int NotInJira)? _previousOpen;
@@ -435,7 +436,7 @@
 
     /// <summary>Missing hours on a day; only counted up to today.</summary>
     private TimeSpan Missing(DateOnly day) =>
-        day > _today || !_days.TryGetValue(day, out var info)
+        day > Today || !_days.TryGetValue(day, out var info)
             ? TimeSpan.Zero
             : WorkCalendarService.Missing(info, Total(SavedOn(day)));
 
@@ -455,8 +456,8 @@
     protected override async Task OnParametersSetAsync()
     {
         var day = ParseDate(DayText);
-        var period = Period.For(ParseDate(StartText) ?? day ?? _today);
-        var selected = day is { } d && period.Contains(d) ? d : period.Contains(_today) ? _today : period.Start;
+        var period = Period.For(ParseDate(StartText) ?? day ?? Today);
+        var selected = day is { } d && period.Contains(d) ? d : period.Contains(Today) ? Today : period.Start;
 
         // Same period, other day (a day picked in the grid, Today, back/forward): keep everything.
         if (_loaded && period == _period)
@@ -532,9 +533,9 @@
     private async Task LoadPreviousAsync()
     {
         _previousOpen = null;
-        if (!_period.Contains(_today)) return;
+        if (!_period.Contains(Today)) return;
         var prev = _period.Previous;
-        var summary = PeriodSummary.For(prev, await Calendar.GetDaysAsync(prev.Start, prev.End), await Entries.GetRangeAsync(prev.Start, prev.End), _today);
+        var summary = PeriodSummary.For(prev, await Calendar.GetDaysAsync(prev.Start, prev.End), await Entries.GetRangeAsync(prev.Start, prev.End), Today);
         var notInJira = (await Entries.GetUnsyncedAsync(prev.Start, prev.End)).Count;
         if (summary.Missing > TimeSpan.Zero || notInJira > 0) _previousOpen = (prev, summary.Missing, notInJira);
     }
@@ -584,7 +585,7 @@
     }
 
     /// <summary>Only workdays up to today with hours missing can be filled.</summary>
-    private bool CanFill(DateOnly day) => day <= _today && Missing(day) > TimeSpan.Zero;
+    private bool CanFill(DateOnly day) => day <= Today && Missing(day) > TimeSpan.Zero;
 
     /// <summary>Puts a suggestion for the missing hours on a short workday, unless it has unsaved changes or the user saved or discarded it.</summary>
     private void Suggest(DateOnly day)
@@ -646,7 +647,7 @@
     private async Task SaveAllAsync()
     {
         _confirmSaveAll = false;
-        if (Conn.Connection is not { } c) return;
+        if (User.Connection is not { } c) return;
         _accepting = true;
         _acceptNotice = null;
         var needsWork = new List<DateOnly>();
@@ -722,7 +723,7 @@
 
     private async Task SyncPeriodAsync()
     {
-        if (Conn.Connection is not { } c) return;
+        if (User.Connection is not { } c) return;
         _syncing = true;
         await Sync.SyncRangeAsync(c, _period.Start, _period.End);
         await ImportAsync();
@@ -850,7 +851,7 @@
         var path = target.Split('?', '#')[0].TrimEnd('/');
         var query = target.Contains('?') ? target[(target.IndexOf('?') + 1)..] : "";
         var day = ParseDate(System.Web.HttpUtility.ParseQueryString(query)["day"]);
-        Period? to = path == "" ? Period.For(day ?? _today)
+        Period? to = path == "" ? Period.For(day ?? Today)
             : path.StartsWith("period/") && ParseDate(path["period/".Length..]) is { } start ? Period.For(start)
             : null;
         if (to == _period) return;

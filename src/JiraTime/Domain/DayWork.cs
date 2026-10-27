@@ -69,14 +69,4 @@ public sealed class DayWork(DateOnly date)
     /// <summary>Hours on one issue once saved.</summary>
     public TimeSpan TotalFor(IReadOnlyList<TimeEntry> saved, string issueKey) =>
         RowsToSave(saved).Where(e => e.IssueKey == issueKey).Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
-
-    /// <summary>Drops every unsaved change.</summary>
-    public void Clear()
-    {
-        _edits.Clear();
-        Removed.Clear();
-        Drafts.Clear();
-        Suggested.Clear();
-        BadHours.Clear();
-    }
 }

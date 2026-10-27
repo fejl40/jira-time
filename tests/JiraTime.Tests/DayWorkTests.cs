@@ -10,7 +10,7 @@ public class DayWorkTests
         new() { IssueKey = key, Date = Day, Duration = TimeSpan.FromHours(hours), Description = desc, JiraWorklogId = "1", SyncPending = false };
 
     [Fact]
-    public void Edits_go_to_a_copy_and_survive_until_cleared()
+    public void Edits_go_to_a_copy_of_the_saved_entry()
     {
         var a = Saved("ABC-1", 4);
         var work = new DayWork(Day);
@@ -22,10 +22,7 @@ public class DayWorkTests
         Assert.True(work.IsChanged(a));
         Assert.True(work.HasChanges([a]));
         Assert.Same(work.Edit(a), work.Edit(a));
-
-        work.Clear();
-        Assert.False(work.HasChanges([a]));
-        Assert.Same(a, work.View(a));
+        Assert.Same(a, new DayWork(Day).View(a));
     }
 
     [Fact]

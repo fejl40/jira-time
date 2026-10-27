@@ -1,6 +1,5 @@
 @page "/setup/connect"
-@inject JiraIdentity Identity
-@inject ConnectionState Conn
+@inject SignInSession Session
 @inject NavigationManager Nav
 
 <PageTitle>Connect · Jira Time</PageTitle>
@@ -69,7 +68,7 @@
     protected override async Task OnInitializedAsync()
     {
         // Prefill when changing an existing connection (the token is always re-entered).
-        if (await Conn.LoadAsync() is { } c)
+        if (await Session.StoredConnectionAsync() is { } c)
         {
             _hasExisting = true;
             _authType = c.AuthType;
@@ -94,15 +93,8 @@
         var connection = new JiraConnection(url, _authType, _token.Trim(), IsCloud ? _email.Trim() : null);
         _busy = true;
         _error = null;
-        // A new connection is only kept after Jira confirms the token and tells us whose it is.
-        var result = await Identity.SignInAsync(connection, allowOffline: false);
+        _error = await Session.ConnectAsync(connection);
         _busy = false;
-        if (!result.SignedIn)
-        {
-            _error = result.Error;
-            return;
-        }
-        await Conn.SaveAsync(connection);
-        Nav.NavigateTo("");
+        if (_error is null) Nav.NavigateTo("");
     }
 }

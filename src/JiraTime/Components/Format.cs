@@ -28,8 +28,6 @@ public static class Format
         return value > TimeSpan.Zero ? value : null;
     }
 
-    public static string Time(TimeOnly t) => t.ToString("HH:mm", CultureInfo.InvariantCulture);
-
     public static string Range(DateOnly a, DateOnly b) =>
         a.Year == b.Year
             ? $"{a.ToString("d MMM", CultureInfo.InvariantCulture)} – {b.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}"

@@ -70,24 +70,6 @@ public class DayFillerTests
     }
 
     [Fact]
-    public void Period_fill_covers_short_workdays_up_to_today_only()
-    {
-        // Thu 15 Oct .. Wed 21 Oct, today Tue 20 Oct. Fri 16 is full, Mon 19 has 2 h, Sat/Sun are weekend.
-        var start = new DateOnly(2026, 10, 15);
-        var days = Enumerable.Range(0, 7).Select(i => start.AddDays(i)).Select(d => new DayInfo(d,
-            d.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? DayKind.Weekend : DayKind.Workday, null)).ToList();
-        var logged = new[] { E("XYZ-1", 8, new DateOnly(2026, 10, 16)), E("XYZ-2", 2) };
-
-        var plan = DayFiller.ProposePeriod(days, today: new DateOnly(2026, 10, 20), logged, [Doing]);
-
-        Assert.Equal(new[] { "2026-10-15", "2026-10-19", "2026-10-20" }.Select(DateOnly.Parse), plan.Keys.Order());
-        Assert.Equal("ABC-1 8h", Show(plan[new DateOnly(2026, 10, 15)])); // nothing before it to copy
-        Assert.Equal("XYZ-2 6h", Show(plan[Monday]));                      // partly logged: the rest on the last issue
-        Assert.Equal("XYZ-2 8h", Show(plan[new DateOnly(2026, 10, 20)])); // copies Monday as filled
-        Assert.All(plan, p => Assert.All(p.Value, d => Assert.Equal(p.Key, d.Date)));
-    }
-
-    [Fact]
     public void An_empty_day_copies_the_previous_worked_day_scaled_to_the_missing_hours()
     {
         var friday = new DateOnly(2026, 10, 16);

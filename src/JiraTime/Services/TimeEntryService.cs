@@ -4,8 +4,11 @@ using JiraTime.Storage;
 namespace JiraTime.Services;
 
 /// <summary>The signed-in user's time entries. Every read and write is limited to <see cref="CurrentUser"/>.</summary>
-public class TimeEntryService(IDocumentStore store, CurrentUser user)
+public class TimeEntryService(IDocumentStore store, CurrentUser user, TimeProvider? clock = null)
 {
+    /// <summary>How far back recent issues and comments are taken from.</summary>
+    public const int RecentDays = 60;
+
     private readonly IDocumentCollection<TimeEntry> _docs = store.Collection<TimeEntry>();
 
     public async Task<IReadOnlyList<TimeEntry>> GetRangeAsync(DateOnly from, DateOnly to)
@@ -18,7 +21,7 @@ public class TimeEntryService(IDocumentStore store, CurrentUser user)
     /// <summary>Most recently used issues, newest first. Used as quick picks when adding an entry.</summary>
     public async Task<IReadOnlyList<JiraIssue>> GetRecentIssuesAsync(int count = 8)
     {
-        var since = DateOnly.FromDateTime(DateTime.Today.AddDays(-60));
+        var since = (clock ?? TimeProvider.System).Today().AddDays(-RecentDays);
         var owner = user.Owner;
         var entries = await _docs.QueryAsync(e => e.Owner == owner && e.Date >= since && !e.DeletePending);
         return entries
@@ -30,12 +33,12 @@ public class TimeEntryService(IDocumentStore store, CurrentUser user)
     }
 
     /// <summary>
-    /// The latest distinct comments per issue from the last 60 days, newest first, at most
+    /// The latest distinct comments per issue from the last <see cref="RecentDays"/> days, newest first, at most
     /// <paramref name="perIssue"/> each. Offered as suggestions in the comment field.
     /// </summary>
     public async Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> GetRecentCommentsAsync(int perIssue = 5)
     {
-        var since = DateOnly.FromDateTime(DateTime.Today.AddDays(-60));
+        var since = (clock ?? TimeProvider.System).Today().AddDays(-RecentDays);
         var owner = user.Owner;
         var entries = await _docs.QueryAsync(e => e.Owner == owner && e.Date >= since && !e.DeletePending && e.Description != null);
         return entries
