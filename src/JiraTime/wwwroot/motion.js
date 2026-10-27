@@ -87,5 +87,18 @@
     }
   };
 
-  window.jiraMotion = { flyTicks };
+  // ---- Collapse: rows shrink away before the page removes them; resolves when done ----
+  const collapse = selector => {
+    const rows = [...document.querySelectorAll(selector)];
+    if (!rows.length || reduced()) return Promise.resolve();
+    return Promise.all(rows.map(el => {
+      el.style.overflow = 'hidden';
+      return el.animate(
+        [{ height: `${el.offsetHeight}px`, opacity: 1 }, { height: '0px', paddingTop: '0px', paddingBottom: '0px', opacity: 0 }],
+        { duration: SLOW, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)', fill: 'forwards' }
+      ).finished;
+    })).then(() => undefined);
+  };
+
+  window.jiraMotion = { flyTicks, collapse };
 })();

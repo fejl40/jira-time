@@ -57,3 +57,6 @@
   50% { color: var(--color-emerald-600); }
 }
 .motion-received { animation: motion-received var(--motion) var(--motion-ease); }
+
+/* Colors that change smoothly, e.g. a row turning red when removed. */
+.motion-colors { transition: background-color var(--motion) var(--motion-ease), color var(--motion) var(--motion-ease); }
