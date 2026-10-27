@@ -1,0 +1,103 @@
+using JiraTime.Domain;
+
+namespace JiraTime.Tests;
+
+public class WorklogMatchingTests
+{
+    private static readonly DateOnly Day = new(2026, 10, 19);
+    private static readonly JiraWorklog Worklog = new("10001", "ABC-1", "Login page", Day, TimeSpan.FromHours(2), "Review");
+
+    private static TimeEntry Entry() => new()
+    {
+        IssueKey = "ABC-1",
+        IssueSummary = "Old summary",
+        Date = Day,
+        Duration = TimeSpan.FromHours(2),
+        Description = "Review",
+        JiraWorklogId = "10001",
+        JiraWorklogIssueKey = "ABC-1",
+        SyncPending = false,
+    };
+
+    [Fact]
+    public void Matches_ignores_issue_key_case_and_treats_no_comment_as_empty()
+    {
+        var e = Entry();
+        e.IssueKey = "abc-1";
+        Assert.True(e.Matches(Worklog));
+
+        e.Description = null;
+        Assert.True(e.Matches(Worklog with { Comment = "" }));
+    }
+
+    [Fact]
+    public void Matches_spots_a_different_day_hours_comment_or_issue()
+    {
+        Assert.False(Entry().Matches(Worklog with { Date = Day.AddDays(1) }));
+        Assert.False(Entry().Matches(Worklog with { Duration = TimeSpan.FromHours(3) }));
+        Assert.False(Entry().Matches(Worklog with { Comment = "Other" }));
+        Assert.False(Entry().Matches(Worklog with { IssueKey = "ABC-2" }));
+    }
+
+    [Fact]
+    public void Matches_without_issue_skips_the_issue_key() =>
+        Assert.True(Entry().Matches(Worklog with { IssueKey = "ABC-2" }, includeIssue: false));
+
+    [Fact]
+    public void TakeFrom_copies_issue_day_hours_and_comment()
+    {
+        var e = Entry();
+        var before = DateTime.UtcNow;
+        e.TakeFrom(Worklog with { IssueKey = "XYZ-9", Date = Day.AddDays(1), Duration = TimeSpan.FromHours(3), Comment = "New" });
+
+        Assert.Equal("XYZ-9", e.IssueKey);
+        Assert.Equal("XYZ-9", e.JiraWorklogIssueKey);
+        Assert.Equal("Login page", e.IssueSummary);
+        Assert.Equal(Day.AddDays(1), e.Date);
+        Assert.Equal(TimeSpan.FromHours(3), e.Duration);
+        Assert.Equal("New", e.Description);
+        Assert.True(e.UpdatedUtc >= before);
+    }
+
+    [Fact]
+    public void TakeFrom_without_issue_keeps_the_issue_and_summary()
+    {
+        var e = Entry();
+        e.TakeFrom(Worklog with { IssueKey = "XYZ-9", IssueSummary = "", Duration = TimeSpan.FromHours(3) }, includeIssue: false);
+
+        Assert.Equal("ABC-1", e.IssueKey);
+        Assert.Equal("ABC-1", e.JiraWorklogIssueKey);
+        Assert.Equal("Old summary", e.IssueSummary);
+        Assert.Equal(TimeSpan.FromHours(3), e.Duration);
+    }
+
+    [Fact]
+    public void ToEntry_makes_a_synced_entry_from_Jira()
+    {
+        var e = Worklog.ToEntry();
+
+        Assert.Equal(("ABC-1", "Login page", Day, TimeSpan.FromHours(2), "Review"), (e.IssueKey, e.IssueSummary, e.Date, e.Duration, e.Description));
+        Assert.Equal("10001", e.JiraWorklogId);
+        Assert.Equal("ABC-1", e.JiraWorklogIssueKey);
+        Assert.True(e.IsSynced);
+        Assert.True(e.FromJira);
+    }
+
+    [Fact]
+    public void SameAsSynced_needs_a_synced_entry_with_the_same_issue_hours_and_description()
+    {
+        Assert.True(Entry().SameAsSynced(Entry()));
+
+        var pending = Entry();
+        pending.SyncPending = true;
+        Assert.False(Entry().SameAsSynced(pending));
+
+        var edited = Entry();
+        edited.Description = "Changed";
+        Assert.False(edited.SameAsSynced(Entry()));
+
+        edited = Entry();
+        edited.IssueKey = "abc-1"; // exact comparison here
+        Assert.False(edited.SameAsSynced(Entry()));
+    }
+}

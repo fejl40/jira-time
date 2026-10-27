@@ -51,8 +51,7 @@ public class WorklogSync(JiraClient jira, TimeEntryService entries)
         {
             if (saved.TryGetValue(row.Id, out var old))
             {
-                if (old.IsSynced && old.IssueKey == row.IssueKey && old.Duration == row.Duration && old.Description == row.Description)
-                    continue; // unchanged
+                if (row.SameAsSynced(old)) continue;
                 // Jira bookkeeping comes from what is stored, not from the edited copy.
                 row.JiraWorklogId = old.JiraWorklogId;
                 row.JiraWorklogIssueKey = old.JiraWorklogIssueKey;
@@ -135,68 +134,62 @@ public class WorklogSync(JiraClient jira, TimeEntryService entries)
         var remote = await jira.GetMyWorklogsAsync(c, profile, from, to, ct);
         var remoteIds = remote.Select(w => w.Id).ToHashSet();
         var inRange = await entries.GetRangeWithRemovedAsync(from, to);
-        var linked = inRange.Concat(await entries.GetByWorklogIdsAsync(remoteIds))
+        var linked = await LinkedEntriesAsync(inRange, remoteIds);
+
+        var changes = new List<ImportChange>();
+        foreach (var w in remote)
+            changes.Add(await ApplyRemoteAsync(w, linked));
+        foreach (var e in inRange.Where(e => e.IsSynced && !e.DeletePending && !remoteIds.Contains(e.JiraWorklogId!)))
+            changes.Add(await ReconcileMissedAsync(c, e, ct));
+
+        return new ImportResult(
+            changes.Count(x => x == ImportChange.Added),
+            changes.Count(x => x == ImportChange.Updated),
+            changes.Count(x => x == ImportChange.Removed));
+    }
+
+    private enum ImportChange { None, Added, Updated, Removed }
+
+    /// <summary>Entries linked to a worklog, by worklog id: those in the range plus any the search found on other days.</summary>
+    private async Task<Dictionary<string, TimeEntry>> LinkedEntriesAsync(IReadOnlyList<TimeEntry> inRange, IReadOnlyCollection<string> remoteIds) =>
+        inRange.Concat(await entries.GetByWorklogIdsAsync(remoteIds))
             .Where(e => e.JiraWorklogId is not null)
             .DistinctBy(e => e.Id)
             .GroupBy(e => e.JiraWorklogId!)
             .ToDictionary(g => g.Key, g => g.First());
 
-        int added = 0, updated = 0, removed = 0;
-        foreach (var w in remote)
+    /// <summary>Updates the entry linked to a worklog the search found, or adds one when none is linked.</summary>
+    private async Task<ImportChange> ApplyRemoteAsync(JiraWorklog w, Dictionary<string, TimeEntry> linked)
+    {
+        if (!linked.TryGetValue(w.Id, out var e))
         {
-            if (linked.TryGetValue(w.Id, out var e))
-            {
-                if (e.SyncPending || e.DeletePending) continue; // ours is newer; Sync sends it
-                if (string.Equals(e.IssueKey, w.IssueKey, StringComparison.OrdinalIgnoreCase) && e.Date == w.Date
-                    && e.Duration == w.Duration && (e.Description ?? "") == (w.Comment ?? "")) continue;
-                e.IssueKey = e.JiraWorklogIssueKey = w.IssueKey;
-                e.IssueSummary = w.IssueSummary;
-                e.Date = w.Date;
-                e.Duration = w.Duration;
-                e.Description = w.Comment;
-                e.UpdatedUtc = DateTime.UtcNow;
-                await entries.SaveSyncStateAsync(e);
-                updated++;
-            }
-            else
-            {
-                await entries.SaveSyncStateAsync(new TimeEntry
-                {
-                    IssueKey = w.IssueKey,
-                    IssueSummary = w.IssueSummary,
-                    Date = w.Date,
-                    Duration = w.Duration,
-                    Description = w.Comment,
-                    JiraWorklogId = w.Id,
-                    JiraWorklogIssueKey = w.IssueKey,
-                    SyncPending = false,
-                    FromJira = true,
-                });
-                added++;
-            }
+            await entries.SaveSyncStateAsync(w.ToEntry());
+            return ImportChange.Added;
         }
+        if (e.SyncPending || e.DeletePending) return ImportChange.None; // ours is newer; Sync sends it
+        if (e.Matches(w)) return ImportChange.None;
+        e.TakeFrom(w);
+        await entries.SaveSyncStateAsync(e);
+        return ImportChange.Updated;
+    }
 
-        // Not found by the search: deleted in Jira, moved to another day there, or Jira's search index
-        // hasn't caught up yet. Ask for the worklog itself before dropping anything.
-        foreach (var e in inRange.Where(e => e.IsSynced && !e.DeletePending && !remoteIds.Contains(e.JiraWorklogId!)))
+    /// <summary>
+    /// A synced entry the search didn't find: deleted in Jira, moved to another day there, or Jira's search
+    /// index hasn't caught up yet. Asks for the worklog itself before dropping anything.
+    /// </summary>
+    private async Task<ImportChange> ReconcileMissedAsync(JiraConnection c, TimeEntry e, CancellationToken ct)
+    {
+        var w = await jira.GetWorklogAsync(c, e.JiraWorklogIssueKey ?? e.IssueKey, e.JiraWorklogId!, ct);
+        if (w is null)
         {
-            var w = await jira.GetWorklogAsync(c, e.JiraWorklogIssueKey ?? e.IssueKey, e.JiraWorklogId!, ct);
-            if (w is null)
-            {
-                await entries.DeleteAsync(e.Id);
-                removed++;
-            }
-            else if (w.Date != e.Date || w.Duration != e.Duration || (w.Comment ?? "") != (e.Description ?? ""))
-            {
-                e.Date = w.Date;
-                e.Duration = w.Duration;
-                e.Description = w.Comment;
-                e.UpdatedUtc = DateTime.UtcNow;
-                await entries.SaveSyncStateAsync(e);
-                updated++;
-            }
+            await entries.DeleteAsync(e.Id);
+            return ImportChange.Removed;
         }
-        return new ImportResult(added, updated, removed);
+        // A single worklog comes without the issue summary, so the issue is left as it is.
+        if (e.Matches(w, includeIssue: false)) return ImportChange.None;
+        e.TakeFrom(w, includeIssue: false);
+        await entries.SaveSyncStateAsync(e);
+        return ImportChange.Updated;
     }
 
     /// <summary>Retries every entry in the range that Jira doesn't have yet.</summary>
