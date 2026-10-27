@@ -47,6 +47,15 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
     public TimeSpan Missing(DateOnly day) =>
         day > Today || !Days.TryGetValue(day, out var info) ? TimeSpan.Zero : info.MissingWith(Total(SavedOn(day)));
 
+    /// <summary>Saved hours as a share of the hours the day needs, from 0 to 1; 0 on days that need none.</summary>
+    public double Progress(DateOnly day) =>
+        Days.GetValueOrDefault(day) is { Expected: var expected } && expected > TimeSpan.Zero
+            ? Math.Min(1, Total(SavedOn(day)) / expected)
+            : 0;
+
+    /// <summary>A day that needs hours and has them all saved.</summary>
+    public bool IsComplete(DateOnly day) => Days.GetValueOrDefault(day) is { Expected.Ticks: > 0 } && Progress(day) >= 1;
+
     /// <summary>Only workdays up to today with hours missing can be filled.</summary>
     public bool CanFill(DateOnly day) => day <= Today && Missing(day) > TimeSpan.Zero;
 

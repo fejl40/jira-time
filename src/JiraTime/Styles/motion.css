@@ -1,6 +1,7 @@
 /* Animations. Kept quick: 75 ms for small things, 150 ms for bigger moves. Everything here is
    switched off when the system asks for reduced motion. Animations that should not play while the
-   page first draws are scoped to html.motion-ready, which wwwroot/motion.js sets once it has settled. */
+   page first draws are scoped to html.motion-ready, which wwwroot/motion.js sets once it has settled;
+   it also marks what was on screen then as data-settled, so only later changes animate. */
 
 :root {
   --motion-fast: 75ms;
@@ -22,8 +23,19 @@
   from { opacity: 0; transform: translateY(-6px) scale(0.9); }
   to { opacity: 1; transform: none; }
 }
-.motion-ready .motion-drop {
+.motion-ready .motion-drop:not([data-settled]) {
   animation: motion-drop var(--motion) var(--motion-ease) both;
   animation-delay: calc(var(--motion-order, 0) * var(--motion-stagger));
 }
 :root { --motion-stagger: 15ms; }
+
+/* A bar that grows or shrinks to its new width, e.g. a day's hours. */
+.motion-bar { transition: width var(--motion) var(--motion-ease), background-color var(--motion) var(--motion-ease); }
+
+/* Pop: a short bounce when something is done, e.g. a day that becomes complete. */
+@keyframes motion-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15, 2.2); }
+  100% { transform: scale(1); }
+}
+.motion-ready .motion-pop:not([data-settled]) { animation: motion-pop var(--motion) var(--motion-ease); }

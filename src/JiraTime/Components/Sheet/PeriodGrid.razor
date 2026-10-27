@@ -16,6 +16,13 @@
                             {
                                 <span class="absolute right-1 top-1 size-1.5 rounded-full bg-blue-600 dark:bg-blue-400" title="Unsaved changes" data-unsaved-day></span>
                             }
+                            @if (Sheet.Day(day) is { Expected.Ticks: > 0 })
+                            {
+                                var complete = Sheet.IsComplete(day);
+                                <span class="mx-1.5 mt-1 block h-1 rounded-full bg-slate-200 dark:bg-slate-700 @(_complete.Fresh.Contains(day) ? "motion-pop" : "")" data-day-progress="@(complete ? "complete" : "")">
+                                    <span class="motion-bar block h-full rounded-full @(complete ? "bg-emerald-500" : "bg-blue-500")" style="width: @Percent(Sheet.Progress(day))"></span>
+                                </span>
+                            }
                         </button>
                     </th>
                 }
@@ -138,7 +145,18 @@
 
     private IReadOnlyList<PeriodRow> Rows = [];
 
-    protected override void OnParametersSet() => Rows = Sheet.Rows;
+    /// <summary>Days that became complete while this period is shown; they pop once.</summary>
+    private Milestones<DateOnly> _complete = new();
+    private PeriodSheet? _shown;
+
+    protected override void OnParametersSet()
+    {
+        Rows = Sheet.Rows;
+        if (_shown != Sheet) (_shown, _complete) = (Sheet, new());
+        _complete.Update(Sheet.Period.Days.Where(Sheet.IsComplete));
+    }
+
+    private static string Percent(double share) => (share * 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
 
     private IEnumerable<(DateOnly Day, int Index)> Days => Sheet.Period.Days.Select((d, i) => (d, i));
 

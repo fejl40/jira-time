@@ -128,4 +128,19 @@ public class PeriodSheetTests
         Assert.Equal("OLD-1 8h", Show(sheet.RowsOn(thursday)));
         Assert.Equal(thursday, sheet.PreviousWorkedDay(Monday)?.Date);
     }
+
+    [Fact]
+    public void Progress_is_the_share_of_the_day_saved()
+    {
+        var sheet = Sheet(Saved("XYZ-1", 8, Friday), Saved("XYZ-2", 2, Monday), Saved("XYZ-3", 9, Tuesday));
+        var saturday = new DateOnly(2026, 10, 17);
+
+        Assert.Equal(1, sheet.Progress(Friday));
+        Assert.Equal(0.25, sheet.Progress(Monday));
+        Assert.Equal(1, sheet.Progress(Tuesday)); // more than needed is still full
+        Assert.Equal(0, sheet.Progress(saturday));
+        Assert.True(sheet.IsComplete(Friday));
+        Assert.False(sheet.IsComplete(Monday));
+        Assert.False(sheet.IsComplete(saturday));
+    }
 }

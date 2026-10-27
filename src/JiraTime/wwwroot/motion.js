@@ -48,8 +48,11 @@
   const start = () => {
     observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['data-count'] });
     document.querySelectorAll('[data-count]').forEach(count);
-    // Let the first screen draw without animations, then allow them.
-    setTimeout(() => document.documentElement.classList.add('motion-ready'), 800);
+    // Let the first screen draw without animations, then allow them for what changes from then on.
+    setTimeout(() => {
+      document.querySelectorAll('[class*="motion-"]').forEach(el => el.dataset.settled = '');
+      document.documentElement.classList.add('motion-ready');
+    }, 800);
   };
   if (document.body) start(); else addEventListener('DOMContentLoaded', start);
 
