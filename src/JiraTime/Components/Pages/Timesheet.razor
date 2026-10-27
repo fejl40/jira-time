@@ -20,7 +20,7 @@
 
 @if (_sheet is { } sheet)
 {
-<div class="mx-auto max-w-7xl space-y-6">
+<div class="mx-auto max-w-7xl space-y-6 overflow-x-clip">
     <PeriodHeader Sheet="sheet" Unsynced="_unsynced" Syncing="_syncing" Saving="_savingAll"
                   OnSync="SyncPeriodAsync" OnFillPeriod="FillPeriod" OnSaveAll="SaveAllAsync" OnDiscardAll="DiscardAll" />
 
@@ -35,10 +35,13 @@
         <p class="-mt-3 text-xs text-slate-500 dark:text-slate-400" role="status" data-import-notice>@_importNotice</p>
     }
 
+    @* A new period slides in from the side it comes from. *@
+    <div @key="sheet.Period" class="space-y-6 @SlideClass">
     <DayList Sheet="sheet" Selected="_selectedDay" OnSelect="d => SelectDay(d)" />
 
     <PeriodGrid Sheet="sheet" Selected="_selectedDay" JiraBaseUrl="@User.Connection?.BaseUrl" Cascade="_cascade" JustSaved="_justSaved" SentToJira="_sentToJira"
                 OnSelectDay="d => SelectDay(d, focus: true)" OnCellClicked="CellClicked" />
+    </div>
 
     @* Selected day *@
     <section class="card p-6">
@@ -94,6 +97,10 @@
     /// <summary>Current Jira status per issue key, for the "isn't to do" note.</summary>
     private readonly Dictionary<string, IssueWithStatus> _statuses = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Which way the last period change went: 1 to a later period, -1 to an earlier one, 0 on first show.</summary>
+    private int _slide;
+    private string SlideClass => Motion.Slide(_slide);
+
     private PeriodSheet Sheet => _sheet!;
     private IReadOnlyList<TimeEntry> DayEntries => Sheet.SavedOn(_selectedDay);
     private bool HasUnsaved => _sheet?.OwnChangeDays.Count > 0;
@@ -113,6 +120,7 @@
 
         // The old period stays on screen until the new one has loaded.
         var sheet = new PeriodSheet(period, () => Today);
+        _slide = _sheet is null ? 0 : period.Start.CompareTo(_sheet.Period.Start);
         await ReloadAsync(sheet);
         (_sheet, _selectedDay, _notice) = (sheet, selected, null);
         await ImportAsync(); // renders the local hours first, then adds what Jira has

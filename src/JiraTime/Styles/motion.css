@@ -60,3 +60,13 @@
 
 /* Colors that change smoothly, e.g. a row turning red when removed. */
 .motion-colors { transition: background-color var(--motion) var(--motion-ease), color var(--motion) var(--motion-ease); }
+
+/* Slide: a new period comes in from the side it lies on. */
+@keyframes motion-slide-next { from { opacity: 0; transform: translateX(24px); } }
+@keyframes motion-slide-previous { from { opacity: 0; transform: translateX(-24px); } }
+.motion-ready .motion-slide-next:not([data-settled]) { animation: motion-slide-next var(--motion) var(--motion-ease); }
+.motion-ready .motion-slide-previous:not([data-settled]) { animation: motion-slide-previous var(--motion) var(--motion-ease); }
+
+/* Fade in, e.g. a new period title. */
+@keyframes motion-fade { from { opacity: 0; } }
+.motion-ready .motion-fade:not([data-settled]) { animation: motion-fade var(--motion) var(--motion-ease); }

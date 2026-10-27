@@ -8,7 +8,7 @@
         <a class="btn-secondary px-3" href="@Links.To(Period.Next)" title="Next period">›</a>
     </div>
     <div>
-        <h1 class="text-xl font-semibold leading-tight outline-none">@Format.Range(Period.Start, Period.End)</h1>
+        <h1 @key="Period" class="motion-fade text-xl font-semibold leading-tight outline-none">@Format.Range(Period.Start, Period.End)</h1>
         <p class="text-sm text-slate-500 dark:text-slate-400" data-period-status>
             <span><Count Value="Summary.Logged" Zero="0" Unit=" h" Class="font-semibold text-slate-800 dark:text-slate-100" /> logged</span>
             @if (Summary.IsComplete(Unsynced, Unsaved.Count > 0))
