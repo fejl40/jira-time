@@ -188,7 +188,7 @@ Services/LegacyDataMigration.cs    gives data from before multi-user support to 
 Services/TimeEntryService.cs       entries: query, save (with validation), delete
 Services/JiraClient.cs             Jira REST calls (myself, issue picker, sprint search, worklogs)
 Services/WorklogSync.cs            keeps Jira worklogs in step with entries
-Services/SprintIssues.cs           my open-sprint issues, cached briefly
+Services/JiraIssueLookup.cs           my open-sprint issues, cached briefly
 Components/Layout/MainLayout.razor header + redirect to setup when not configured
 Components/Pages/Setup/            Connect
 Components/Pages/Timesheet.razor   period grid + day view

@@ -7,8 +7,8 @@ public class DayFillerTests
     private static readonly DateOnly Monday = new(2026, 10, 19);
     private static readonly DayInfo Workday = new(Monday, DayKind.Workday, null);
 
-    private static readonly SprintIssue Todo = new("ABC-2", "Fix the build", "Task", "To Do", "new");
-    private static readonly SprintIssue Doing = new("ABC-1", "Login page", "Story", "In Progress", "indeterminate");
+    private static readonly IssueWithStatus Todo = new("ABC-2", "Fix the build", "Task", "To Do", "new");
+    private static readonly IssueWithStatus Doing = new("ABC-1", "Login page", "Story", "In Progress", "indeterminate");
 
     private static TimeEntry E(string key, double hours, DateOnly? date = null, int updatedMinute = 0) => new()
     {

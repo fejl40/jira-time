@@ -14,7 +14,7 @@ public class SprintIssuesTests
 
     private readonly FakeJira _jira = new();
     private readonly FakeClock _clock = new();
-    private readonly SprintIssues _sprint;
+    private readonly JiraIssueLookup _sprint;
 
     public SprintIssuesTests()
     {
@@ -28,7 +28,7 @@ public class SprintIssuesTests
         };
         _jira.Gets["/rest/api/2/search"] = Result;
         _jira.Gets["/rest/api/3/search/jql"] = Result;
-        _sprint = new SprintIssues(new JiraClient(_jira.Client()), _clock);
+        _sprint = new JiraIssueLookup(new JiraClient(_jira.Client()), _clock);
     }
 
     private static object Issue(string key, string summary, string type, string status, string category) => new
@@ -43,7 +43,7 @@ public class SprintIssuesTests
     [Fact]
     public async Task Server_asks_for_my_open_issues_in_open_sprints_by_username()
     {
-        var issues = await _sprint.GetAsync(Server, ServerMe);
+        var issues = await _sprint.GetSprintAsync(Server, ServerMe);
 
         var req = Assert.Single(_jira.Requests);
         Assert.StartsWith("/rest/api/2/search?", req.Path);
@@ -57,7 +57,7 @@ public class SprintIssuesTests
     [Fact]
     public async Task Cloud_uses_search_jql_and_the_account_id()
     {
-        await _sprint.GetAsync(Cloud, CloudMe);
+        await _sprint.GetSprintAsync(Cloud, CloudMe);
 
         var req = Assert.Single(_jira.Requests);
         Assert.StartsWith("/rest/api/3/search/jql?", req.Path);
@@ -67,7 +67,7 @@ public class SprintIssuesTests
     [Fact]
     public async Task Maps_type_status_and_in_progress()
     {
-        var issues = await _sprint.GetAsync(Server, ServerMe);
+        var issues = await _sprint.GetSprintAsync(Server, ServerMe);
 
         var story = issues[0];
         Assert.Equal("Login page", story.Summary);
@@ -84,7 +84,7 @@ public class SprintIssuesTests
         // Jira without Jira Software rejects the sprint field with 400.
         _jira.FailWhen = uri => HttpUtility.UrlDecode(uri.Query).Contains("openSprints") ? HttpStatusCode.BadRequest : null;
 
-        var issues = await _sprint.GetAsync(Server, ServerMe);
+        var issues = await _sprint.GetSprintAsync(Server, ServerMe);
 
         Assert.Equal(2, _jira.Requests.Count);
         Assert.DoesNotContain("openSprints", Jql(_jira.Requests[1]));
@@ -97,29 +97,29 @@ public class SprintIssuesTests
     {
         _jira.FailWith = HttpStatusCode.Unauthorized;
 
-        await Assert.ThrowsAsync<JiraException>(() => _sprint.GetAsync(Server, ServerMe));
+        await Assert.ThrowsAsync<JiraException>(() => _sprint.GetSprintAsync(Server, ServerMe));
         Assert.Single(_jira.Requests);
     }
 
     [Fact]
     public async Task Results_are_cached_for_five_minutes()
     {
-        await _sprint.GetAsync(Server, ServerMe);
+        await _sprint.GetSprintAsync(Server, ServerMe);
         _clock.Advance(TimeSpan.FromMinutes(4));
-        await _sprint.GetAsync(Server, ServerMe);
+        await _sprint.GetSprintAsync(Server, ServerMe);
         Assert.Single(_jira.Requests);
 
         _clock.Advance(TimeSpan.FromMinutes(2));
-        await _sprint.GetAsync(Server, ServerMe);
+        await _sprint.GetSprintAsync(Server, ServerMe);
         Assert.Equal(2, _jira.Requests.Count);
     }
 
     [Fact]
     public async Task Refresh_bypasses_the_cache_and_profiles_are_cached_separately()
     {
-        await _sprint.GetAsync(Server, ServerMe);
-        await _sprint.GetAsync(Server, ServerMe, refresh: true);
-        await _sprint.GetAsync(Server, ServerMe with { Id = "JIRAUSER2", Username = "anna" });
+        await _sprint.GetSprintAsync(Server, ServerMe);
+        await _sprint.GetSprintAsync(Server, ServerMe, refresh: true);
+        await _sprint.GetSprintAsync(Server, ServerMe with { Id = "JIRAUSER2", Username = "anna" });
 
         Assert.Equal(3, _jira.Requests.Count);
         Assert.Contains("assignee = \"anna\"", Jql(_jira.Requests[2]));

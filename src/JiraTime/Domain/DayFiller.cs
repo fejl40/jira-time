@@ -18,7 +18,7 @@ public static class DayFiller
     /// best-guess issue. Non-workdays and full days get nothing. When no issue can be guessed the
     /// draft's <see cref="TimeEntry.IssueKey"/> is empty.
     /// </summary>
-    public static IReadOnlyList<TimeEntry> Propose(DayInfo day, IReadOnlyList<TimeEntry> logged, IReadOnlyList<SprintIssue> sprint,
+    public static IReadOnlyList<TimeEntry> Propose(DayInfo day, IReadOnlyList<TimeEntry> logged, IReadOnlyList<IssueWithStatus> sprint,
         IReadOnlyList<TimeEntry>? previous = null)
     {
         var total = logged.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
@@ -90,7 +90,7 @@ public static class DayFiller
     /// Best guess for the rest of a day: the issue last worked on that day, then an In Progress
     /// sprint issue, then any sprint issue.
     /// </summary>
-    public static JiraIssue? GuessIssue(IReadOnlyList<TimeEntry> sameDay, IReadOnlyList<SprintIssue> sprint)
+    public static JiraIssue? GuessIssue(IReadOnlyList<TimeEntry> sameDay, IReadOnlyList<IssueWithStatus> sprint)
     {
         if (sameDay.Where(e => e.IssueKey != "").MaxBy(e => e.UpdatedUtc) is { } last)
             return new JiraIssue(last.IssueKey, last.IssueSummary);

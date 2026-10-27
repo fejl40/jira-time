@@ -37,7 +37,7 @@ public record JiraWorklog(string Id, string IssueKey, string IssueSummary, DateO
 
 /// <summary>An issue with its current status (from a sprint, period or status lookup).</summary>
 /// <param name="StatusCategory">Jira's status category key: "new", "indeterminate" (in progress) or "done".</param>
-public record SprintIssue(string Key, string Summary, string Type, string Status, string StatusCategory)
+public record IssueWithStatus(string Key, string Summary, string Type, string Status, string StatusCategory)
 {
     [JsonIgnore]
     public bool IsInProgress => StatusCategory == "indeterminate";

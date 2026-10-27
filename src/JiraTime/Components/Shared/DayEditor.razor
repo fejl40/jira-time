@@ -142,11 +142,11 @@
     [Parameter] public IReadOnlyList<JiraIssue> Recent { get; set; } = [];
     /// <summary>Recent comments per issue key, newest first.</summary>
     [Parameter] public IReadOnlyDictionary<string, IReadOnlyList<string>> Comments { get; set; } = new Dictionary<string, IReadOnlyList<string>>();
-    [Parameter] public IReadOnlyList<SprintIssue> Sprint { get; set; } = [];
+    [Parameter] public IReadOnlyList<IssueWithStatus> Sprint { get; set; } = [];
     /// <summary>Issues that were to do earlier in the period, offered in the picker after the sprint.</summary>
-    [Parameter] public IReadOnlyList<SprintIssue> Earlier { get; set; } = [];
+    [Parameter] public IReadOnlyList<IssueWithStatus> Earlier { get; set; } = [];
     /// <summary>Current Jira status per issue key; rows on Done issues get a note.</summary>
-    [Parameter] public IReadOnlyDictionary<string, SprintIssue> Statuses { get; set; } = new Dictionary<string, SprintIssue>();
+    [Parameter] public IReadOnlyDictionary<string, IssueWithStatus> Statuses { get; set; } = new Dictionary<string, IssueWithStatus>();
     /// <summary>Raised with the key when an issue is picked, so the page can look up its status.</summary>
     [Parameter] public EventCallback<string> OnIssuePicked { get; set; }
     [Parameter, EditorRequired] public JiraConnection Connection { get; set; } = default!;

@@ -5,7 +5,7 @@
 @inject TimeProvider Clock
 @inject WorklogSync Sync
 @inject WorkCalendarService Calendar
-@inject SprintIssues Sprint
+@inject JiraIssueLookup Issues
 @inject CurrentUser User
 @inject NavigationManager Nav
 @inject IJSRuntime JS
@@ -359,11 +359,11 @@
     private IReadOnlyList<TimeEntry> _before = [];
     private IReadOnlyList<JiraIssue> _recent = [];
     private IReadOnlyDictionary<string, IReadOnlyList<string>> _comments = new Dictionary<string, IReadOnlyList<string>>();
-    private IReadOnlyList<SprintIssue> _sprint = [];
+    private IReadOnlyList<IssueWithStatus> _sprint = [];
     /// <summary>Issues assigned to the user that were to do earlier in this period (maybe Done now).</summary>
-    private IReadOnlyList<SprintIssue> _earlier = [];
+    private IReadOnlyList<IssueWithStatus> _earlier = [];
     /// <summary>Current Jira status per issue key, for the "isn't to do" note.</summary>
-    private readonly Dictionary<string, SprintIssue> _statuses = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, IssueWithStatus> _statuses = new(StringComparer.OrdinalIgnoreCase);
     private DateOnly _selectedDay;
     private bool _loaded, _syncing;
     private int _unsynced;
@@ -549,7 +549,7 @@
         if (User.Connection is not { } c || User.Profile is not { } profile) return;
         try
         {
-            _sprint = await Sprint.GetAsync(c, profile);
+            _sprint = await Issues.GetSprintAsync(c, profile);
         }
         catch (JiraException)
         {
@@ -557,7 +557,7 @@
         }
         try
         {
-            _earlier = await Sprint.GetPeriodAsync(c, profile, _period);
+            _earlier = await Issues.GetPeriodAsync(c, profile, _period);
         }
         catch (JiraException)
         {
@@ -576,7 +576,7 @@
         if (unknown.Count == 0) return;
         try
         {
-            foreach (var (key, issue) in await Sprint.GetStatusesAsync(c, unknown)) _statuses[key] = issue;
+            foreach (var (key, issue) in await Issues.GetStatusesAsync(c, unknown)) _statuses[key] = issue;
         }
         catch (JiraException)
         {

@@ -13,7 +13,7 @@ public class PeriodIssuesTests
 
     private readonly FakeJira _jira = new();
     private readonly Clock _clock = new();
-    private readonly SprintIssues _issues;
+    private readonly JiraIssueLookup _issues;
 
     /// <summary>What the fake Jira knows: key → (summary, status, category).</summary>
     private readonly Dictionary<string, (string Summary, string Status, string Category)> _known = new()
@@ -39,7 +39,7 @@ public class PeriodIssuesTests
                 }),
             };
         };
-        _issues = new SprintIssues(new JiraClient(_jira.Client()), _clock);
+        _issues = new JiraIssueLookup(new JiraClient(_jira.Client()), _clock);
     }
 
     private static string Jql(Uri uri) => HttpUtility.ParseQueryString(uri.Query)["jql"]!;
@@ -105,7 +105,7 @@ public class PeriodIssuesTests
         Assert.Empty(_jira.Requests);
         Assert.Single(again);
 
-        _clock.Advance(SprintIssues.CacheFor);
+        _clock.Advance(JiraIssueLookup.CacheFor);
         await _issues.GetStatusesAsync(Server, ["ABC-4"]);
         Assert.Single(_jira.Requests);
     }
@@ -124,9 +124,9 @@ public class PeriodIssuesTests
     [Fact]
     public void Done_means_status_category_done()
     {
-        Assert.True(new SprintIssue("A-1", "", "Story", "Closed", "done").IsDone);
-        Assert.False(new SprintIssue("A-1", "", "Story", "To Do", "new").IsDone);
-        Assert.False(new SprintIssue("A-1", "", "Story", "In Review", "indeterminate").IsDone);
+        Assert.True(new IssueWithStatus("A-1", "", "Story", "Closed", "done").IsDone);
+        Assert.False(new IssueWithStatus("A-1", "", "Story", "To Do", "new").IsDone);
+        Assert.False(new IssueWithStatus("A-1", "", "Story", "In Review", "indeterminate").IsDone);
     }
 
     private sealed class Clock : TimeProvider
