@@ -163,7 +163,7 @@ day lowers the hours that day needs. The grid shows the hours still missing on e
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the file document store, time entry rules, workdays, worklog sync and import, sprint issues and fill suggestions.
+xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, worklog sync and import, Jira queries, issue lookups and the picker, and fill suggestions.
 
 ## Contributing
 
@@ -176,24 +176,37 @@ Paths below are relative to `src/JiraTime/`.
 
 ```
 Program.cs                         DI: storage, data protection, Jira client
-Domain/Documents.cs                AppSettings, TimeEntry, JiraProfile, Period, ...
-Domain/WorkCalendar.cs             day kinds, Danish holidays, days off
+Domain/TimeEntry.cs                one block of work on an issue on a day
+Domain/Period.cs                   semi-monthly periods
+Domain/Jira.cs                     connection, profile, issues and worklogs as Jira has them
+Domain/PeriodSheet.cs              a period being worked on: saved data, unsaved changes per day, rules
+Domain/DayWork.cs                  one day's unsaved changes
 Domain/DayFiller.cs                suggestions for a day's missing hours
+Domain/PeriodSummary.cs            logged, missing and weekly hours of a period
+Domain/IssueChoices.cs             what the issue picker offers, in which group
+Domain/WorklogMatching.cs          comparing entries with Jira worklogs
+Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work hours
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount
+Domain/LegacyData.cs               data from before multi-user support
 Storage/                           document store interfaces + file-system implementation
+Services/SignInSession.cs          restores, connects and signs out a tab (uses the two below)
 Services/ConnectionState.cs        encrypted connection in browser localStorage (per tab/circuit)
-Services/CurrentUser.cs            the verified user of this tab; data services filter by it
 Services/JiraIdentity.cs           signs a tab in as the user Jira says the token belongs to
+Services/CurrentUser.cs            the verified user of this tab; data services filter by it
 Services/LegacyDataMigration.cs    gives data from before multi-user support to its owner
 Services/TimeEntryService.cs       entries: query, save (with validation), delete
-Services/JiraClient.cs             Jira REST calls (myself, issue picker, sprint search, worklogs)
+Services/WorkCalendarService.cs    days and work hours of the signed-in user
+Services/JiraClient.cs             Jira REST calls (myself, issue picker, searches, worklogs)
+Services/Jira/                     HTTP transport, JQL quoting, comment format, raw JSON shapes
 Services/WorklogSync.cs            keeps Jira worklogs in step with entries
-Services/JiraIssueLookup.cs           my open-sprint issues, cached briefly
-Components/Layout/MainLayout.razor header + redirect to setup when not configured
+Services/JiraIssueLookup.cs        sprint and period issues and issue statuses, cached briefly
+Services/ExpiringCache.cs          small cache whose values expire
+Components/Layout/MainLayout.razor header + redirect to setup when not signed in
 Components/Pages/Setup/            Connect
-Components/Pages/Timesheet.razor   period grid + day view
+Components/Pages/Timesheet.razor   loads a period and wires the parts below to the services
+Components/Sheet/                  period header, reminders, grid, day list (phones), day header
 Components/Pages/SettingsPage.razor
-Components/Shared/                 Autocomplete, DayEditor, UserRow
+Components/Shared/                 DayEditor, IssuePicker, ThemeToggle, UserRow
 Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
 ```
 

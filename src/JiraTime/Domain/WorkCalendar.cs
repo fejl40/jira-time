@@ -40,6 +40,9 @@ public record DayInfo(DateOnly Date, DayKind Kind, string? Name)
 
     /// <summary>Hours to log: the day's hours minus time off, zero on non-workdays.</summary>
     public TimeSpan Expected => IsWorkday && Hours > Off ? Hours - Off : TimeSpan.Zero;
+
+    /// <summary>Hours still missing when <paramref name="logged"/> is logged: expected minus logged, never negative.</summary>
+    public TimeSpan MissingWith(TimeSpan logged) => Expected > logged ? Expected - logged : TimeSpan.Zero;
 }
 
 /// <summary>Hours each weekday needs, per user (id = owner).</summary>

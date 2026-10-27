@@ -60,7 +60,7 @@ public class WorkCalendarTests
     {
         var day = new DayInfo(D("2026-10-19"), DayKind.Workday, null);
 
-        Assert.Equal(TimeSpan.FromHours(missing), WorkCalendarService.Missing(day, TimeSpan.FromHours(logged)));
+        Assert.Equal(TimeSpan.FromHours(missing), day.MissingWith(TimeSpan.FromHours(logged)));
     }
 
     [Fact]
@@ -101,7 +101,7 @@ public class WorkCalendarTests
         Assert.True(partial.HasPartialDayOff);
         Assert.Equal("Other", partial.Name);
         Assert.Equal(TimeSpan.FromHours(5), partial.Expected);
-        Assert.Equal(TimeSpan.FromHours(1), WorkCalendarService.Missing(partial, TimeSpan.FromHours(4)));
+        Assert.Equal(TimeSpan.FromHours(1), partial.MissingWith(TimeSpan.FromHours(4)));
         Assert.Equal(TimeSpan.FromHours(5), DayFiller.Propose(partial, [], []).Single().Duration);
 
         await calendar.UnmarkDayOffAsync(day);

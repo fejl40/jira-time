@@ -1,0 +1,107 @@
+@* Period header: navigation and title, one status line, the main action, and the Save all question. *@
+@using System.Globalization
+
+<div class="flex flex-wrap items-center gap-x-4 gap-y-3">
+    <div class="flex items-center gap-1.5">
+        <a class="btn-secondary px-3" href="@Links.To(Period.Previous)" title="Previous period">‹</a>
+        <a class="btn-secondary" href="" title="Go to today">Today</a>
+        <a class="btn-secondary px-3" href="@Links.To(Period.Next)" title="Next period">›</a>
+    </div>
+    <div>
+        <h1 class="text-xl font-semibold leading-tight outline-none">@Format.Range(Period.Start, Period.End)</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400" data-period-status>
+            <span><span class="font-semibold text-slate-800 dark:text-slate-100">@Format.HoursText(Summary.Logged)</span> logged</span>
+            @if (Summary.IsComplete(Unsynced, Unsaved.Count > 0))
+            {
+                <span class="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" data-period-complete
+                      title="No workday up to today is short, nothing is unsaved and everything is in Jira">✓ Complete so far</span>
+            }
+            @if (Summary.Missing > TimeSpan.Zero)
+            {
+                <span> · <span class="text-amber-700 dark:text-amber-400" title="Hours missing on workdays up to today">@Format.Hours(Summary.Missing) h missing</span></span>
+            }
+            @if (Unsaved.Count > 0)
+            {
+                <span> · <span class="text-blue-700 dark:text-blue-300">unsaved on @Format.Days(Unsaved.Count)</span></span>
+            }
+            @if (Unsynced > 0)
+            {
+                <span> · <span class="text-amber-700 dark:text-amber-400" title="Saved here, but Jira doesn't have it yet">@Unsynced not in Jira</span></span>
+            }
+            <button class="btn-ghost ml-1 px-1.5 py-0.5 text-xs" disabled="@Syncing" @onclick="OnSync"
+                    title="Send what Jira is missing and read worklogs logged in Jira">@(Syncing ? "Syncing…" : Unsynced > 0 ? "Sync now" : "↻ Sync")</button>
+        </p>
+    </div>
+    <div class="ml-auto flex items-center gap-2">
+        @if (Unsaved.Count > 0)
+        {
+            <button class="btn-ghost" disabled="@Saving" @onclick="DiscardAllAsync">Discard all</button>
+            <button class="btn-primary" disabled="@Saving" @onclick="() => _confirming = true">@(Saving ? "Saving…" : $"Save all ({Format.Days(Unsaved.Count)})")</button>
+        }
+        else if (CanFillAny)
+        {
+            <button class="btn-primary" title="@FillTitle" @onclick="OnFillPeriod">Fill period</button>
+        }
+        @if (Unsaved.Count > 0 && CanFillMore)
+        {
+            <button class="btn-secondary order-first" title="@FillTitle" @onclick="OnFillPeriod">Fill period</button>
+        }
+    </div>
+</div>
+
+@if (_confirming && Unsaved.Count > 0)
+{
+    <div class="flex flex-wrap items-center gap-3 rounded-lg bg-blue-50 px-4 py-3 text-sm ring-1 ring-blue-200 dark:bg-blue-950/40 dark:ring-blue-900" role="alertdialog" data-confirm-save-all>
+        <span>Save @Format.Days(Unsaved.Count) (@Format.HoursText(Sheet.UnsavedTotal)) and update Jira to match?
+            @if (Sheet.UnsavedRemovals is var removals and > 0)
+            {
+                <span class="text-red-700 dark:text-red-400">@removals @(removals == 1 ? "worklog is" : "worklogs are") deleted.</span>
+            }
+        </span>
+        <button class="btn-secondary ml-auto" @onclick="() => _confirming = false">Cancel</button>
+        <button class="btn-primary" @onclick="SaveAllAsync">Save @Format.Days(Unsaved.Count)</button>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
+    /// <summary>Saved entries in the period that Jira doesn't have yet.</summary>
+    [Parameter] public int Unsynced { get; set; }
+    [Parameter] public bool Syncing { get; set; }
+    [Parameter] public bool Saving { get; set; }
+    [Parameter] public EventCallback OnSync { get; set; }
+    [Parameter] public EventCallback OnFillPeriod { get; set; }
+    [Parameter] public EventCallback OnSaveAll { get; set; }
+    [Parameter] public EventCallback OnDiscardAll { get; set; }
+
+    private const string FillTitle = "Suggest work for every workday so far that is short of hours";
+
+    private bool _confirming;
+    private Period? _shown;
+
+    private Period Period => Sheet.Period;
+    private PeriodSummary Summary => Sheet.Summary;
+    private IReadOnlyList<DateOnly> Unsaved => Sheet.UnsavedDays;
+    private bool CanFillAny => Period.Days.Any(Sheet.CanFill);
+    private bool CanFillMore => Period.Days.Any(d => Sheet.CanFill(d) && !Sheet.IsUnsaved(d));
+
+    protected override void OnParametersSet()
+    {
+        // A new period starts without the Save all question.
+        if (_shown == Period) return;
+        _shown = Period;
+        _confirming = false;
+    }
+
+    private Task SaveAllAsync()
+    {
+        _confirming = false;
+        return OnSaveAll.InvokeAsync();
+    }
+
+    private Task DiscardAllAsync()
+    {
+        _confirming = false;
+        return OnDiscardAll.InvokeAsync();
+    }
+}

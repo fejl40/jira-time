@@ -49,8 +49,4 @@ public class WorkCalendarService(IDocumentStore store, CurrentUser user)
         });
 
     public Task UnmarkDayOffAsync(DateOnly date) => _daysOff.DeleteAsync(DayOff.IdFor(user.Owner, date));
-
-    /// <summary>Hours still missing on a day: target minus logged, never negative. Zero on non-workdays.</summary>
-    public static TimeSpan Missing(DayInfo day, TimeSpan logged) =>
-        day.Expected > logged ? day.Expected - logged : TimeSpan.Zero;
 }

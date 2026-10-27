@@ -1,0 +1,49 @@
+@* Reminders: the end of this period, and a previous period that isn't done. *@
+@using System.Globalization
+
+@if (EndReminder is { } end)
+{
+    <div class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900" role="status" data-reminder="end">
+        The period ends @(Sheet.Period.End == Sheet.Today ? "today" : Sheet.Period.End.ToString("dddd d MMM", CultureInfo.InvariantCulture)): @end.
+    </div>
+}
+@if (Previous is { } prev && !_previousHidden)
+{
+    <div class="flex flex-wrap items-center gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900" role="status" data-reminder="previous">
+        <span>Last period (@Format.Range(prev.Period.Start, prev.Period.End)) isn't done:
+            @List(prev.Missing > TimeSpan.Zero ? $"{Format.Hours(prev.Missing)} h missing" : null,
+                  prev.NotInJira > 0 ? $"{prev.NotInJira} not in Jira" : null).
+        </span>
+        <a class="btn-secondary ml-auto py-1" href="@Links.To(prev.Period)">Open it</a>
+        <button class="btn-ghost px-1.5" title="Hide until the page is reloaded" aria-label="Hide" @onclick="() => _previousHidden = true">✕</button>
+    </div>
+}
+
+@code {
+    /// <summary>Where a period that isn't done stands.</summary>
+    public record OpenPeriod(Period Period, TimeSpan Missing, int NotInJira);
+
+    [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
+    [Parameter] public int Unsynced { get; set; }
+    /// <summary>The previous period, when this is the current one and the previous isn't done.</summary>
+    [Parameter] public OpenPeriod? Previous { get; set; }
+
+    private bool _previousHidden;
+
+    /// <summary>What is left, in the last days of the current period; null when nothing is or it isn't ending.</summary>
+    private string? EndReminder
+    {
+        get
+        {
+            if (!PeriodSummary.EndsSoon(Sheet.Period, Sheet.Today)) return null;
+            var s = Sheet.Summary;
+            var left = List(
+                s.Missing > TimeSpan.Zero ? $"{Format.Hours(s.Missing)} h missing so far" : null,
+                s.StillToLog > TimeSpan.Zero ? $"{Format.Hours(s.StillToLog)} h for the days left" : null,
+                Unsynced > 0 ? $"{Unsynced} not in Jira" : null);
+            return left == "" ? null : left;
+        }
+    }
+
+    private static string List(params string?[] parts) => string.Join(", ", parts.Where(p => p is not null));
+}

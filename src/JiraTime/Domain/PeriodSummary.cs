@@ -26,12 +26,13 @@ public sealed class PeriodSummary
             .ToDictionary(g => g.Key, g => g.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration));
         TimeSpan LoggedOn(DateOnly d) => logged.GetValueOrDefault(d);
         TimeSpan ExpectedOn(DateOnly d) => days.TryGetValue(d, out var info) ? info.Expected : TimeSpan.Zero;
+        TimeSpan MissingOn(DateOnly d) => days.TryGetValue(d, out var info) ? info.MissingWith(LoggedOn(d)) : TimeSpan.Zero;
 
         var missing = TimeSpan.Zero;
         var still = TimeSpan.Zero;
         foreach (var d in period.Days)
         {
-            if (d <= today) missing += ExpectedOn(d) > LoggedOn(d) ? ExpectedOn(d) - LoggedOn(d) : TimeSpan.Zero;
+            if (d <= today) missing += MissingOn(d);
             else still += ExpectedOn(d);
         }
 

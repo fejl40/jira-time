@@ -1,0 +1,100 @@
+@* The selected day's title, hours, kind of day and time off. *@
+@using System.Globalization
+
+<div class="flex flex-wrap items-center gap-3">
+    <h2 class="text-lg font-semibold">@Date.ToString("dddd d MMMM", CultureInfo.InvariantCulture)</h2>
+    <span class="text-sm text-slate-500 dark:text-slate-400">@(Logged > TimeSpan.Zero ? Format.HoursText(Logged) : "Nothing logged")</span>
+    @if (Info is { Kind: DayKind.Holiday or DayKind.Weekend })
+    {
+        <span class="@Badge">@(Info.Name ?? "Weekend")</span>
+    }
+    else if (Info is { Kind: DayKind.DayOff })
+    {
+        <span class="@Badge" data-time-off>Day off · @Info.Name</span>
+        <button class="btn-ghost text-xs" @onclick="OnUnmarkOff">Undo</button>
+    }
+    else if (Info is { Kind: DayKind.Workday } work)
+    {
+        @if (Missing > TimeSpan.Zero)
+        {
+            <span class="text-sm text-amber-700 dark:text-amber-400">@Format.Hours(Missing) h missing</span>
+        }
+        @if (work.HasPartialDayOff)
+        {
+            <span class="@Badge" data-time-off>@work.Name · @Format.Hours(work.Off) h off</span>
+            <button class="btn-ghost text-xs" @onclick="OnUnmarkOff">Undo</button>
+        }
+        else if (!_open)
+        {
+            <button class="btn-ghost text-xs" @onclick="Open">Time off…</button>
+        }
+        else
+        {
+            <span class="flex flex-wrap items-center gap-1.5 text-xs" data-time-off-form>
+                <select class="field w-auto py-1 text-xs" aria-label="Reason" @bind="_reason">
+                    @foreach (var r in Enum.GetValues<DayOffReason>())
+                    {
+                        <option value="@r">@r</option>
+                    }
+                </select>
+                <input type="text" inputmode="decimal" class="field w-16 py-1 text-right text-xs" aria-label="Hours off" @bind="_hours" />
+                <span class="text-slate-500 dark:text-slate-400">h of @Format.Hours(work.Hours) h</span>
+                <button class="btn-secondary py-1 text-xs" @onclick="MarkOffAsync">Mark off</button>
+                <button class="btn-ghost text-xs" @onclick="() => _open = false">Cancel</button>
+                @if (_error is not null)
+                {
+                    <span class="text-red-700 dark:text-red-400" role="alert">@_error</span>
+                }
+            </span>
+        }
+    }
+</div>
+
+@code {
+    /// <summary>Time off asked for: the reason and the hours (null for the whole day).</summary>
+    public record TimeOff(DayOffReason Reason, TimeSpan? Hours);
+
+    [Parameter, EditorRequired] public DateOnly Date { get; set; }
+    [Parameter] public DayInfo? Info { get; set; }
+    [Parameter] public TimeSpan Logged { get; set; }
+    /// <summary>Hours missing so far (zero after today).</summary>
+    [Parameter] public TimeSpan Missing { get; set; }
+    [Parameter] public EventCallback<TimeOff> OnMarkOff { get; set; }
+    [Parameter] public EventCallback OnUnmarkOff { get; set; }
+
+    private const string Badge = "rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs text-slate-600 dark:text-slate-300";
+
+    private bool _open;
+    private DayOffReason _reason = DayOffReason.Vacation;
+    private string _hours = "";
+    private string? _error;
+    private DateOnly? _shown;
+
+    protected override void OnParametersSet()
+    {
+        // Another day closes the form.
+        if (_shown == Date) return;
+        _shown = Date;
+        _open = false;
+    }
+
+    private void Open()
+    {
+        _open = true;
+        _error = null;
+        _hours = Format.Hours(Info?.Hours ?? DayInfo.Target);
+    }
+
+    /// <summary>Hours equal to the whole day make it a day off.</summary>
+    private async Task MarkOffAsync()
+    {
+        if (Info is not { } day) return;
+        if (Format.ParseHours(_hours) is not { } hours)
+        {
+            _error = "Enter the hours off, e.g. 4.";
+            return;
+        }
+        _open = false;
+        await OnMarkOff.InvokeAsync(new TimeOff(_reason, hours >= day.Hours ? null : hours));
+    }
+}

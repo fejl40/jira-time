@@ -28,6 +28,12 @@ public static class Format
         return value > TimeSpan.Zero ? value : null;
     }
 
+    /// <summary>Hours with a unit, "0 h" for none: 7.5 h.</summary>
+    public static string HoursText(TimeSpan t) => $"{(Hours(t) is { Length: > 0 } h ? h : "0")} h";
+
+    /// <summary>"1 day", "3 days".</summary>
+    public static string Days(int n) => n == 1 ? "1 day" : $"{n} days";
+
     public static string Range(DateOnly a, DateOnly b) =>
         a.Year == b.Year
             ? $"{a.ToString("d MMM", CultureInfo.InvariantCulture)} – {b.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}"
