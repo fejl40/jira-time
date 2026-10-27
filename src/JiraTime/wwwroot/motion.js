@@ -100,5 +100,19 @@
     })).then(() => undefined);
   };
 
-  window.jiraMotion = { flyTicks, collapse };
+  // ---- Glide: the selected day's highlight moves to the selected column of a grid ----
+  const glide = grid => {
+    const highlight = grid?.querySelector('[data-day-glide]');
+    const column = grid?.querySelector('[data-selected-day]');
+    if (!highlight) return;
+    if (!column) { highlight.style.opacity = '0'; return; }
+    highlight.style.opacity = '';
+    highlight.style.width = `${column.offsetWidth}px`;
+    highlight.style.transform = `translateX(${column.offsetLeft}px)`;
+    // The first placement jumps; later ones glide.
+    if (!('placed' in highlight.dataset)) requestAnimationFrame(() => highlight.dataset.placed = '');
+  };
+  addEventListener('resize', () => document.querySelectorAll('[data-day-glide]').forEach(h => glide(h.parentElement)));
+
+  window.jiraMotion = { flyTicks, collapse, glide };
 })();

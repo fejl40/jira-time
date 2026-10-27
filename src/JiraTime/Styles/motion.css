@@ -70,3 +70,6 @@
 /* Fade in, e.g. a new period title. */
 @keyframes motion-fade { from { opacity: 0; } }
 .motion-ready .motion-fade:not([data-settled]) { animation: motion-fade var(--motion) var(--motion-ease); }
+
+/* Glide: the selected day's highlight moves across the grid (placed by wwwroot/motion.js). */
+.motion-glide[data-placed] { transition: transform var(--motion) var(--motion-ease), width var(--motion) var(--motion-ease); }
