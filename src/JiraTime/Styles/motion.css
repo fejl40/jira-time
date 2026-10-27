@@ -87,3 +87,10 @@
 
 /* Confetti bits for a period that becomes complete (wwwroot/motion.js). */
 .motion-confetti { position: fixed; z-index: 60; width: 6px; height: 10px; border-radius: 1px; pointer-events: none; }
+
+/* Pulse: a reminder glows once when it appears, also on the first screen. Never loops. */
+@keyframes motion-pulse {
+  0% { box-shadow: 0 0 0 0 rgb(245 158 11 / 0.5); }
+  100% { box-shadow: 0 0 0 10px rgb(245 158 11 / 0); }
+}
+.motion-pulse { animation: motion-pulse calc(var(--motion) * 2) var(--motion-ease) 1; }

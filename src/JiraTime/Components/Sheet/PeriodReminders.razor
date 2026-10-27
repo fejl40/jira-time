@@ -3,13 +3,13 @@
 
 @if (EndReminder is { } end)
 {
-    <div class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900" role="status" data-reminder="end">
+    <div class="motion-pulse rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900" role="status" data-reminder="end">
         The period ends @(Sheet.Period.End == Sheet.Today ? "today" : Sheet.Period.End.ToString("dddd d MMM", CultureInfo.InvariantCulture)): @end.
     </div>
 }
 @if (Previous is { } prev && !_previousHidden)
 {
-    <div class="flex flex-wrap items-center gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900" role="status" data-reminder="previous">
+    <div class="motion-pulse flex flex-wrap items-center gap-3 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900" role="status" data-reminder="previous">
         <span>Last period (@Format.Range(prev.Period.Start, prev.Period.End)) isn't done:
             @List(prev.Missing > TimeSpan.Zero ? $"{Format.Hours(prev.Missing)} h missing" : null,
                   prev.NotInJira > 0 ? $"{prev.NotInJira} not in Jira" : null).
