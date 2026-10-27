@@ -199,7 +199,7 @@
     private string DayCellClass(DateOnly day, int index, bool footer = false)
     {
         var info = Sheet.Day(day);
-        var classes = new List<string>();
+        var classes = new List<string> { "motion-colors" }; // a day marked off fades to grey
         if (index > 0 && day.DayOfWeek == DayOfWeek.Monday) classes.Add("border-l-2 border-slate-300 dark:border-slate-600"); // week boundary
         if (!footer && info is { IsWorkday: false }) classes.Add("bg-slate-50 dark:bg-slate-800/60");
         if (!footer && info is { Kind: DayKind.Holiday or DayKind.DayOff }) classes.Add("text-slate-400 dark:text-slate-500");

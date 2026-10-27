@@ -8,7 +8,7 @@
         var saved = Sheet.SavedOn(day);
         var logged = PeriodSheet.Total(saved);
         <li>
-            <button type="button" class="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm @(day == Selected ? "bg-blue-50 dark:bg-blue-950/60" : info is { IsWorkday: false } ? "bg-slate-50 dark:bg-slate-800/60" : "")"
+            <button type="button" class="motion-colors flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm @(day == Selected ? "bg-blue-50 dark:bg-blue-950/60" : info is { IsWorkday: false } ? "bg-slate-50 dark:bg-slate-800/60" : "")"
                     @onclick="() => OnSelect.InvokeAsync(day)">
                 <span class="w-20 flex-none @(day == Sheet.Today ? "font-semibold text-blue-700 dark:text-blue-400" : "")">@day.ToString("ddd d", CultureInfo.InvariantCulture)</span>
                 <span class="flex-1 truncate text-xs text-slate-500 dark:text-slate-400">@Note(info)</span>

@@ -94,3 +94,7 @@
   100% { box-shadow: 0 0 0 10px rgb(245 158 11 / 0); }
 }
 .motion-pulse { animation: motion-pulse calc(var(--motion) * 2) var(--motion-ease) 1; }
+
+/* Sunrise: the sun on a vacation day comes up. */
+@keyframes motion-sunrise { from { opacity: 0; transform: translateY(8px) scale(0.6) rotate(-45deg); } }
+.motion-ready .motion-sunrise:not([data-settled]) { animation: motion-sunrise var(--motion) var(--motion-ease) both; }

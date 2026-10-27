@@ -17,7 +17,7 @@
     }
     else if (Info is { Kind: DayKind.DayOff })
     {
-        <span class="@Badge" data-time-off>Day off · @Info.Name</span>
+        <span class="@Badge" data-time-off>@Sun Day off · @Info.Name</span>
         <button class="btn-ghost text-xs" @onclick="OnUnmarkOff">Undo</button>
     }
     else if (Info is { Kind: DayKind.Workday } work)
@@ -28,7 +28,7 @@
         }
         @if (work.HasPartialDayOff)
         {
-            <span class="@Badge" data-time-off>@work.Name · @Format.Hours(work.Off) h off</span>
+            <span class="@Badge" data-time-off>@Sun @work.Name · @Format.Hours(work.Off) h off</span>
             <button class="btn-ghost text-xs" @onclick="OnUnmarkOff">Undo</button>
         }
         else if (!_open)
@@ -68,6 +68,11 @@
     [Parameter] public TimeSpan Missing { get; set; }
     [Parameter] public EventCallback<TimeOff> OnMarkOff { get; set; }
     [Parameter] public EventCallback OnUnmarkOff { get; set; }
+
+    /// <summary>A sun that rises in, for vacation.</summary>
+    private RenderFragment? Sun => Info?.Name == nameof(DayOffReason.Vacation)
+        ? @<span class="motion-sunrise inline-block" aria-hidden="true">☀️</span>
+        : null;
 
     private const string Badge = "rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs text-slate-600 dark:text-slate-300";
 
