@@ -1,6 +1,6 @@
 @* Period grid: one row per issue, one column per day, with day, week, unsaved and missing totals. *@
 @using System.Globalization
-@inject IJSRuntime JS
+@inject MotionScript Animations
 
 <div @ref="_grid" class="relative hidden overflow-x-auto rounded-xl bg-white dark:bg-slate-900 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 sm:block">
     <table class="w-full border-collapse text-sm">
@@ -167,14 +167,7 @@
     private ElementReference _grid;
 
     /// <summary>Moves the selected day's highlight after every render, as columns can change width.</summary>
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        try
-        {
-            await JS.InvokeVoidAsync("jiraMotion.glide", _grid);
-        }
-        catch (JSDisconnectedException) { }
-    }
+    protected override Task OnAfterRenderAsync(bool firstRender) => Animations.GlideAsync(_grid);
 
     private static string Percent(double share) => (share * 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
 

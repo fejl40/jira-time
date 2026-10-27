@@ -26,6 +26,7 @@ builder.Services.AddScoped<ConnectionState>();
 builder.Services.AddScoped<CurrentUser>();
 builder.Services.AddScoped<JiraIdentity>();
 builder.Services.AddScoped<SignInSession>();
+builder.Services.AddScoped<JiraTime.Components.MotionScript>();
 builder.Services.AddSingleton<LegacyDataMigration>();
 builder.Services.AddScoped<TimeEntryService>();
 builder.Services.AddScoped<WorklogSync>();

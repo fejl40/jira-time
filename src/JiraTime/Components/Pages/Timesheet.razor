@@ -9,6 +9,7 @@
 @inject CurrentUser User
 @inject NavigationManager Nav
 @inject IJSRuntime JS
+@inject MotionScript Animations
 @implements IAsyncDisposable
 
 @* Loads a period into a PeriodSheet and wires its parts to the services. The rules live in
@@ -36,11 +37,12 @@
     }
 
     @* A new period slides in from the side it comes from. *@
-    <div @key="sheet.Period" class="space-y-6 @SlideClass">
-    <DayList Sheet="sheet" Selected="_selectedDay" OnSelect="d => SelectDay(d)" />
+    <div @key="sheet.Period" class="space-y-6 @Motion.Slide(_slide)">
+        <DayList Sheet="sheet" Selected="_selectedDay" OnSelect="d => SelectDay(d)" />
 
-    <PeriodGrid Sheet="sheet" Selected="_selectedDay" JiraBaseUrl="@User.Connection?.BaseUrl" Cascade="_cascade" JustSaved="_justSaved" SentToJira="_sentToJira"
-                OnSelectDay="d => SelectDay(d, focus: true)" OnCellClicked="CellClicked" />
+        <PeriodGrid Sheet="sheet" Selected="_selectedDay" JiraBaseUrl="@User.Connection?.BaseUrl"
+                    Cascade="_cascade" JustSaved="_justSaved" SentToJira="_sentToJira"
+                    OnSelectDay="d => SelectDay(d, focus: true)" OnCellClicked="CellClicked" />
     </div>
 
     @* Selected day *@
@@ -99,7 +101,6 @@
 
     /// <summary>Which way the last period change went: 1 to a later period, -1 to an earlier one, 0 on first show.</summary>
     private int _slide;
-    private string SlideClass => Motion.Slide(_slide);
 
     private PeriodSheet Sheet => _sheet!;
     private IReadOnlyList<TimeEntry> DayEntries => Sheet.SavedOn(_selectedDay);
@@ -297,7 +298,7 @@
             else needsWork.Add(day);
         }
         _savingAll = false;
-        if (_justSaved.Contains(_selectedDay)) await JS.InvokeVoidAsync("jiraMotion.collapse", "[data-row=removed]");
+        if (_justSaved.Contains(_selectedDay)) await Animations.CollapseAsync(MotionScript.RemovedRows);
         await ReloadAsync();
         FinishSave();
         if (needsWork.Count > 0)
@@ -414,7 +415,7 @@
         if (_flyTicks)
         {
             _flyTicks = false;
-            await JS.InvokeVoidAsync("jiraMotion.flyTicks", "[data-sent]", "[data-period-status]");
+            await Animations.FlyTicksAsync();
         }
     }
 
@@ -429,7 +430,7 @@
         if (_completedSheet != sheet) (_completedSheet, _completed) = (sheet, new());
         var complete = sheet.Summary.IsComplete(_unsynced, sheet.UnsavedDays.Count > 0);
         if (_completed.Update(complete ? [sheet.Period] : []).Count > 0)
-            await JS.InvokeVoidAsync("jiraMotion.celebrate", $"{user.Id}:{Format.Iso(sheet.Period.Start)}", "[data-period-complete]");
+            await Animations.CelebrateAsync(user, sheet.Period);
     }
 
     [JSInvokable]

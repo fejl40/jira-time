@@ -157,6 +157,15 @@ hours** (a day with 0 hours is not a workday). Danish public holidays are skippe
 **Time off…** in the day view marks a whole day or part of it off (vacation, sick, other); part of a
 day lowers the hours that day needs. The grid shows the hours still missing on each workday up to today.
 
+## Animations
+
+Totals count to their new value, Fill period suggestions drop in day by day, day headers fill like a
+progress bar, saved cells settle while a tick flies to the Jira status, removed rows turn red and
+collapse, periods slide, the selected day glides, picker groups slide in, reminders pulse once, time off
+fades to grey (with a sun for vacation), and a period that becomes complete gets confetti once. They
+are quick (75–150 ms) and switch off when your system asks for reduced motion. Styles and speeds are in
+`Styles/motion.css`, the script parts in `wwwroot/motion.js`, called through `Components/MotionScript.cs`.
+
 ## Tests
 
 ```sh
@@ -205,6 +214,7 @@ Components/Layout/MainLayout.razor header + redirect to setup when not signed in
 Components/Pages/Setup/            Connect
 Components/Pages/Timesheet.razor   loads a period and wires the parts below to the services
 Components/Sheet/                  period header, reminders, grid, day list (phones), day header
+Components/MotionScript.cs         calls the animations in wwwroot/motion.js (styles: Styles/motion.css)
 Components/Pages/SettingsPage.razor
 Components/Shared/                 DayEditor, IssuePicker, ThemeToggle, UserRow
 Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)

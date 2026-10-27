@@ -1,16 +1,22 @@
-/* Animations. Kept quick: 75 ms for small things, 150 ms for bigger moves. Everything here is
-   switched off when the system asks for reduced motion. Animations that should not play while the
-   page first draws are scoped to html.motion-ready, which wwwroot/motion.js sets once it has settled;
-   it also marks what was on screen then as data-settled, so only later changes animate. */
+/* Animations. Quick on purpose: 75 ms for small things, 150 ms for moves. All of it is switched off
+   when the system asks for reduced motion (the speeds become 0, which wwwroot/motion.js reads too).
+
+   Two kinds:
+   - Entrances play once when an element appears or gets the class. They wait for html.motion-ready,
+     which wwwroot/motion.js sets shortly after the first screen, marking what is on screen then as
+     data-settled, so only what changes later animates.
+   - Transitions (motion-bar, motion-colors, motion-glide) ease a change of size, colour or place. */
 
 :root {
   --motion-fast: 75ms;
   --motion: 150ms;
   --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Delay between items of a staggered entrance; set the item's place with style="--motion-order: n". */
+  --motion-stagger: 15ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --motion-fast: 0ms; --motion: 0ms; }
+  :root { --motion-fast: 0ms; --motion: 0ms; --motion-stagger: 0ms; }
   *, *::before, *::after {
     animation-duration: 0ms !important;
     animation-delay: 0ms !important;
@@ -18,83 +24,74 @@
   }
 }
 
-/* Drop in: new cells, e.g. Fill period suggestions. --motion-order staggers them left to right. */
-@keyframes motion-drop {
-  from { opacity: 0; transform: translateY(-6px) scale(0.9); }
-  to { opacity: 1; transform: none; }
-}
-.motion-ready .motion-drop:not([data-settled]) {
-  animation: motion-drop var(--motion) var(--motion-ease) both;
+/* ---- Entrances ---- */
+
+.motion-ready :is(.motion-drop, .motion-rise, .motion-pop, .motion-grow, .motion-settle,
+                  .motion-slide-next, .motion-slide-previous, .motion-fade, .motion-sunrise):not([data-settled]) {
+  animation-duration: var(--motion);
+  animation-timing-function: var(--motion-ease);
+  animation-fill-mode: both;
   animation-delay: calc(var(--motion-order, 0) * var(--motion-stagger));
 }
-:root { --motion-stagger: 15ms; }
+
+/* Drop in: new grid cells, e.g. Fill period suggestions, left to right. */
+.motion-ready .motion-drop:not([data-settled]) { animation-name: motion-drop; }
+@keyframes motion-drop { from { opacity: 0; transform: translateY(-6px) scale(0.9); } }
+
+/* Rise: list entries slide up into place, e.g. issue picker groups. */
+.motion-ready .motion-rise:not([data-settled]) { animation-name: motion-rise; }
+@keyframes motion-rise { from { opacity: 0; transform: translateY(6px); } }
+
+/* Pop: a bar bounces when its day becomes complete. */
+.motion-ready .motion-pop:not([data-settled]) { animation-name: motion-pop; animation-fill-mode: none; }
+@keyframes motion-pop { 50% { transform: scale(1.15, 2.2); } }
+
+/* Grow: a dot swells for a moment when its issue is picked. */
+.motion-ready .motion-grow:not([data-settled]) { animation-name: motion-grow; animation-fill-mode: none; }
+@keyframes motion-grow { 50% { transform: scale(1.7); } }
+
+/* Settle: a just-saved cell goes from draft blue to plain. */
+.motion-ready .motion-settle:not([data-settled]) { animation-name: motion-settle; animation-fill-mode: none; }
+@keyframes motion-settle { from { background-color: rgb(59 130 246 / 0.25); transform: scale(0.9); } }
+
+/* Slide: a new period comes in from the side it lies on. */
+.motion-ready .motion-slide-next:not([data-settled]) { animation-name: motion-slide-next; animation-fill-mode: none; }
+.motion-ready .motion-slide-previous:not([data-settled]) { animation-name: motion-slide-previous; animation-fill-mode: none; }
+@keyframes motion-slide-next { from { opacity: 0; transform: translateX(24px); } }
+@keyframes motion-slide-previous { from { opacity: 0; transform: translateX(-24px); } }
+
+/* Fade in, e.g. a new period title. */
+.motion-ready .motion-fade:not([data-settled]) { animation-name: motion-fade; }
+@keyframes motion-fade { from { opacity: 0; } }
+
+/* Sunrise: the sun on a vacation day comes up. */
+.motion-ready .motion-sunrise:not([data-settled]) { animation-name: motion-sunrise; }
+@keyframes motion-sunrise { from { opacity: 0; transform: translateY(8px) scale(0.6) rotate(-45deg); } }
+
+/* Pulse: a reminder glows once when it appears, also on the first screen. Never loops. */
+.motion-pulse { animation: motion-pulse calc(var(--motion) * 2) var(--motion-ease); }
+@keyframes motion-pulse {
+  from { box-shadow: 0 0 0 0 rgb(245 158 11 / 0.5); }
+  to { box-shadow: 0 0 0 10px rgb(245 158 11 / 0); }
+}
+
+/* Received: the period status flashes green when the ticks from saved cells arrive (wwwroot/motion.js). */
+.motion-received { animation: motion-received var(--motion) var(--motion-ease); }
+@keyframes motion-received { 50% { color: var(--color-emerald-600); } }
+
+/* ---- Transitions ---- */
 
 /* A bar that grows or shrinks to its new width, e.g. a day's hours. */
 .motion-bar { transition: width var(--motion) var(--motion-ease), background-color var(--motion) var(--motion-ease); }
 
-/* Pop: a short bounce when something is done, e.g. a day that becomes complete. */
-@keyframes motion-pop {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.15, 2.2); }
-  100% { transform: scale(1); }
-}
-.motion-ready .motion-pop:not([data-settled]) { animation: motion-pop var(--motion) var(--motion-ease); }
+/* Colours that change smoothly, e.g. a removed row turning red, a day off turning grey. */
+.motion-colors { transition: background-color var(--motion-fast) var(--motion-ease), color var(--motion-fast) var(--motion-ease); }
 
-/* Settle: a cell that was just saved goes from a draft blue to plain. */
-@keyframes motion-settle {
-  from { background-color: rgb(59 130 246 / 0.25); transform: scale(0.9); }
-  to { background-color: transparent; transform: none; }
-}
-.motion-ready .motion-settle:not([data-settled]) { animation: motion-settle var(--motion) var(--motion-ease); }
-
-/* The check mark that flies from saved cells to the period status (wwwroot/motion.js). */
-.motion-tick {
-  position: fixed; z-index: 60; pointer-events: none;
-  font-size: 0.75rem; font-weight: 700; color: var(--color-emerald-600);
-}
-/* The period status when the ticks arrive. */
-@keyframes motion-received {
-  50% { color: var(--color-emerald-600); }
-}
-.motion-received { animation: motion-received var(--motion) var(--motion-ease); }
-
-/* Colors that change smoothly, e.g. a row turning red when removed. */
-.motion-colors { transition: background-color var(--motion) var(--motion-ease), color var(--motion) var(--motion-ease); }
-
-/* Slide: a new period comes in from the side it lies on. */
-@keyframes motion-slide-next { from { opacity: 0; transform: translateX(24px); } }
-@keyframes motion-slide-previous { from { opacity: 0; transform: translateX(-24px); } }
-.motion-ready .motion-slide-next:not([data-settled]) { animation: motion-slide-next var(--motion) var(--motion-ease); }
-.motion-ready .motion-slide-previous:not([data-settled]) { animation: motion-slide-previous var(--motion) var(--motion-ease); }
-
-/* Fade in, e.g. a new period title. */
-@keyframes motion-fade { from { opacity: 0; } }
-.motion-ready .motion-fade:not([data-settled]) { animation: motion-fade var(--motion) var(--motion-ease); }
-
-/* Glide: the selected day's highlight moves across the grid (placed by wwwroot/motion.js). */
+/* The selected day's highlight gliding across the grid; placed by wwwroot/motion.js. */
 .motion-glide[data-placed] { transition: transform var(--motion) var(--motion-ease), width var(--motion) var(--motion-ease); }
 
-/* Rise: list entries slide up into place, staggered by --motion-order (e.g. issue picker groups). */
-@keyframes motion-rise { from { opacity: 0; transform: translateY(6px); } }
-.motion-ready .motion-rise:not([data-settled]) {
-  animation: motion-rise var(--motion) var(--motion-ease) both;
-  animation-delay: calc(var(--motion-order, 0) * var(--motion-stagger) * 2);
-}
+/* ---- Pieces made by wwwroot/motion.js ---- */
 
-/* Grow: a small dot swells for a moment, e.g. when an issue is picked. */
-@keyframes motion-grow { 50% { transform: scale(1.7); } }
-.motion-ready .motion-grow:not([data-settled]) { animation: motion-grow var(--motion) var(--motion-ease); }
-
-/* Confetti bits for a period that becomes complete (wwwroot/motion.js). */
-.motion-confetti { position: fixed; z-index: 60; width: 6px; height: 10px; border-radius: 1px; pointer-events: none; }
-
-/* Pulse: a reminder glows once when it appears, also on the first screen. Never loops. */
-@keyframes motion-pulse {
-  0% { box-shadow: 0 0 0 0 rgb(245 158 11 / 0.5); }
-  100% { box-shadow: 0 0 0 10px rgb(245 158 11 / 0); }
-}
-.motion-pulse { animation: motion-pulse calc(var(--motion) * 2) var(--motion-ease) 1; }
-
-/* Sunrise: the sun on a vacation day comes up. */
-@keyframes motion-sunrise { from { opacity: 0; transform: translateY(8px) scale(0.6) rotate(-45deg); } }
-.motion-ready .motion-sunrise:not([data-settled]) { animation: motion-sunrise var(--motion) var(--motion-ease) both; }
+.motion-tick, .motion-confetti { position: fixed; z-index: 60; pointer-events: none; }
+.motion-tick { font-size: 0.75rem; font-weight: 700; color: var(--color-emerald-600); }
+.motion-confetti { width: 6px; height: 10px; border-radius: 1px; }

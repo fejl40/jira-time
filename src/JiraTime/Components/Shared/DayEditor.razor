@@ -2,7 +2,7 @@
    The unsaved changes live in a DayWork owned by the page, so they survive picking another day. *@
 @inject JiraClient Jira
 @inject WorklogSync Sync
-@inject IJSRuntime JS
+@inject MotionScript Animations
 
 <div>
     <ul class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -286,24 +286,13 @@
         if (row.Saved is { } s) Work.Removed.Add(s.Id);
         else
         {
-            await CollapseAsync($"[data-row-id='{row.Entry.Id}']");
+            await Animations.CollapseAsync($"[data-row-id='{row.Entry.Id}']");
             Work.Drafts.Remove(row.Entry);
             Work.Suggested.Remove(row.Entry.Id);
             Work.BadHours.Remove(row.Entry.Id);
         }
         _errors.Remove(row.Entry.Id);
         await Changed();
-    }
-
-    /// <summary>Lets rows collapse before they leave the list. A gone circuit or tab just skips it.</summary>
-    private async Task CollapseAsync(string selector)
-    {
-        try
-        {
-            await JS.InvokeVoidAsync("jiraMotion.collapse", selector);
-        }
-        catch (JSException) { }
-        catch (JSDisconnectedException) { }
     }
 
     private Task Restore(RowView row)
@@ -341,7 +330,7 @@
         _notice = result.SyncFailures > 0
             ? $"Saved, but {result.SyncFailures} {(result.SyncFailures == 1 ? "change" : "changes")} could not be sent to Jira yet. Use Sync now to retry."
             : null;
-        await CollapseAsync("[data-row=removed]");
+        await Animations.CollapseAsync(MotionScript.RemovedRows);
         await OnSaved.InvokeAsync(result);
     }
 }
