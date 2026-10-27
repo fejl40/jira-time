@@ -173,58 +173,45 @@ public class DataSeparationTests : IDisposable
         _dir.Dispose();
     }
 
-    private TimeEntryService Entries(UserKey user) => new(_store, CurrentUser.SignedIn(user));
+    private RetryQueue Queue(UserKey user) => new(_store, CurrentUser.SignedIn(user));
     private WorkCalendarService Calendar(UserKey user) => new(_store, CurrentUser.SignedIn(user));
 
-    private static TimeEntry Entry(string key, double hours) => new() { IssueKey = key, Date = Day, Duration = TimeSpan.FromHours(hours) };
+    private static TimeEntry Waiting(string key, double hours) =>
+        new() { IssueKey = key, Date = Day, Duration = TimeSpan.FromHours(hours), SyncPending = true };
 
     [Fact]
-    public async Task Users_only_see_their_own_entries()
+    public async Task Users_only_see_their_own_waiting_changes()
     {
-        await Entries(TestUsers.Carl).SaveAsync(Entry("ABC-1", 8));
-        await Entries(TestUsers.Anna).SaveAsync(Entry("XYZ-1", 3));
+        await Queue(TestUsers.Carl).AddAsync(Waiting("ABC-1", 8));
+        await Queue(TestUsers.Anna).AddAsync(Waiting("XYZ-1", 3));
 
-        Assert.Equal(["ABC-1"], (await Entries(TestUsers.Carl).GetRangeAsync(Day, Day)).Select(e => e.IssueKey));
-        Assert.Equal(["XYZ-1"], (await Entries(TestUsers.Anna).GetRangeAsync(Day, Day)).Select(e => e.IssueKey));
-        Assert.Single(await Entries(TestUsers.Anna).GetPendingAsync(Day, Day));
+        Assert.Equal(["ABC-1"], (await Queue(TestUsers.Carl).GetPendingAsync(Day, Day)).Select(e => e.IssueKey));
+        Assert.Equal(["XYZ-1"], (await Queue(TestUsers.Anna).GetPendingAsync(Day, Day)).Select(e => e.IssueKey));
     }
 
     [Fact]
-    public async Task Entries_are_stored_with_their_owner()
+    public async Task Waiting_changes_are_stored_with_their_owner()
     {
-        var entry = Entry("ABC-1", 8);
-        await Entries(TestUsers.Carl).SaveAsync(entry);
+        var entry = Waiting("ABC-1", 8);
+        await Queue(TestUsers.Carl).AddAsync(entry);
 
         Assert.Equal(TestUsers.Carl.Id, (await _store.Collection<TimeEntry>().GetAsync(entry.Id))!.Owner);
     }
 
     [Fact]
-    public async Task A_user_cannot_load_change_or_delete_someone_elses_entry()
+    public async Task A_user_cannot_change_or_remove_someone_elses_waiting_change()
     {
-        var carls = Entry("ABC-1", 8);
-        await Entries(TestUsers.Carl).SaveAsync(carls);
-        var anna = Entries(TestUsers.Anna);
-
-        Assert.Null(await anna.GetAsync(carls.Id));
+        var carls = Waiting("ABC-1", 8);
+        await Queue(TestUsers.Carl).AddAsync(carls);
+        var anna = Queue(TestUsers.Anna);
 
         var forged = carls.Copy();
         forged.Owner = null;
         forged.Duration = TimeSpan.FromHours(1);
-        Assert.NotNull(await anna.SaveAsync(forged));
-        await Assert.ThrowsAsync<InvalidOperationException>(() => anna.SaveSyncStateAsync(forged));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => anna.AddAsync(forged));
+        await anna.RemoveAsync(carls.Id);
 
-        await anna.DeleteAsync(carls.Id);
-
-        var stored = (await Entries(TestUsers.Carl).GetAsync(carls.Id))!;
-        Assert.Equal(TimeSpan.FromHours(8), stored.Duration);
-    }
-
-    [Fact]
-    public async Task The_24_hour_limit_counts_only_the_users_own_hours()
-    {
-        await Entries(TestUsers.Carl).SaveAsync(Entry("ABC-1", 20));
-
-        Assert.Null(await Entries(TestUsers.Anna).SaveAsync(Entry("XYZ-1", 20)));
+        Assert.Equal(TimeSpan.FromHours(8), Assert.Single(await Queue(TestUsers.Carl).GetPendingAsync(Day, Day)).Duration);
     }
 
     [Fact]
@@ -242,9 +229,9 @@ public class DataSeparationTests : IDisposable
     [Fact]
     public async Task Nothing_works_without_a_verified_user()
     {
-        var service = new TimeEntryService(_store, new CurrentUser());
+        var queue = new RetryQueue(_store, new CurrentUser());
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => service.GetRangeAsync(Day, Day));
+        await Assert.ThrowsAsync<InvalidOperationException>(() => queue.GetPendingAsync(Day, Day));
     }
 }
 
@@ -274,6 +261,13 @@ public class LegacyDataMigrationTests : IDisposable
 
     private static readonly DateOnly From = new(2026, 10, 1), To = new(2026, 10, 31);
 
+    /// <summary>All the user's stored entries, waiting for Jira or not, in day order.</summary>
+    private static async Task<IReadOnlyList<TimeEntry>> StoredAsync(FileDocumentStore store, CurrentUser user)
+    {
+        var owner = user.Owner;
+        return (await store.Collection<TimeEntry>().QueryAsync(e => e.Owner == owner && e.Date >= From && e.Date <= To)).OrderBy(e => e.Date).ToList();
+    }
+
     [Fact]
     public async Task The_old_user_gets_all_old_data_after_a_backup()
     {
@@ -282,7 +276,7 @@ public class LegacyDataMigrationTests : IDisposable
 
         Assert.True(await new LegacyDataMigration(store).ClaimAsync(TestUsers.Carl));
 
-        var entries = await new TimeEntryService(store, CurrentUser.SignedIn(TestUsers.Carl)).GetRangeAsync(From, To);
+        var entries = await StoredAsync(store, CurrentUser.SignedIn(TestUsers.Carl));
         Assert.Equal(["ABC-1", "ABC-2"], entries.Select(e => e.IssueKey));
         Assert.Equal(TimeSpan.FromHours(2), entries[1].Duration);       // old start/end kept as hours
         Assert.Equal("10", entries[0].JiraWorklogId);                    // still linked to its Jira worklog
@@ -307,7 +301,7 @@ public class LegacyDataMigrationTests : IDisposable
 
         Assert.False(await new LegacyDataMigration(store).ClaimAsync(TestUsers.Anna));
 
-        Assert.Empty(await new TimeEntryService(store, CurrentUser.SignedIn(TestUsers.Anna)).GetRangeAsync(From, To));
+        Assert.Empty(await StoredAsync(store, CurrentUser.SignedIn(TestUsers.Anna)));
         Assert.Empty(await store.Collection<LegacyBackup>().QueryAsync(_ => true));
         Assert.True(await new LegacyDataMigration(store).ClaimAsync(TestUsers.Carl)); // still there for Carl
     }
@@ -322,7 +316,7 @@ public class LegacyDataMigrationTests : IDisposable
 
         Assert.False(await migration.ClaimAsync(TestUsers.Carl));
         Assert.Single(await store.Collection<LegacyBackup>().QueryAsync(_ => true));
-        Assert.Equal(2, (await new TimeEntryService(store, CurrentUser.SignedIn(TestUsers.Carl)).GetRangeAsync(From, To)).Count);
+        Assert.Equal(2, (await StoredAsync(store, CurrentUser.SignedIn(TestUsers.Carl))).Count);
     }
 
     [Fact]
@@ -332,7 +326,7 @@ public class LegacyDataMigrationTests : IDisposable
         using var store = Store();
 
         Assert.True(await new LegacyDataMigration(store).ClaimAsync(TestUsers.Anna));
-        Assert.Equal(2, (await new TimeEntryService(store, CurrentUser.SignedIn(TestUsers.Anna)).GetRangeAsync(From, To)).Count);
+        Assert.Equal(2, (await StoredAsync(store, CurrentUser.SignedIn(TestUsers.Anna))).Count);
     }
 
     [Fact]
@@ -343,7 +337,7 @@ public class LegacyDataMigrationTests : IDisposable
             await new LegacyDataMigration(store).ClaimAsync(TestUsers.Carl);
 
         using var reopened = Store();
-        Assert.Equal(2, (await new TimeEntryService(reopened, CurrentUser.SignedIn(TestUsers.Carl)).GetRangeAsync(From, To)).Count);
+        Assert.Equal(2, (await StoredAsync(reopened, CurrentUser.SignedIn(TestUsers.Carl))).Count);
         Assert.False(File.Exists(Path.Combine(_dir.Path, "days-off", "2026-10-20.json")));
     }
 
@@ -360,7 +354,7 @@ public class LegacyDataMigrationTests : IDisposable
             .SignInAsync(new JiraConnection("https://jira.example.com", JiraAuthType.Pat, "t", null));
 
         // The entry Jira has is dropped after a backup; the one it doesn't have stays to be sent.
-        Assert.Equal(["ABC-2"], (await new TimeEntryService(store, user).GetRangeAsync(From, To)).Select(e => e.IssueKey));
+        Assert.Equal(["ABC-2"], (await StoredAsync(store, user)).Select(e => e.IssueKey));
         Assert.Equal(2, Assert.Single(await store.Collection<TimeEntriesBackup>().QueryAsync(_ => true)).Entries.Count);
     }
 }

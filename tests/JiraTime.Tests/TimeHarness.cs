@@ -17,7 +17,7 @@ public sealed class TimeHarness : IDisposable
     public FileDocumentStore Store { get; }
     public FakeJira Jira { get; } = new();
     public TestClock Clock { get; } = new(new DateTimeOffset(2026, 10, 27, 12, 0, 0, TimeSpan.Zero));
-    public TimeEntryService Queue { get; }
+    public RetryQueue Queue { get; }
     public RecentWorklogIssues Recent { get; }
     public TimeLog Log { get; }
     public WorklogSync Sync { get; }
@@ -29,7 +29,7 @@ public sealed class TimeHarness : IDisposable
         Store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
         var user = CurrentUser.SignedIn(TestUsers.Carl, connection: Connection);
         var client = new JiraClient(Jira.Client());
-        Queue = new TimeEntryService(Store, user);
+        Queue = new RetryQueue(Store, user);
         Recent = new RecentWorklogIssues(Clock);
         Log = new TimeLog(client, Queue, user, Recent, Clock);
         Sync = new WorklogSync(client, Queue, Log);

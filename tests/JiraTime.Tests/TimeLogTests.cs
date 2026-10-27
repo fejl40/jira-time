@@ -89,16 +89,16 @@ public class TimeLogTests : IDisposable
     {
         var edited = _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 3600);
         var removed = _h.Jira.AddWorklog("ABC-2", "2026-10-19T09:00:00.000+0200", 3600);
-        await _h.Queue.SaveSyncStateAsync(new TimeEntry
+        await _h.Queue.AddAsync(new TimeEntry
         {
             IssueKey = "ABC-1", Date = Day, Duration = TimeSpan.FromHours(4), JiraWorklogId = edited, JiraWorklogIssueKey = "ABC-1", SyncPending = true,
         });
-        await _h.Queue.SaveSyncStateAsync(new TimeEntry
+        await _h.Queue.AddAsync(new TimeEntry
         {
             IssueKey = "ABC-2", Date = Day, Duration = TimeSpan.FromHours(1), JiraWorklogId = removed, JiraWorklogIssueKey = "ABC-2",
             SyncPending = true, DeletePending = true,
         });
-        await _h.Queue.SaveSyncStateAsync(new TimeEntry { IssueKey = "ABC-3", Date = Day, Duration = TimeSpan.FromHours(2), SyncPending = true });
+        await _h.Queue.AddAsync(new TimeEntry { IssueKey = "ABC-3", Date = Day, Duration = TimeSpan.FromHours(2), SyncPending = true });
 
         var entries = (await Period()).Entries;
 
@@ -109,7 +109,7 @@ public class TimeLogTests : IDisposable
     public async Task When_Jira_cannot_be_read_only_work_waiting_for_Jira_shows_with_the_reason()
     {
         _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 3600);
-        await _h.Queue.SaveSyncStateAsync(new TimeEntry { IssueKey = "ABC-3", Date = Day, Duration = TimeSpan.FromHours(2), SyncPending = true });
+        await _h.Queue.AddAsync(new TimeEntry { IssueKey = "ABC-3", Date = Day, Duration = TimeSpan.FromHours(2), SyncPending = true });
         _h.Jira.FailWith = HttpStatusCode.ServiceUnavailable;
 
         var time = await Period();

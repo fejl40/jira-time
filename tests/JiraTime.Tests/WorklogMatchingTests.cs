@@ -44,34 +44,6 @@ public class WorklogMatchingTests
         Assert.True(Entry().Matches(Worklog with { IssueKey = "ABC-2" }, includeIssue: false));
 
     [Fact]
-    public void TakeFrom_copies_issue_day_hours_and_comment()
-    {
-        var e = Entry();
-        var before = DateTime.UtcNow;
-        e.TakeFrom(Worklog with { IssueKey = "XYZ-9", Date = Day.AddDays(1), Duration = TimeSpan.FromHours(3), Comment = "New" });
-
-        Assert.Equal("XYZ-9", e.IssueKey);
-        Assert.Equal("XYZ-9", e.JiraWorklogIssueKey);
-        Assert.Equal("Login page", e.IssueSummary);
-        Assert.Equal(Day.AddDays(1), e.Date);
-        Assert.Equal(TimeSpan.FromHours(3), e.Duration);
-        Assert.Equal("New", e.Description);
-        Assert.True(e.UpdatedUtc >= before);
-    }
-
-    [Fact]
-    public void TakeFrom_without_issue_keeps_the_issue_and_summary()
-    {
-        var e = Entry();
-        e.TakeFrom(Worklog with { IssueKey = "XYZ-9", IssueSummary = "", Duration = TimeSpan.FromHours(3) }, includeIssue: false);
-
-        Assert.Equal("ABC-1", e.IssueKey);
-        Assert.Equal("ABC-1", e.JiraWorklogIssueKey);
-        Assert.Equal("Old summary", e.IssueSummary);
-        Assert.Equal(TimeSpan.FromHours(3), e.Duration);
-    }
-
-    [Fact]
     public void ToEntry_makes_a_synced_entry_from_Jira()
     {
         var e = Worklog.ToEntry();

@@ -46,7 +46,7 @@ public class RetireLocalTimeTests : IDisposable
 
         Assert.Equal(1, dropped);
         Assert.Equal(["CHANGED-1", "GONE-1", "NEW-1"], await Left(TestUsers.Carl));
-        var queue = await new TimeEntryService(_store, TestUsers.SignedIn()).GetPendingAsync(Day, Day);
+        var queue = await new RetryQueue(_store, TestUsers.SignedIn()).GetPendingAsync(Day, Day);
         Assert.Equal(3, queue.Count);
     }
 

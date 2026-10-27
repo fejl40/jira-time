@@ -218,7 +218,7 @@ Services/CurrentUser.cs            the verified user of this tab; data services 
 Services/LegacyDataMigration.cs    gives data from before multi-user support to its owner
 Services/TimeLog.cs                logged time: Jira worklogs plus the retry queue, cached briefly
 Services/RecentWorklogIssues.cs    issues just saved on, read directly while Jira's search catches up
-Services/TimeEntryService.cs       the retry queue: changes Jira couldn't take yet; entry rules
+Services/RetryQueue.cs             the retry queue: changes Jira couldn't take yet
 Services/WorkCalendarService.cs    days and work hours of the signed-in user
 Services/JiraClient.cs             Jira REST calls (myself, issue picker, searches, worklogs)
 Services/Jira/                     HTTP transport, JQL quoting, comment format, raw JSON shapes

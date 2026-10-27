@@ -6,9 +6,9 @@ namespace JiraTime.Services;
 /// <summary>
 /// Writes work to Jira. Jira is where logged time lives: saving a day creates, updates and deletes its
 /// worklogs directly. When Jira can't be reached the change is kept in the local retry queue
-/// (<see cref="TimeEntryService"/>), shown as not in Jira with the reason, and sent by <see cref="SyncRangeAsync"/>.
+/// (<see cref="RetryQueue"/>), shown as not in Jira with the reason, and sent by <see cref="SyncRangeAsync"/>.
 /// </summary>
-public class WorklogSync(JiraClient jira, TimeEntryService queue, TimeLog log)
+public class WorklogSync(JiraClient jira, RetryQueue queue, TimeLog log)
 {
     /// <summary>Outcome of <see cref="SaveDayAsync"/>.</summary>
     /// <param name="Errors">Row id → why it is invalid; <see cref="DayError"/> for the day as a whole. Empty when saved.</param>
@@ -36,10 +36,10 @@ public class WorklogSync(JiraClient jira, TimeEntryService queue, TimeLog log)
         foreach (var r in rows)
         {
             r.Date = date;
-            if (TimeEntryService.Validate(r) is { } error) errors[r.Id] = error;
+            if (TimeEntry.Validate(r) is { } error) errors[r.Id] = error;
         }
         if (rows.Aggregate(TimeSpan.Zero, (t, r) => t + r.Duration) > TimeEntry.MaxDuration)
-            errors[DayResult.DayError] = TimeEntryService.TooManyHours;
+            errors[DayResult.DayError] = TimeEntry.TooManyHours;
         if (errors.Count > 0) return new DayResult(errors, 0);
 
         var before = saved.ToDictionary(e => e.Id);
@@ -143,7 +143,7 @@ public class WorklogSync(JiraClient jira, TimeEntryService queue, TimeLog log)
         entry.SyncPending = false;
         entry.SyncError = null;
         log.Written(new JiraIssue(entry.IssueKey, entry.IssueSummary));
-        await queue.DeleteAsync(entry.Id);
+        await queue.RemoveAsync(entry.Id);
         return null;
     }
 
@@ -166,7 +166,7 @@ public class WorklogSync(JiraClient jira, TimeEntryService queue, TimeLog log)
     {
         if (entry.JiraWorklogId is null)
         {
-            await queue.DeleteAsync(entry.Id); // work that never reached Jira
+            await queue.RemoveAsync(entry.Id); // work that never reached Jira
             return null;
         }
         entry.DeletePending = true;
@@ -189,7 +189,7 @@ public class WorklogSync(JiraClient jira, TimeEntryService queue, TimeLog log)
             return ex.Message;
         }
         log.Written(new JiraIssue(issue, entry.IssueSummary));
-        await queue.DeleteAsync(entry.Id);
+        await queue.RemoveAsync(entry.Id);
         return null;
     }
 
@@ -200,7 +200,7 @@ public class WorklogSync(JiraClient jira, TimeEntryService queue, TimeLog log)
     private async Task QueueAsync(TimeEntry entry)
     {
         if (entry.Id.StartsWith(WorklogMatching.JiraIdPrefix, StringComparison.Ordinal)) entry.Id = Guid.NewGuid().ToString("N");
-        await queue.SaveSyncStateAsync(entry);
+        await queue.AddAsync(entry);
     }
 
     private async Task DeleteIgnoringMissingAsync(JiraConnection c, string issueKey, string worklogId, CancellationToken ct)

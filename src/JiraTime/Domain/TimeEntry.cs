@@ -36,9 +36,6 @@ public class TimeEntry : IDocument
     /// <summary>The issue the worklog lives on. Differs from <see cref="IssueKey"/> after the entry moved to another issue.</summary>
     public string? JiraWorklogIssueKey { get; set; }
 
-    /// <summary>The worklog was logged in Jira (not in this app) and imported.</summary>
-    public bool FromJira { get; set; }
-
     /// <summary>True when the entry changed locally and Jira has not caught up yet.</summary>
     public bool SyncPending { get; set; } = true;
 
@@ -63,6 +60,19 @@ public class TimeEntry : IDocument
 
     [JsonInclude, JsonPropertyName("end"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public TimeOnly? LegacyEnd { get => null; set { _legacyEnd = value; FromLegacy(); } }
+
+    public const string TooManyHours = "A day can't have more than 24 hours.";
+
+    /// <summary>Rules for a single entry, without looking at the rest of its day.</summary>
+    /// <returns>An error message, or null when the entry is fine.</returns>
+    public static string? Validate(TimeEntry entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry.IssueKey)) return "Pick a Jira issue.";
+        if (entry.Duration <= TimeSpan.Zero) return "Enter the hours, e.g. 1.5.";
+        if (entry.Duration.Ticks % TimeSpan.TicksPerMinute != 0) return "Hours must be whole minutes.";
+        if (entry.Duration > MaxDuration) return TooManyHours;
+        return null;
+    }
 
     /// <summary>A separate copy to edit without touching this one.</summary>
     public TimeEntry Copy() => (TimeEntry)MemberwiseClone();

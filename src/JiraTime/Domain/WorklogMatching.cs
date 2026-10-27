@@ -1,6 +1,6 @@
 namespace JiraTime.Domain;
 
-/// <summary>Compares time entries with Jira worklogs and copies worklog values onto entries. Pure logic.</summary>
+/// <summary>Turns Jira worklogs into entries, lays waiting work over them and compares the two. Pure logic.</summary>
 public static class WorklogMatching
 {
     /// <summary>
@@ -12,23 +12,6 @@ public static class WorklogMatching
         && entry.Date == worklog.Date
         && entry.Duration == worklog.Duration
         && (entry.Description ?? "") == (worklog.Comment ?? "");
-
-    /// <summary>
-    /// Copies the worklog's day, hours and comment onto the entry and marks it updated now.
-    /// With <paramref name="includeIssue"/> the issue key, worklog issue key and issue summary are taken over too.
-    /// </summary>
-    public static void TakeFrom(this TimeEntry entry, JiraWorklog worklog, bool includeIssue = true)
-    {
-        if (includeIssue)
-        {
-            entry.IssueKey = entry.JiraWorklogIssueKey = worklog.IssueKey;
-            entry.IssueSummary = worklog.IssueSummary;
-        }
-        entry.Date = worklog.Date;
-        entry.Duration = worklog.Duration;
-        entry.Description = worklog.Comment;
-        entry.UpdatedUtc = DateTime.UtcNow;
-    }
 
     /// <summary>Prefix of the ids of entries read from Jira; the rest is the worklog id.</summary>
     public const string JiraIdPrefix = "jira-";

@@ -52,7 +52,7 @@ public class RetryQueueTests : IDisposable
         _h.Jira.Offline = true;
         await _h.SaveDayAsync(Day, [Row("ABC-1", 6)]);
 
-        var again = new JiraTime.Services.TimeEntryService(_h.Store, TestUsers.SignedIn());
+        var again = new JiraTime.Services.RetryQueue(_h.Store, TestUsers.SignedIn());
 
         Assert.Single(await again.GetPendingAsync(From, To));
     }
@@ -135,7 +135,7 @@ public class RetryQueueTests : IDisposable
     public async Task A_queued_edit_whose_worklog_was_deleted_in_Jira_is_logged_again()
     {
         var id = _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 3600);
-        await _h.Queue.SaveSyncStateAsync(new TimeEntry
+        await _h.Queue.AddAsync(new TimeEntry
         {
             IssueKey = "ABC-1", Date = Day, Duration = TimeSpan.FromHours(2), JiraWorklogId = id, JiraWorklogIssueKey = "ABC-1", SyncPending = true,
         });

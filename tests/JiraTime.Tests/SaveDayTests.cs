@@ -94,7 +94,7 @@ public class SaveDayTests : IDisposable
     {
         var result = await _h.SaveDayAsync(Day, [Row("ABC-1", 20), Row("ABC-2", 5)]);
 
-        Assert.Equal(TimeEntryService.TooManyHours, result.Errors[WorklogSync.DayResult.DayError]);
+        Assert.Equal(TimeEntry.TooManyHours, result.Errors[WorklogSync.DayResult.DayError]);
         Assert.Empty(_h.Jira.Worklogs);
     }
 

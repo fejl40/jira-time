@@ -15,9 +15,9 @@ public sealed record LoggedTime(IReadOnlyList<TimeEntry> Entries, string? JiraEr
 /// <summary>
 /// The signed-in user's logged time. Jira is the source of truth: work is read from the user's Jira
 /// worklogs, however they were logged (here, in Jira, in WorklogPRO). The only time kept locally is work
-/// Jira didn't get yet (<see cref="TimeEntryService"/>), shown on top until it is sent.
+/// Jira didn't get yet (<see cref="RetryQueue"/>), shown on top until it is sent.
 /// </summary>
-public class TimeLog(JiraClient jira, TimeEntryService pending, CurrentUser user, RecentWorklogIssues recent, TimeProvider clock)
+public class TimeLog(JiraClient jira, RetryQueue pending, CurrentUser user, RecentWorklogIssues recent, TimeProvider clock)
 {
     /// <summary>How long worklogs read from Jira are reused before reading them again.</summary>
     public static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(1);
