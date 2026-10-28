@@ -87,7 +87,7 @@
     private void Show(IReadOnlyDictionary<DayOfWeek, TimeSpan> hours) =>
         _hours = Week.ToDictionary(d => d, d => hours.GetValueOrDefault(d) is var h && h > TimeSpan.Zero ? Format.Hours(h) : "0");
 
-    private static TimeSpan? Read(string text) => text.Trim() is "" or "0" ? TimeSpan.Zero : Format.ParseHours(text);
+    private static TimeSpan? Read(string text) => text.Trim() is "" or "0" ? TimeSpan.Zero : TypedHours.Parse(text);
 
     private TimeSpan? WeekTotal => _hours.Values.Select(Read).Aggregate((TimeSpan?)TimeSpan.Zero, (t, h) => t + h);
 

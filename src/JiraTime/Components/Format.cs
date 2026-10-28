@@ -8,26 +8,6 @@ public static class Format
     public static string Hours(TimeSpan t) =>
         t == TimeSpan.Zero ? "" : t.TotalHours.ToString("0.##", CultureInfo.InvariantCulture);
 
-    /// <summary>
-    /// Reads hours typed by the user: decimals with a dot or comma (1.5, 1,5) or hours and minutes (1:30).
-    /// Rounded to whole minutes. Null when it can't be read or is not positive.
-    /// </summary>
-    public static TimeSpan? ParseHours(string? text)
-    {
-        var s = text?.Trim().TrimEnd('h', 'H').Trim() ?? "";
-        TimeSpan value;
-        if (s.Split(':') is [var h, var m])
-        {
-            if (!int.TryParse(h, NumberStyles.None, CultureInfo.InvariantCulture, out var hours)
-                || !int.TryParse(m, NumberStyles.None, CultureInfo.InvariantCulture, out var minutes) || minutes >= 60) return null;
-            value = new TimeSpan(hours, minutes, 0);
-        }
-        else if (decimal.TryParse(s.Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var d))
-            value = TimeSpan.FromMinutes((double)Math.Round(d * 60));
-        else return null;
-        return value > TimeSpan.Zero ? value : null;
-    }
-
     /// <summary>Decimal hours for scripts, e.g. "7.5": never empty, always with a dot.</summary>
     public static string HoursValue(TimeSpan t) => t.TotalHours.ToString("0.####", CultureInfo.InvariantCulture);
 

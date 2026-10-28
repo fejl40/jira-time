@@ -184,7 +184,7 @@ are quick (150–300 ms) and switch off when your system asks for reduced motion
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, saving days to Jira and the retry queue, Jira queries, issue lookups and the picker, and fill suggestions.
+xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, loading a period, saving days to Jira and the retry queue, links, Jira queries, issue lookups and the picker, and fill suggestions.
 
 ## Contributing
 
@@ -196,12 +196,13 @@ Tasks are tracked with [Backlog.md](https://github.com/MrLesk/Backlog.md) in `ba
 Paths below are relative to `src/JiraTime/`.
 
 ```
-Program.cs                         DI: storage, data protection, Jira client
+Program.cs                         DI: storage, data protection, Jira clients
 Domain/TimeEntry.cs                one block of work on an issue on a day
 Domain/Period.cs                   semi-monthly periods
 Domain/Jira.cs                     connection, profile, issues and worklogs as Jira has them
 Domain/PeriodSheet.cs              a period being worked on: saved data, unsaved changes per day, rules
-Domain/DayWork.cs                  one day's unsaved changes
+Domain/DayWork.cs                  one day's unsaved changes and the row edits that make them
+Domain/TypedHours.cs               reading hours as the user types them (1.5, 1,5, 1:30)
 Domain/DayFiller.cs                suggestions for a day's missing hours
 Domain/PeriodSummary.cs            logged, missing and weekly hours of a period
 Domain/IssueChoices.cs             what the issue picker offers, in which group
@@ -209,13 +210,13 @@ Domain/WorklogMatching.cs          worklogs as entries, waiting work laid over t
 Domain/RecentWork.cs               recent issues and comments for quick picks
 Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work hours
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount
-Domain/LegacyData.cs               data from before multi-user support
+Domain/LegacyData.cs               data from older versions and their backups
 Storage/                           document store interfaces + file-system implementation
 Services/SignInSession.cs          restores, connects and signs out a tab (uses the two below)
 Services/ConnectionState.cs        encrypted connection in browser localStorage (per tab/circuit)
 Services/JiraIdentity.cs           signs a tab in as the user Jira says the token belongs to
 Services/CurrentUser.cs            the verified user of this tab; data services filter by it
-Services/LegacyDataMigration.cs    gives data from before multi-user support to its owner
+Services/LegacyDataMigration.cs    moves data saved by older versions (owners, entries Jira has)
 Services/TimeLog.cs                logged time: Jira worklogs plus the retry queue, cached briefly
 Services/RecentWorklogIssues.cs    issues just saved on, read directly while Jira's search catches up
 Services/RetryQueue.cs             the retry queue: changes Jira couldn't take yet
@@ -223,12 +224,15 @@ Services/WorkCalendarService.cs    days and work hours of the signed-in user
 Services/JiraClient.cs             Jira REST calls about issues (myself, issue picker, searches)
 Services/JiraWorklogClient.cs      Jira REST calls that read and write worklogs
 Services/Jira/                     HTTP transport, JQL quoting, comment format, raw JSON shapes
-Services/WorklogSync.cs            saves days to Jira, queues what fails, sends the queue
+Services/WorklogSync.cs            saves a day or every unsaved day to Jira, queues what fails, sends the queue
+Services/PeriodLoader.cs           loads a period for the timesheet: time, days, picks, previous period
+Services/IssueStatuses.cs          current status of the issues a timesheet shows
 Services/JiraIssueLookup.cs        sprint and period issues and issue statuses, cached briefly
 Services/ExpiringCache.cs          small cache whose values expire
 Components/Layout/MainLayout.razor header + redirect to setup when not signed in
 Components/Pages/Setup/            Connect
-Components/Pages/Timesheet.razor   loads a period and wires the parts below to the services
+Components/Pages/Timesheet.razor   shows a period: wires PeriodLoader, WorklogSync and the parts below
+Components/Links.cs                builds and reads timesheet links (period, selected day)
 Components/Sheet/                  period header, reminders, grid, day list (phones), day header
 Components/MotionScript.cs         calls the animations in wwwroot/motion.js (styles: Styles/motion.css)
 Components/Pages/SettingsPage.razor

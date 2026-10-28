@@ -1,4 +1,3 @@
-using JiraTime.Components;
 
 namespace JiraTime.Domain;
 
@@ -101,7 +100,7 @@ public sealed class DayWork(DateOnly date)
     {
         var e = Editable(row, saved);
         text ??= "";
-        var hours = Format.ParseHours(text);
+        var hours = TypedHours.Parse(text);
         if (hours is null && text.Trim() != "") BadHours[e.Id] = text;
         else BadHours.Remove(e.Id);
         e.Duration = hours ?? TimeSpan.Zero;

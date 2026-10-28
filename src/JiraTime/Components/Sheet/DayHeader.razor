@@ -101,7 +101,7 @@
     private async Task MarkOffAsync()
     {
         if (Info is not { } day) return;
-        if (Format.ParseHours(_hours) is not { } hours)
+        if (TypedHours.Parse(_hours) is not { } hours)
         {
             _error = "Enter the hours off, e.g. 4.";
             return;
