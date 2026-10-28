@@ -73,6 +73,47 @@ public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log)
         return new DayResult(errors, failures);
     }
 
+    /// <summary>Outcome of <see cref="SaveDaysAsync"/>.</summary>
+    /// <param name="Saved">Days saved, with how each went.</param>
+    /// <param name="NeedsWork">Days not saved because a row needs an issue or hours.</param>
+    /// <param name="ChangedInJira">Days not saved because their worklogs changed in Jira meanwhile.</param>
+    public record SaveAllResult(IReadOnlyDictionary<DateOnly, DayResult> Saved, IReadOnlyList<DateOnly> NeedsWork, IReadOnlyList<DateOnly> ChangedInJira)
+    {
+        /// <summary>The day to show the user, the one <see cref="Notice"/> is about; null when every day was saved.</summary>
+        public DateOnly? FirstToFix => ChangedInJira.Count > 0 ? ChangedInJira[0] : NeedsWork.Count > 0 ? NeedsWork[0] : null;
+
+        /// <summary>What to tell the user about the days not saved; null when every day was saved.</summary>
+        public string? Notice =>
+            ChangedInJira.Count > 0
+                ? $"{Days(ChangedInJira.Count)} not saved because the worklogs were changed in Jira meanwhile. Each shows Jira's version with your changes on top; check it and press Save day."
+                : NeedsWork.Count > 0
+                    ? $"{Days(NeedsWork.Count)} not saved because a row needs an issue or hours. Finish it below and press Save day."
+                    : null;
+
+        private static string Days(int n) => n == 1 ? "1 day" : $"{n} days";
+    }
+
+    /// <summary>
+    /// Saves every day of the sheet with unsaved changes, each as <see cref="SaveDayAsync"/> does. Days with
+    /// hours that can't be read are left for the user to finish. The sheet itself is not changed.
+    /// </summary>
+    public async Task<SaveAllResult> SaveDaysAsync(JiraConnection c, PeriodSheet sheet, CancellationToken ct = default)
+    {
+        var saved = new Dictionary<DateOnly, DayResult>();
+        var needsWork = new List<DateOnly>();
+        var changedInJira = new List<DateOnly>();
+        foreach (var day in sheet.UnsavedDays)
+        {
+            var work = sheet.WorkFor(day);
+            var before = sheet.SavedOn(day);
+            var result = work.BadHours.Count == 0 ? await SaveDayAsync(c, day, work.RowsToSave(before), before, ct) : null;
+            if (result is { Saved: true }) saved[day] = result;
+            else if (result is { ChangedInJira: true }) changedInJira.Add(day);
+            else needsWork.Add(day);
+        }
+        return new SaveAllResult(saved, needsWork, changedInJira);
+    }
+
     /// <summary>
     /// True when one of the worklogs is gone from Jira or no longer has the day, hours and comment it was
     /// read with. When Jira can't be asked the save goes ahead: its changes then wait in the retry queue.

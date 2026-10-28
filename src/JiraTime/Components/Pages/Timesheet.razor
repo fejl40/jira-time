@@ -194,36 +194,23 @@ else
         _notice = null;
     }
 
-    /// <summary>Saves every day with unsaved changes. Days with an invalid row are left for the user to finish.</summary>
+    /// <summary>Saves every day with unsaved changes. Days that couldn't be saved are left for the user to finish.</summary>
     private async Task SaveAllAsync()
     {
         if (User.Connection is not { } c) return;
         _savingAll = true;
         _notice = null;
-        var needsWork = new List<DateOnly>();
-        var changedInJira = new List<DateOnly>();
         StartSave();
-        foreach (var day in Sheet.UnsavedDays)
-        {
-            var work = Sheet.WorkFor(day);
-            var result = work.BadHours.Count == 0 ? await Sync.SaveDayAsync(c, day, work.RowsToSave(Sheet.SavedOn(day)), Sheet.SavedOn(day)) : null;
-            if (result is { Saved: true }) Saved(day, result);
-            else if (result is { ChangedInJira: true }) changedInJira.Add(day);
-            else needsWork.Add(day);
-        }
+        var result = await Sync.SaveDaysAsync(c, Sheet);
+        foreach (var (savedDay, dayResult) in result.Saved) Saved(savedDay, dayResult);
         _savingAll = false;
         if (_justSaved.Contains(_selectedDay)) await Animations.CollapseAsync(MotionScript.RemovedRows);
         await ReloadAsync();
         FinishSave();
-        if (changedInJira.Count > 0)
+        if (result.FirstToFix is { } day)
         {
-            SelectDay(changedInJira[0]);
-            _notice = $"{Format.Days(changedInJira.Count)} not saved because the worklogs were changed in Jira meanwhile. Each shows Jira's version with your changes on top; check it and press Save day.";
-        }
-        else if (needsWork.Count > 0)
-        {
-            SelectDay(needsWork[0]);
-            _notice = $"{Format.Days(needsWork.Count)} not saved because a row needs an issue or hours. Finish it below and press Save day.";
+            SelectDay(day);
+            _notice = result.Notice;
         }
     }
 

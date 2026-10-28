@@ -187,3 +187,54 @@ public class SaveDayTests : IDisposable
         Assert.Equal("2026-10-19T09:00:00.000+0200", JiraWorklogClient.FormatStarted(Day, new TimeOnly(9, 0), zone));
     }
 }
+
+/// <summary>Save all: every unsaved day of a period at once.</summary>
+public class SaveAllTests : IDisposable
+{
+    private static readonly DateOnly Monday = new(2026, 10, 19), Tuesday = new(2026, 10, 20), Wednesday = new(2026, 10, 21);
+
+    private readonly TimeHarness _h = new();
+    public void Dispose() => _h.Dispose();
+
+    private async Task<PeriodSheet> SheetAsync()
+    {
+        var sheet = new PeriodSheet(Period.For(Monday), () => _h.Today);
+        var (loader, statuses) = _h.PeriodLoading();
+        await loader.LoadAsync(sheet, statuses);
+        return sheet;
+    }
+
+    [Fact]
+    public async Task Every_unsaved_day_is_saved_and_the_rest_are_reported()
+    {
+        var id = _h.Jira.AddWorklog("ABC-9", "2026-10-21T09:00:00.000+0200", 3600);
+        var sheet = await SheetAsync();
+        sheet.WorkFor(Monday).Drafts.Add(TimeHarness.Row("ABC-1", 8));
+        sheet.WorkFor(Tuesday).Drafts.Add(TimeHarness.Row("ABC-2", 4));
+        sheet.WorkFor(Tuesday).BadHours["x"] = "lots";
+        sheet.WorkFor(Wednesday).Edit(sheet.SavedOn(Wednesday)[0]).Duration = TimeSpan.FromHours(2);
+        _h.Jira.Worklogs["ABC-9"][id]!["timeSpentSeconds"] = 3 * 3600; // changed in Jira meanwhile
+
+        var result = await _h.Sync.SaveDaysAsync(_h.Connection, sheet);
+
+        Assert.Equal([Monday], result.Saved.Keys);
+        Assert.Equal([Tuesday], result.NeedsWork);
+        Assert.Equal([Wednesday], result.ChangedInJira);
+        Assert.Equal(Wednesday, result.FirstToFix); // the day the notice is about
+        Assert.StartsWith("1 day not saved because the worklogs were changed in Jira", result.Notice);
+        Assert.Equal(8 * 3600, _h.JiraSeconds("ABC-1"));
+        Assert.Equal(0, _h.JiraSeconds("ABC-2"));
+    }
+
+    [Fact]
+    public async Task When_every_day_is_saved_there_is_nothing_to_fix()
+    {
+        var sheet = await SheetAsync();
+        sheet.WorkFor(Monday).Drafts.Add(TimeHarness.Row("ABC-1", 8));
+
+        var result = await _h.Sync.SaveDaysAsync(_h.Connection, sheet);
+
+        Assert.Null(result.FirstToFix);
+        Assert.Null(result.Notice);
+    }
+}
