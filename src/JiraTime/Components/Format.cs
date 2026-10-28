@@ -43,6 +43,10 @@ public static class Format
             : $"{a.ToString("d MMM yyyy", CultureInfo.InvariantCulture)} – {b.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}";
 
     public static string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    /// <summary>A day written as <see cref="Iso"/>; null for anything else.</summary>
+    public static DateOnly? ParseIso(string? text) =>
+        DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
 }
 
 public static class IssueColors

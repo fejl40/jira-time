@@ -1,6 +1,5 @@
 @page "/"
 @page "/period/{StartText}"
-@using System.Globalization
 @inject TimeLog Log
 @inject TimeProvider Clock
 @inject WorklogSync Sync
@@ -112,8 +111,8 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        var day = ParseDate(DayText);
-        var period = Period.For(ParseDate(StartText) ?? day ?? Today);
+        var day = Format.ParseIso(DayText);
+        var period = Period.For(Format.ParseIso(StartText) ?? day ?? Today);
         var selected = day is { } d && period.Contains(d) ? d : period.Contains(Today) ? Today : period.Start;
 
         // Same period, other day (a day picked in the grid, Today, back/forward): keep everything.
@@ -130,9 +129,6 @@ else
         (_sheet, _selectedDay, _notice) = (sheet, selected, null);
         sheet.Suggest(_selectedDay);
     }
-
-    private static DateOnly? ParseDate(string? text) =>
-        DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
 
     // ---- Loading ----
 
@@ -369,13 +365,7 @@ else
     {
         if (!HasUnsaved) return;
         var target = Nav.ToBaseRelativePath(Nav.ToAbsoluteUri(context.TargetLocation).ToString());
-        var path = target.Split('?', '#')[0].TrimEnd('/');
-        var query = target.Contains('?') ? target[(target.IndexOf('?') + 1)..] : "";
-        var day = ParseDate(System.Web.HttpUtility.ParseQueryString(query)["day"]);
-        Period? to = path == "" ? Period.For(day ?? Today)
-            : path.StartsWith("period/") && ParseDate(path["period/".Length..]) is { } start ? Period.For(start)
-            : null;
-        if (to == Sheet.Period) return;
+        if (Links.Read(target, Today)?.Period == Sheet.Period) return;
 
         if (!await JS.InvokeAsync<bool>("confirm", $"You have unsaved changes on {Format.Days(Sheet.OwnChangeDays.Count)}. Leave without saving them?"))
             context.PreventNavigation();

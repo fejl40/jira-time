@@ -61,14 +61,7 @@
     private bool _ready, _verifying;
     private string? _verifyError;
 
-    private bool OnTimesheet
-    {
-        get
-        {
-            var path = Nav.ToBaseRelativePath(Nav.Uri).Split('?', '#')[0];
-            return path == "" || path.StartsWith("period/", StringComparison.OrdinalIgnoreCase);
-        }
-    }
+    private bool OnTimesheet => Links.Read(Nav.ToBaseRelativePath(Nav.Uri), DateOnly.MinValue) is not null;
 
     private bool OnSetup => Nav.ToBaseRelativePath(Nav.Uri).StartsWith("setup", StringComparison.OrdinalIgnoreCase);
 
