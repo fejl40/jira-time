@@ -1,3 +1,5 @@
+using JiraTime.Components;
+
 namespace JiraTime.Domain;
 
 /// <summary>
@@ -69,4 +71,90 @@ public sealed class DayWork(DateOnly date)
     /// <summary>Hours on one issue once saved.</summary>
     public TimeSpan TotalFor(IReadOnlyList<TimeEntry> saved, string issueKey) =>
         RowsToSave(saved).Where(e => e.IssueKey == issueKey).Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
+
+    /// <summary>
+    /// The entry to change for a row: the copy of the saved entry, or the new row itself (which then
+    /// no longer counts as a suggestion).
+    /// </summary>
+    /// <param name="saved">The stored entry for saved rows; null for new rows.</param>
+    public TimeEntry Editable(TimeEntry row, TimeEntry? saved)
+    {
+        if (saved is not null) return Edit(saved);
+        Touched(row);
+        return row;
+    }
+
+    /// <summary>Puts the row on another issue. Returns the entry that changed.</summary>
+    public TimeEntry PickIssue(TimeEntry row, TimeEntry? saved, JiraIssue issue)
+    {
+        var e = Editable(row, saved);
+        e.IssueKey = issue.Key;
+        e.IssueSummary = issue.Summary;
+        return e;
+    }
+
+    /// <summary>
+    /// Sets the row's hours from what was typed. Text that can't be read is kept in
+    /// <see cref="BadHours"/> (so Save day can report it) and the hours become zero.
+    /// </summary>
+    public void SetHours(TimeEntry row, TimeEntry? saved, string? text)
+    {
+        var e = Editable(row, saved);
+        text ??= "";
+        var hours = Format.ParseHours(text);
+        if (hours is null && text.Trim() != "") BadHours[e.Id] = text;
+        else BadHours.Remove(e.Id);
+        e.Duration = hours ?? TimeSpan.Zero;
+    }
+
+    /// <summary>Sets the row's comment, trimmed; an empty comment becomes none.</summary>
+    public void SetDescription(TimeEntry row, TimeEntry? saved, string? text)
+    {
+        text = text?.Trim();
+        Editable(row, saved).Description = string.IsNullOrEmpty(text) ? null : text;
+    }
+
+    /// <summary>Adds an empty new row, optionally on an issue, and returns it.</summary>
+    public TimeEntry AddRow(JiraIssue? issue = null)
+    {
+        var draft = new TimeEntry { IssueKey = issue?.Key ?? "", IssueSummary = issue?.Summary ?? "", Date = Date };
+        Drafts.Add(draft);
+        return draft;
+    }
+
+    /// <summary>Adds new rows for the hours still missing of <paramref name="expected"/>, on a best-guess issue.</summary>
+    public void FillRest(IReadOnlyList<TimeEntry> saved, TimeSpan expected, IReadOnlyList<IssueWithStatus> sprint)
+    {
+        var current = RowsToSave(saved).Where(e => e.Duration > TimeSpan.Zero).ToList();
+        var day = new DayInfo(Date, DayKind.Workday, null) { Hours = expected };
+        Drafts.AddRange(DayFiller.Propose(day, current, sprint));
+    }
+
+    /// <summary>
+    /// Adds the issues of an earlier day, scaled to the hours still missing of <paramref name="expected"/>
+    /// (or as they were when nothing is missing). Untouched suggestions are replaced by the copy.
+    /// </summary>
+    public void CopyDay(IReadOnlyList<TimeEntry> saved, TimeSpan expected, IReadOnlyList<TimeEntry> previous)
+    {
+        Drafts.RemoveAll(d => Suggested.Contains(d.Id));
+        Suggested.Clear();
+        var missing = expected - Total(saved);
+        Drafts.AddRange(DayFiller.Copy(Date, previous, missing > TimeSpan.Zero ? missing : null));
+    }
+
+    /// <summary>A saved row is marked removed (deleted on save); a new row is dropped right away.</summary>
+    public void Remove(TimeEntry row, TimeEntry? saved)
+    {
+        if (saved is not null)
+        {
+            Removed.Add(saved.Id);
+            return;
+        }
+        Drafts.Remove(row);
+        Suggested.Remove(row.Id);
+        BadHours.Remove(row.Id);
+    }
+
+    /// <summary>Keeps a saved row that was marked removed.</summary>
+    public void Restore(TimeEntry saved) => Removed.Remove(saved.Id);
 }

@@ -201,14 +201,6 @@
         _notice = null;
     }
 
-    /// <summary>The entry to change for a row: the draft itself, or the copy of a saved entry.</summary>
-    private TimeEntry Editable(RowView row)
-    {
-        if (row.Saved is { } s) return Work.Edit(s);
-        Work.Touched(row.Entry);
-        return row.Entry;
-    }
-
     private string HoursText(TimeEntry e) =>
         Work.BadHours.TryGetValue(e.Id, out var text) ? text : Format.Hours(e.Duration);
 
@@ -220,10 +212,8 @@
 
     private async Task PickIssue(RowView row, JiraIssue issue)
     {
-        var e = Editable(row);
+        var e = Work.PickIssue(row.Entry, row.Saved, issue);
         _picked = e.Id;
-        e.IssueKey = issue.Key;
-        e.IssueSummary = issue.Summary;
         _errors.Remove(e.Id);
         await Changed();
         if (issue.Key != "") await OnIssuePicked.InvokeAsync(issue.Key);
@@ -231,29 +221,21 @@
 
     private Task SetHours(RowView row, ChangeEventArgs ev)
     {
-        var e = Editable(row);
-        var text = ev.Value?.ToString() ?? "";
-        var hours = Format.ParseHours(text);
-        // Keep what was typed when it can't be read; Save day reports it.
-        if (hours is null && text.Trim() != "") Work.BadHours[e.Id] = text;
-        else Work.BadHours.Remove(e.Id);
-        e.Duration = hours ?? TimeSpan.Zero;
-        _errors.Remove(e.Id);
+        Work.SetHours(row.Entry, row.Saved, ev.Value?.ToString());
+        _errors.Remove(row.Entry.Id);
         return Changed();
     }
 
     private Task SetDescription(RowView row, ChangeEventArgs ev)
     {
-        var text = ev.Value?.ToString()?.Trim();
-        Editable(row).Description = string.IsNullOrEmpty(text) ? null : text;
+        Work.SetDescription(row.Entry, row.Saved, ev.Value?.ToString());
         return Changed();
     }
 
     /// <summary>Adds an empty row, optionally on an issue. Returns it so the caller can focus it.</summary>
     public async Task<TimeEntry> AddRowAsync(JiraIssue? issue = null)
     {
-        var draft = new TimeEntry { IssueKey = issue?.Key ?? "", IssueSummary = issue?.Summary ?? "", Date = Date };
-        Work.Drafts.Add(draft);
+        var draft = Work.AddRow(issue);
         await Changed();
         return draft;
     }
@@ -262,44 +244,29 @@
 
     private Task FillRest()
     {
-        var current = Work.RowsToSave(Saved).Where(e => e.Duration > TimeSpan.Zero).ToList();
-        var day = new DayInfo(Date, DayKind.Workday, null) { Hours = Expected };
-        Work.Drafts.AddRange(DayFiller.Propose(day, current, Sprint));
+        Work.FillRest(Saved, Expected, Sprint);
         return Changed();
     }
 
-    /// <summary>
-    /// Adds the previous worked day's issues, scaled to the hours still missing (or as they were when
-    /// nothing is missing). Untouched suggestions are replaced by the copy.
-    /// </summary>
     private Task CopyPrevious()
     {
         if (Previous is not { } previous) return Task.CompletedTask;
-        foreach (var d in Work.Drafts.Where(d => Work.Suggested.Contains(d.Id)).ToList()) Work.Drafts.Remove(d);
-        Work.Suggested.Clear();
-        var missing = Expected - Total;
-        Work.Drafts.AddRange(DayFiller.Copy(Date, previous.Rows, missing > TimeSpan.Zero ? missing : null));
+        Work.CopyDay(Saved, Expected, previous.Rows);
         return Changed();
     }
 
     /// <summary>A saved row is marked removed (it turns red); a new row collapses and goes.</summary>
     private async Task Remove(RowView row)
     {
-        if (row.Saved is { } s) Work.Removed.Add(s.Id);
-        else
-        {
-            await Animations.CollapseAsync($"[data-row-id='{row.Entry.Id}']");
-            Work.Drafts.Remove(row.Entry);
-            Work.Suggested.Remove(row.Entry.Id);
-            Work.BadHours.Remove(row.Entry.Id);
-        }
+        if (row.IsDraft) await Animations.CollapseAsync($"[data-row-id='{row.Entry.Id}']");
+        Work.Remove(row.Entry, row.Saved);
         _errors.Remove(row.Entry.Id);
         await Changed();
     }
 
     private Task Restore(RowView row)
     {
-        Work.Removed.Remove(row.Saved!.Id);
+        Work.Restore(row.Saved!);
         return Changed();
     }
 
