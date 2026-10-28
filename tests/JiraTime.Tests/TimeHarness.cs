@@ -22,18 +22,29 @@ public sealed class TimeHarness : IDisposable
     public TimeLog Log { get; }
     public WorklogSync Sync { get; }
     public JiraConnection Connection { get; }
+    public CurrentUser User { get; }
+    public JiraIssueLookup Issues { get; }
+    public WorkCalendarService Calendar { get; }
 
     public TimeHarness(JiraConnection? connection = null)
     {
         Connection = connection ?? Server;
         Store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
-        var user = CurrentUser.SignedIn(TestUsers.Carl, connection: Connection);
+        var user = User = CurrentUser.SignedIn(TestUsers.Carl, connection: Connection);
+        Issues = new JiraIssueLookup(new JiraClient(Jira.Client()), Clock);
+        Calendar = new WorkCalendarService(Store, user);
         var client = new JiraWorklogClient(Jira.Client());
         Queue = new RetryQueue(Store, user);
         Recent = new RecentWorklogIssues(Clock);
         Log = new TimeLog(client, Queue, user, Recent, Clock);
         Sync = new WorklogSync(client, Queue, Log);
     }
+
+    public DateOnly Today => DateOnly.FromDateTime(Clock.Now.UtcDateTime);
+
+    /// <summary>A period loader and status book over the same fake Jira and store.</summary>
+    public (PeriodLoader Loader, IssueStatuses Statuses) PeriodLoading() =>
+        (new PeriodLoader(Log, Calendar, Issues, User), new IssueStatuses(Issues, User));
 
     /// <summary>The day's work as the timesheet reads it.</summary>
     public async Task<IReadOnlyList<TimeEntry>> DayAsync(DateOnly day) => (await Log.GetRangeAsync(day, day)).Entries;

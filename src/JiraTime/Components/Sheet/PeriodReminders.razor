@@ -20,9 +20,6 @@
 }
 
 @code {
-    /// <summary>Where a period that isn't done stands.</summary>
-    public record OpenPeriod(Period Period, TimeSpan Missing, int NotInJira);
-
     [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
     [Parameter] public int Unsynced { get; set; }
     /// <summary>The previous period, when this is the current one and the previous isn't done.</summary>

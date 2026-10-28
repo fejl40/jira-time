@@ -1,10 +1,11 @@
 @page "/"
 @page "/period/{StartText}"
 @inject TimeLog Log
+@inject PeriodLoader Loader
+@inject IssueStatuses Statuses
 @inject TimeProvider Clock
 @inject WorklogSync Sync
 @inject WorkCalendarService Calendar
-@inject JiraIssueLookup Issues
 @inject CurrentUser User
 @inject NavigationManager Nav
 @inject IJSRuntime JS
@@ -56,8 +57,8 @@
         {
             <div class="mt-4">
                 <DayEditor @ref="_editor" Date="_selectedDay" Saved="DayEntries" Work="sheet.WorkFor(_selectedDay)"
-                           Recent="_recent" Comments="_comments" Sprint="sheet.Sprint" Earlier="_earlier" Statuses="_statuses"
-                           OnIssuePicked="LookUpStatusAsync" Connection="connection" Expected="@(sheet.Day(_selectedDay)?.Expected ?? TimeSpan.Zero)"
+                           Recent="_recent" Comments="_comments" Sprint="sheet.Sprint" Earlier="_earlier" Statuses="Statuses.Known"
+                           OnIssuePicked="key => Statuses.LookUpAsync([key])" Connection="connection" Expected="@(sheet.Day(_selectedDay)?.Expected ?? TimeSpan.Zero)"
                            Previous="sheet.PreviousWorkedDay(_selectedDay)"
                            OnChanged="StateHasChanged" OnSaved="DaySavedAsync" OnChangedInJira="ReloadAsync" OnDiscard="() => sheet.Finish(_selectedDay)" />
             </div>
@@ -86,7 +87,7 @@ else
     private PeriodSheet? _sheet;
     private DateOnly _selectedDay;
     private int _unsynced;
-    private PeriodReminders.OpenPeriod? _previousOpen;
+    private OpenPeriod? _previousOpen;
     private bool _syncing, _savingAll, _loading;
     /// <summary>News about the selected day, such as days Save all couldn't save.</summary>
     private string? _notice;
@@ -99,8 +100,6 @@ else
     private IReadOnlyDictionary<string, IReadOnlyList<string>> _comments = new Dictionary<string, IReadOnlyList<string>>();
     /// <summary>Issues assigned to the user that were to do earlier in this period (maybe Done now).</summary>
     private IReadOnlyList<IssueWithStatus> _earlier = [];
-    /// <summary>Current Jira status per issue key, for the "isn't to do" note.</summary>
-    private readonly Dictionary<string, IssueWithStatus> _statuses = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Which way the last period change went: 1 to a later period, -1 to an earlier one, 0 on first show.</summary>
     private int _slide;
@@ -136,36 +135,11 @@ else
 
     private async Task ReloadAsync(PeriodSheet sheet)
     {
-        var p = sheet.Period;
-        // One read covers the period, the days before it to copy from, and the period before it.
-        var from = new[] { p.Start.AddDays(-DayFiller.LookBackDays), p.Previous.Start }.Min();
         _loading = true;
-        var time = await Log.GetRangeAsync(from, p.End);
+        var loaded = await Loader.LoadAsync(sheet, Statuses);
         _loading = false;
-        _jiraError = time.JiraError;
-        sheet.Load(
-            time.Between(p.Start, p.End),
-            time.Between(p.Start.AddDays(-DayFiller.LookBackDays), p.Start.AddDays(-1)),
-            await Calendar.GetDaysAsync(p.Start, p.End),
-            time.IsComplete);
+        (_jiraError, _previousOpen, _recent, _comments, _earlier) = (loaded.JiraError, loaded.Previous, loaded.Recent, loaded.Comments, loaded.Earlier);
         _unsynced = sheet.Entries.Count(e => !e.IsSynced);
-        _previousOpen = await LoadPreviousAsync(p, time);
-        var recent = await Log.GetRecentAsync();
-        _recent = RecentWork.Issues(recent);
-        _comments = RecentWork.Comments(recent);
-        await LoadIssuesAsync(sheet);
-    }
-
-    /// <summary>The period before the current one, when it has missing hours or work not in Jira.</summary>
-    private async Task<PeriodReminders.OpenPeriod?> LoadPreviousAsync(Period period, LoggedTime time)
-    {
-        if (!period.Contains(Today)) return null;
-        var prev = period.Previous;
-        var entries = time.Between(prev.Start, prev.End);
-        var notInJira = entries.Count(e => !e.IsSynced);
-        // Without Jira the hours are unknown, so only work waiting for Jira is worth a reminder.
-        var missing = time.IsComplete ? PeriodSummary.For(prev, await Calendar.GetDaysAsync(prev.Start, prev.End), entries, Today).Missing : TimeSpan.Zero;
-        return missing > TimeSpan.Zero || notInJira > 0 ? new(prev, missing, notInJira) : null;
     }
 
     private async Task RetryJiraAsync()
@@ -173,48 +147,6 @@ else
         Log.Refresh();
         await ReloadAsync();
         Sheet.Suggest(_selectedDay);
-    }
-
-    /// <summary>
-    /// Sprint issues for picks and suggestions, issues from earlier in the period, and the current status
-    /// of every issue logged in the period. Jira being down just means fewer picks.
-    /// </summary>
-    private async Task LoadIssuesAsync(PeriodSheet sheet)
-    {
-        if (User is not { Connection: { } c, Profile: { } profile }) return;
-        sheet.Sprint = await OrEmptyAsync(() => Issues.GetSprintAsync(c, profile));
-        _earlier = await OrEmptyAsync(() => Issues.GetPeriodAsync(c, profile, sheet.Period));
-        foreach (var i in sheet.Sprint.Concat(_earlier)) _statuses[i.Key] = i;
-        await LookUpStatusesAsync(sheet.Entries.Select(e => e.IssueKey));
-    }
-
-    private static async Task<IReadOnlyList<IssueWithStatus>> OrEmptyAsync(Func<Task<IReadOnlyList<IssueWithStatus>>> load)
-    {
-        try
-        {
-            return await load();
-        }
-        catch (JiraException)
-        {
-            return [];
-        }
-    }
-
-    private Task LookUpStatusAsync(string key) => LookUpStatusesAsync([key]);
-
-    private async Task LookUpStatusesAsync(IEnumerable<string> keys)
-    {
-        if (User.Connection is not { } c) return;
-        var unknown = keys.Where(k => k != "" && !_statuses.ContainsKey(k)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        if (unknown.Count == 0) return;
-        try
-        {
-            foreach (var (key, issue) in await Issues.GetStatusesAsync(c, unknown)) _statuses[key] = issue;
-        }
-        catch (JiraException)
-        {
-            // No status means no note; the time can still be logged.
-        }
     }
 
     // ---- Saving and syncing ----

@@ -31,6 +31,8 @@ builder.Services.AddSingleton<LegacyDataMigration>();
 builder.Services.AddScoped<RetryQueue>();
 builder.Services.AddScoped<WorklogSync>();
 builder.Services.AddScoped<TimeLog>();
+builder.Services.AddScoped<PeriodLoader>();
+builder.Services.AddTransient<IssueStatuses>();
 builder.Services.AddSingleton<RecentWorklogIssues>();
 builder.Services.AddScoped<WorkCalendarService>();
 builder.Services.AddSingleton(TimeProvider.System);
