@@ -167,7 +167,7 @@ public class TimeLogTests : IDisposable
     [InlineData(91, 2)]
     [InlineData(10, 1)]
     public void Worklog_time_is_read_in_whole_minutes(int seconds, int minutes) =>
-        Assert.Equal(TimeSpan.FromMinutes(minutes), JiraClient.WholeMinutes(seconds));
+        Assert.Equal(TimeSpan.FromMinutes(minutes), JiraWorklogClient.WholeMinutes(seconds));
 
     [Theory]
     [InlineData("2026-10-19T09:30:00.000+0200", "2026-10-19T07:30:00Z")]
@@ -176,5 +176,5 @@ public class TimeLogTests : IDisposable
     [InlineData("nonsense", null)]
     [InlineData(null, null)]
     public void Created_times_are_read_with_or_without_a_colon_in_the_offset(string? text, string? utc) =>
-        Assert.Equal(utc is null ? null : DateTimeOffset.Parse(utc), JiraClient.ParseCreated(text));
+        Assert.Equal(utc is null ? null : DateTimeOffset.Parse(utc), JiraWorklogClient.ParseCreated(text));
 }

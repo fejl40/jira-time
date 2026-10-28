@@ -184,6 +184,6 @@ public class SaveDayTests : IDisposable
     public void Started_uses_jira_format_with_offset_without_colon()
     {
         var zone = TimeZoneInfo.CreateCustomTimeZone("Plus2", TimeSpan.FromHours(2), "Plus2", "Plus2");
-        Assert.Equal("2026-10-19T09:00:00.000+0200", JiraClient.FormatStarted(Day, new TimeOnly(9, 0), zone));
+        Assert.Equal("2026-10-19T09:00:00.000+0200", JiraWorklogClient.FormatStarted(Day, new TimeOnly(9, 0), zone));
     }
 }

@@ -28,7 +28,7 @@ public sealed class TimeHarness : IDisposable
         Connection = connection ?? Server;
         Store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
         var user = CurrentUser.SignedIn(TestUsers.Carl, connection: Connection);
-        var client = new JiraClient(Jira.Client());
+        var client = new JiraWorklogClient(Jira.Client());
         Queue = new RetryQueue(Store, user);
         Recent = new RecentWorklogIssues(Clock);
         Log = new TimeLog(client, Queue, user, Recent, Clock);

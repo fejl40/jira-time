@@ -8,7 +8,7 @@ namespace JiraTime.Services;
 /// worklogs directly. When Jira can't be reached the change is kept in the local retry queue
 /// (<see cref="RetryQueue"/>), shown as not in Jira with the reason, and sent by <see cref="SyncRangeAsync"/>.
 /// </summary>
-public class WorklogSync(JiraClient jira, RetryQueue queue, TimeLog log)
+public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log)
 {
     /// <summary>Outcome of <see cref="SaveDayAsync"/>.</summary>
     /// <param name="Errors">Row id → why it is invalid; <see cref="DayError"/> for the day as a whole. Empty when saved.</param>

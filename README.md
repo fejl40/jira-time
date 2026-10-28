@@ -220,7 +220,8 @@ Services/TimeLog.cs                logged time: Jira worklogs plus the retry que
 Services/RecentWorklogIssues.cs    issues just saved on, read directly while Jira's search catches up
 Services/RetryQueue.cs             the retry queue: changes Jira couldn't take yet
 Services/WorkCalendarService.cs    days and work hours of the signed-in user
-Services/JiraClient.cs             Jira REST calls (myself, issue picker, searches, worklogs)
+Services/JiraClient.cs             Jira REST calls about issues (myself, issue picker, searches)
+Services/JiraWorklogClient.cs      Jira REST calls that read and write worklogs
 Services/Jira/                     HTTP transport, JQL quoting, comment format, raw JSON shapes
 Services/WorklogSync.cs            saves days to Jira, queues what fails, sends the queue
 Services/JiraIssueLookup.cs        sprint and period issues and issue statuses, cached briefly

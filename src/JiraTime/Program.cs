@@ -36,6 +36,7 @@ builder.Services.AddScoped<WorkCalendarService>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<JiraIssueLookup>();
 builder.Services.AddHttpClient<JiraClient>(c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddHttpClient<JiraWorklogClient>(c => c.Timeout = TimeSpan.FromSeconds(30));
 
 var app = builder.Build();
 
