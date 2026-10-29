@@ -7,7 +7,7 @@
     <StepNav Unit="period" PreviousHref="@Links.To(Period.Previous)" NextHref="@Links.To(Period.Next)" CurrentLabel="Today" CurrentTitle="Go to today" />
     <div>
         <h1 @key="Period" class="motion-fade text-xl font-semibold leading-tight outline-none">@Format.Range(Period.Start, Period.End)</h1>
-        <p class="text-sm text-slate-500 dark:text-slate-400" data-period-status>
+        <p class="text-sm text-muted" data-period-status>
             <span><Count Value="Summary.Logged" Zero="0" Unit=" h" Class="font-semibold text-slate-800 dark:text-slate-100" /> logged</span>
             @if (Sheet.HoursKnown && Summary.IsComplete(Unsynced, Unsaved.Count > 0))
             {
@@ -16,15 +16,15 @@
             }
             @if (Sheet.HoursKnown && Summary.Missing > TimeSpan.Zero)
             {
-                <span> · <span class="text-amber-700 dark:text-amber-400" title="Hours missing on workdays up to today"><Count Value="Summary.Missing" Unit=" h" /> missing</span></span>
+                <span> · <span class="text-warning" title="Hours missing on workdays up to today"><Count Value="Summary.Missing" Unit=" h" /> missing</span></span>
             }
             @if (Unsaved.Count > 0)
             {
-                <span> · <span class="text-blue-700 dark:text-blue-300">unsaved on @Format.Days(Unsaved.Count)</span></span>
+                <span> · <span class="text-unsaved">unsaved on @Format.Days(Unsaved.Count)</span></span>
             }
             @if (Unsynced > 0)
             {
-                <span> · <span class="text-amber-700 dark:text-amber-400" title="Saved here, but Jira doesn't have it yet">@Unsynced not in Jira</span></span>
+                <span> · <span class="text-warning" title="Saved here, but Jira doesn't have it yet">@Unsynced not in Jira</span></span>
             }
             <button class="btn-ghost ml-1 px-1.5 py-0.5 text-xs" disabled="@Syncing" @onclick="OnSync"
                     title="Send what Jira is missing and read worklogs logged in Jira">@(Syncing ? "Syncing…" : Unsynced > 0 ? "Sync now" : "↻ Sync")</button>

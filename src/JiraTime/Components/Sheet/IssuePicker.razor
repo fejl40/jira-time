@@ -21,19 +21,19 @@
                     <li role="option" aria-selected="@(i == _active ? "true" : "false")" data-option="@item.Key" style="@Motion.Order(g)"
                         class="motion-rise flex cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm @(i == _active ? "bg-blue-50 dark:bg-blue-950/60" : "")"
                         @onmousedown="() => SelectAsync(item)" @onmousedown:preventDefault @onmouseover="() => _active = i">
-                        <span class="size-2.5 flex-none self-center rounded-full @IssueColors.For(item.Key)"></span>
+                        <span class="issue-dot self-center @IssueColors.For(item.Key)"></span>
                         <span class="flex-none font-semibold">@item.Key</span>
                         <span class="truncate text-slate-600 dark:text-slate-300">@item.Summary</span>
                         @if (choices.StatusOf(item.Key) is { } status)
                         {
-                            <span class="ml-auto flex-none text-xs @(status.IsDone ? "text-amber-700 dark:text-amber-400" : "text-slate-400 dark:text-slate-500")">@status.Status</span>
+                            <span class="ml-auto flex-none text-xs @(status.IsDone ? "text-warning" : "text-slate-400 dark:text-slate-500")">@status.Status</span>
                         }
                     </li>
                 }
             }
             @if (_searching)
             {
-                <li class="px-2 py-1.5 text-sm text-slate-500 dark:text-slate-400">Searching Jira…</li>
+                <li class="px-2 py-1.5 text-sm text-muted">Searching Jira…</li>
             }
             else if (_searchError is not null)
             {
@@ -41,7 +41,7 @@
             }
             else if (index == 0)
             {
-                <li class="px-2 py-1.5 text-sm text-slate-500 dark:text-slate-400">@(IssueFilter.ShouldSearchJira(_query) ? "No matches" : "Type to search Jira")</li>
+                <li class="px-2 py-1.5 text-sm text-muted">@(IssueFilter.ShouldSearchJira(_query) ? "No matches" : "Type to search Jira")</li>
             }
         </ul>
     }

@@ -13,7 +13,7 @@
         }
         @if (Rows.Count == 0)
         {
-            <li class="py-6 text-center text-sm text-slate-500 dark:text-slate-400">No work on this day.</li>
+            <li class="py-6 text-center text-sm text-muted">No work on this day.</li>
         }
     </ul>
 
@@ -51,20 +51,20 @@
     }
     @if (_notice is not null)
     {
-        <div class="mt-3 text-sm text-amber-700 dark:text-amber-400" role="status">@_notice</div>
+        <div class="mt-3 text-sm text-warning" role="status">@_notice</div>
     }
 
     <div class="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
         <span class="text-sm">
-            <Count Value="Total" Zero="0" Unit=" h" Class="@($"font-semibold tabular-nums {(Expected > TimeSpan.Zero && Total != Expected ? "text-amber-700 dark:text-amber-400" : "")}")" data-day-total />
+            <Count Value="Total" Zero="0" Unit=" h" Class="@($"font-semibold tabular-nums {(Expected > TimeSpan.Zero && Total != Expected ? "text-warning" : "")}")" data-day-total />
             @if (Expected > TimeSpan.Zero)
             {
-                <span class="text-slate-500 dark:text-slate-400"> of @Format.Hours(Expected) h</span>
+                <span class="text-muted"> of @Format.Hours(Expected) h</span>
             }
         </span>
         @if (HasChanges)
         {
-            <span class="text-xs text-blue-700 dark:text-blue-300">Unsaved changes</span>
+            <span class="text-xs text-unsaved">Unsaved changes</span>
             <button type="button" class="btn-secondary ml-auto" disabled="@_busy" @onclick="ResetAsync">Discard changes</button>
         }
         <button type="button" class="btn-primary @(HasChanges ? "" : "ml-auto")" disabled="@(_busy || !CanSave)" @onclick="SaveAsync" data-save-day>

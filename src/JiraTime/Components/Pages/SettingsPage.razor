@@ -15,11 +15,11 @@
         @if (User.Connection is { } c)
         {
             <dl class="mt-3 grid grid-cols-[8rem_1fr] gap-y-1 text-sm">
-                <dt class="text-slate-500 dark:text-slate-400">URL</dt><dd>@c.BaseUrl</dd>
-                <dt class="text-slate-500 dark:text-slate-400">Type</dt><dd>@(c.IsCloud ? "Cloud (API token)" : "Server / Data Center (PAT)")</dd>
+                <dt class="text-muted">URL</dt><dd>@c.BaseUrl</dd>
+                <dt class="text-muted">Type</dt><dd>@(c.IsCloud ? "Cloud (API token)" : "Server / Data Center (PAT)")</dd>
                 @if (c.Email is not null)
                 {
-                    <dt class="text-slate-500 dark:text-slate-400">Email</dt><dd>@c.Email</dd>
+                    <dt class="text-muted">Email</dt><dd>@c.Email</dd>
                 }
             </dl>
         }
@@ -45,7 +45,7 @@
         <div class="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-7">
             @foreach (var day in Week)
             {
-                <label class="text-xs text-slate-500 dark:text-slate-400">
+                <label class="text-xs text-muted">
                     @day.ToString()[..3]
                     <input type="text" inputmode="decimal" class="field mt-1 py-1.5 text-right text-sm" aria-label="@day hours"
                            value="@_hours.GetValueOrDefault(day)" @onchange="e => SetHours(day, e)" />

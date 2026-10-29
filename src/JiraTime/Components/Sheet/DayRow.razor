@@ -4,7 +4,7 @@
 
 <li class="motion-colors flex flex-wrap items-center gap-2 py-2.5 @RowClass" data-row="@(Row.Removed ? "removed" : Row.IsDraft ? "draft" : "saved")" data-row-id="@E.Id">
     @* Keyed by issue, so picking an issue makes a new dot that can pop. *@
-    <span @key="E.IssueKey" class="size-2.5 flex-none rounded-full @(E.IssueKey == "" ? "bg-slate-300" : IssueColors.For(E.IssueKey)) @(Picked ? "motion-grow" : "")"></span>
+    <span @key="E.IssueKey" class="issue-dot @(E.IssueKey == "" ? "bg-slate-300" : IssueColors.For(E.IssueKey)) @(Picked ? "motion-grow" : "")"></span>
     @if (Row.Removed)
     {
         <div class="min-w-56 flex-1 basis-64 truncate text-sm text-slate-500 line-through dark:text-slate-400">
@@ -23,7 +23,7 @@
         <div class="flex items-center gap-1">
             <input type="text" inputmode="decimal" class="field w-20 py-1.5 text-right" aria-label="Hours" placeholder="h"
                    id="hours-@E.Id" data-hours value="@HoursText" @onchange="SetHours" />
-            <span class="text-sm text-slate-500 dark:text-slate-400">h</span>
+            <span class="text-sm text-muted">h</span>
         </div>
         <input type="text" class="field min-w-40 flex-1 basis-48 py-1.5" aria-label="Comment" placeholder="Comment (optional)"
                list="@CommentListId(E.IssueKey)" data-comment value="@E.Description" @onchange="SetDescription" />
@@ -31,13 +31,13 @@
             @switch (Row.State)
             {
                 case RowState.New or RowState.Suggested or RowState.Changed:
-                    <span class="font-medium text-blue-700 dark:text-blue-300">@Row.State</span>
+                    <span class="font-medium text-unsaved">@Row.State</span>
                     break;
                 case RowState.InJira:
                     <span class="text-emerald-700 dark:text-emerald-400">✓ In Jira</span>
                     break;
                 default:
-                    <span class="font-medium text-amber-700 dark:text-amber-400">Not in Jira</span>
+                    <span class="font-medium text-warning">Not in Jira</span>
                     break;
             }
         </span>
@@ -49,11 +49,11 @@
     }
     else if (Row.ShowsSyncError)
     {
-        <span class="basis-full pl-5 text-xs text-amber-700 dark:text-amber-400">Jira: @E.SyncError</span>
+        <span class="basis-full pl-5 text-xs text-warning">Jira: @E.SyncError</span>
     }
     @if (!Row.Removed && Choices.Statuses.GetValueOrDefault(E.IssueKey) is { IsDone: true } done)
     {
-        <span class="basis-full pl-5 text-xs text-amber-700 dark:text-amber-400" data-not-todo>
+        <span class="basis-full pl-5 text-xs text-warning" data-not-todo>
             @E.IssueKey is @done.Status in Jira, so this time is logged on an issue that isn't to do any more.
         </span>
     }

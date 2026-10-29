@@ -4,11 +4,11 @@
     <h2 class="text-lg font-semibold">@Format.LongDay(Date)</h2>
     @if (Logged > TimeSpan.Zero)
     {
-        <Count Value="Logged" Unit=" h" Class="text-sm text-slate-500 dark:text-slate-400" />
+        <Count Value="Logged" Unit=" h" Class="text-sm text-muted" />
     }
     else
     {
-        <span class="text-sm text-slate-500 dark:text-slate-400">Nothing logged</span>
+        <span class="text-sm text-muted">Nothing logged</span>
     }
     @if (Info is { Kind: DayKind.Holiday or DayKind.Weekend })
     {
@@ -23,7 +23,7 @@
     {
         @if (Missing > TimeSpan.Zero)
         {
-            <span class="text-sm text-amber-700 dark:text-amber-400"><Count Value="Missing" Unit=" h" /> missing</span>
+            <span class="text-sm text-warning"><Count Value="Missing" Unit=" h" /> missing</span>
         }
         @if (work.HasPartialDayOff)
         {
@@ -44,7 +44,7 @@
                     }
                 </select>
                 <input type="text" inputmode="decimal" class="field w-16 py-1 text-right text-xs" aria-label="Hours off" @bind="_hours" />
-                <span class="text-slate-500 dark:text-slate-400">h of @Format.Hours(work.Hours) h</span>
+                <span class="text-muted">h of @Format.Hours(work.Hours) h</span>
                 <button class="btn-secondary py-1 text-xs" @onclick="MarkOffAsync">Mark off</button>
                 <button class="btn-ghost text-xs" @onclick="() => _open = false">Cancel</button>
                 @if (_error is not null)

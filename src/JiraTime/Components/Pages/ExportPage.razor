@@ -13,7 +13,7 @@
                  CurrentHref="export" CurrentLabel="This month" CurrentTitle="This month" />
         <div>
             <h1 class="text-xl font-semibold leading-tight">Export @Title</h1>
-            <p class="text-sm text-slate-500 dark:text-slate-400" data-export-status>
+            <p class="text-sm text-muted" data-export-status>
                 @if (_loading)
                 {
                     <span>Reading your worklogs…</span>
@@ -49,7 +49,7 @@
     {
         @if (_notInJira > 0)
         {
-            <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900" data-not-in-jira>
+            <p class="alert-warning" data-not-in-jira>
                 @Format.Count(_notInJira, "entry") this month @(_notInJira == 1 ? "is" : "are") saved here but not in Jira yet. @(_notInJira == 1 ? "It is" : "They are") included; use Sync on the timesheet to send @(_notInJira == 1 ? "it" : "them").
             </p>
         }
@@ -63,7 +63,7 @@
                 {
                     <div class="mt-4 overflow-x-auto">
                         <table class="w-full min-w-[48rem] text-sm">
-                            <thead class="text-left text-xs text-slate-500 dark:text-slate-400">
+                            <thead class="text-left text-xs text-muted">
                                 <tr>
                                     <th class="pb-2 pr-3 font-medium">Epic</th>
                                     <th class="pb-2 pr-3 font-medium">Fase (ydelsesområde)</th>
