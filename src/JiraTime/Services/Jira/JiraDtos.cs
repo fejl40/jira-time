@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace JiraTime.Services;
 
@@ -17,4 +18,16 @@ internal record SearchFields(string? Summary, NamedField? IssueType, StatusField
 internal record NamedField(string? Name);
 internal record StatusField(string? Name, StatusCategoryField? StatusCategory);
 internal record StatusCategoryField(string? Key);
+internal record EpicSearchResult(List<EpicSearchIssue> Issues);
+internal record EpicSearchIssue(string? Key, EpicFields? Fields);
+internal record EpicFields(EpicParent? Parent, IssueTypeField? IssueType)
+{
+    /// <summary>The other fields asked for, among them the Epic Link field, whose id differs per Jira.</summary>
+    [JsonExtensionData] public Dictionary<string, JsonElement>? Other { get; init; }
+}
+internal record EpicParent(string? Key, EpicParentFields? Fields);
+internal record EpicParentFields(IssueTypeField? IssueType);
+internal record IssueTypeField(string? Name, int? HierarchyLevel, bool Subtask);
+internal record RawField(string? Id, string? Name, RawFieldSchema? Schema);
+internal record RawFieldSchema(string? Custom);
 internal record JiraErrorBody(List<string>? ErrorMessages, Dictionary<string, string>? Errors);

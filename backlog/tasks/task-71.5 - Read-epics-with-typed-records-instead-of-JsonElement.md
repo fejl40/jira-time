@@ -1,9 +1,10 @@
 ---
 id: TASK-71.5
 title: Read epics with typed records instead of JsonElement
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 07:52'
+updated_date: '2026-10-29 08:01'
 labels:
   - refactor
 dependencies: []
@@ -20,8 +21,14 @@ EpicOf, IsEpic, ReadEpicsAsync and GetEpicLinkFieldAsync hand-walk JsonElement w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No TryGetProperty left in JiraClient.cs except the Epic Link extension-data lookup
-- [ ] #2 JiraClient.cs about 150 lines
-- [ ] #3 EpicOf and IssueEpic are private
-- [ ] #4 EpicLookupTests pass unchanged
+- [x] #1 No TryGetProperty left in JiraClient.cs except the Epic Link extension-data lookup
+- [x] #2 JiraClient.cs about 150 lines
+- [x] #3 EpicOf and IssueEpic are private
+- [x] #4 EpicLookupTests pass unchanged
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Epic search and the field list are read into typed records in Jira/JiraDtos.cs (the Epic Link value through [JsonExtensionData]); EpicOf and IssueEpic are private. JiraClient.cs is 168 lines (it still holds the sprint, period and key searches).
+<!-- SECTION:FINAL_SUMMARY:END -->
