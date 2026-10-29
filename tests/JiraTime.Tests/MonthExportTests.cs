@@ -151,3 +151,19 @@ public class EpicExportStoreTests : IDisposable
         _dir.Dispose();
     }
 }
+
+public class ExportLinksTests
+{
+    [Fact]
+    public void Links_name_the_month() =>
+        Assert.Equal("export?month=2026-02", JiraTime.Components.ExportLinks.To(new DateOnly(2026, 2, 16)));
+
+    [Theory]
+    [InlineData("2026-02", "2026-02-01")]
+    [InlineData(" 2026-12 ", "2026-12-01")]
+    [InlineData("2026-13", null)]
+    [InlineData("feb", null)]
+    [InlineData(null, null)]
+    public void Links_are_read_back(string? month, string? first) =>
+        Assert.Equal(first is null ? null : DateOnly.Parse(first), JiraTime.Components.ExportLinks.Read(month));
+}

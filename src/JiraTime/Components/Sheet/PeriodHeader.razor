@@ -30,6 +30,7 @@
             }
             <button class="btn-ghost ml-1 px-1.5 py-0.5 text-xs" disabled="@Syncing" @onclick="OnSync"
                     title="Send what Jira is missing and read worklogs logged in Jira">@(Syncing ? "Syncing…" : Unsynced > 0 ? "Sync now" : "↻ Sync")</button>
+            <a class="btn-ghost px-1.5 py-0.5 text-xs" href="@ExportLinks.To(Period.Start)" title="Export the month this period is in" data-export-link>Export month</a>
         </p>
     </div>
     <div class="ml-auto flex items-center gap-2">

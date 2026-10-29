@@ -1,0 +1,219 @@
+@page "/export"
+@using System.Globalization
+@inject CurrentUser User
+@inject TimeLog Log
+@inject JiraIssueLookup Issues
+@inject EpicExportStore EpicValues
+@inject TimeProvider Clock
+@inject IJSRuntime JS
+
+<PageTitle>Export @Title · Jira Time</PageTitle>
+
+<div class="mx-auto max-w-6xl space-y-6">
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div class="flex items-center gap-1.5">
+            <a class="btn-secondary px-3" href="@ExportLinks.To(_month.AddMonths(-1))" title="Previous month">‹</a>
+            <a class="btn-secondary" href="export" title="This month">This month</a>
+            <a class="btn-secondary px-3" href="@ExportLinks.To(_month.AddMonths(1))" title="Next month">›</a>
+        </div>
+        <div>
+            <h1 class="text-xl font-semibold leading-tight">Export @Title</h1>
+            <p class="text-sm text-slate-500 dark:text-slate-400" data-export-status>
+                @if (_loading)
+                {
+                    <span>Reading your worklogs…</span>
+                }
+                else if (_error is null)
+                {
+                    <span><span class="font-semibold text-slate-800 dark:text-slate-100">@Format.Hours(Total) h</span> on @Plural(_rows.Count(r => r.IssueKey is not null), "row")</span>
+                    <span> · <a class="underline" href="@Links.To(Period.For(_month))">timesheet</a></span>
+                }
+            </p>
+        </div>
+        @if (!_loading && _error is null)
+        {
+            <div class="ml-auto flex items-center gap-2">
+                @if (_copied)
+                {
+                    <span class="text-sm text-emerald-700 dark:text-emerald-400" role="status">Copied. Paste it into Excel.</span>
+                }
+                <button class="btn-secondary" @onclick="DownloadAsync" data-download>Download .tsv</button>
+                <button class="btn-primary" @onclick="CopyAsync" data-copy>Copy</button>
+            </div>
+        }
+    </div>
+
+    @if (_error is not null)
+    {
+        <div class="card p-6">
+            <h2 class="font-semibold">Can't export this month</h2>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">The export needs your worklogs and their epics from Jira, and Jira couldn't be read:</p>
+            <div class="alert-error" role="alert">@_error</div>
+            <div class="mt-4 flex justify-end"><button class="btn-primary" @onclick="() => LoadAsync(refresh: true)">Try again</button></div>
+        </div>
+    }
+    else if (!_loading)
+    {
+        @if (_notInJira > 0)
+        {
+            <p class="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900" data-not-in-jira>
+                @Plural(_notInJira, "entry") this month @(_notInJira == 1 ? "is" : "are") saved here but not in Jira yet. @(_notInJira == 1 ? "It is" : "They are") included; use Sync on the timesheet to send @(_notInJira == 1 ? "it" : "them").
+            </p>
+        }
+
+        @if (_values.Count > 0 || _noEpic.Count > 0)
+        {
+            <section class="card p-6" data-epic-values>
+                <h2 class="font-semibold">Values per epic</h2>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Set once per epic and remembered for later months. Changes are saved as you leave a field.</p>
+                @if (_values.Count > 0)
+                {
+                    <div class="mt-4 overflow-x-auto">
+                        <table class="w-full min-w-[48rem] text-sm">
+                            <thead class="text-left text-xs text-slate-500 dark:text-slate-400">
+                                <tr>
+                                    <th class="pb-2 pr-3 font-medium">Epic</th>
+                                    <th class="pb-2 pr-3 font-medium">Fase (ydelsesområde)</th>
+                                    <th class="pb-2 pr-3 font-medium">Forordning</th>
+                                    <th class="pb-2 pr-3 font-medium">Hovedleverance nr.</th>
+                                    <th class="pb-2 font-medium">Hovedleverance link</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var v in _values.Values.OrderBy(v => v.EpicKey, StringComparer.Ordinal))
+                                {
+                                    <tr @key="v.EpicKey" data-epic="@v.EpicKey">
+                                        <td class="py-1 pr-3 whitespace-nowrap"><a class="underline" href="@MonthExport.IssueUrl(BaseUrl, v.EpicKey)" target="_blank" rel="noopener">@v.EpicKey</a></td>
+                                        <td class="py-1 pr-3"><input class="field py-1.5 text-sm" aria-label="@v.EpicKey Fase" value="@v.Fase" @onchange="e => SaveAsync(v, x => x.Fase = Text(e))" /></td>
+                                        <td class="py-1 pr-3"><input class="field py-1.5 text-sm" aria-label="@v.EpicKey Forordning" value="@v.Forordning" @onchange="e => SaveAsync(v, x => x.Forordning = Text(e))" /></td>
+                                        <td class="py-1 pr-3"><input class="field py-1.5 text-sm" aria-label="@v.EpicKey Hovedleverance nr." value="@v.HovedleveranceNr" @onchange="e => SaveAsync(v, x => x.HovedleveranceNr = Text(e))" /></td>
+                                        <td class="py-1"><input class="field py-1.5 text-sm" aria-label="@v.EpicKey Hovedleverance link" value="@v.HovedleveranceLink" @onchange="e => SaveAsync(v, x => x.HovedleveranceLink = Text(e))" /></td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                @if (_noEpic.Count > 0)
+                {
+                    <p class="hint mt-3" data-no-epic>No epic in Jira, so their epic columns stay empty: @string.Join(", ", _noEpic)</p>
+                }
+                @if (_saveError is not null)
+                {
+                    <div class="alert-error" role="alert">@_saveError</div>
+                }
+            </section>
+        }
+
+        <section class="card overflow-x-auto p-0">
+            <table class="w-full min-w-[60rem] text-sm" data-export-rows>
+                <thead class="bg-slate-50 text-left text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                    <tr>
+                        @foreach (var h in MonthExport.Header)
+                        {
+                            <th class="px-3 py-2 font-medium whitespace-nowrap">@h</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                    @foreach (var row in _rows)
+                    {
+                        var cells = MonthExport.Cells(row, BaseUrl, _values);
+                        <tr class="@(row.IssueKey is null ? "text-slate-400 dark:text-slate-500" : "")">
+                            @for (var i = 0; i < cells.Count; i++)
+                            {
+                                <td class="px-3 py-1.5 @(i == 1 ? "text-right tabular-nums" : "") @(i == 0 ? "whitespace-nowrap tabular-nums" : "") @(i == 6 ? "whitespace-nowrap" : "")">@cells[i]</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    }
+</div>
+
+@code {
+    /// <summary>The month to show, as yyyy-MM; this month when missing or unreadable.</summary>
+    [SupplyParameterFromQuery(Name = "month")] public string? MonthParam { get; set; }
+
+    private DateOnly _month;
+    private bool _loading = true, _copied;
+    private string? _error, _saveError;
+    private IReadOnlyList<ExportRow> _rows = [];
+    private Dictionary<string, EpicExportValues> _values = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<string> _noEpic = [];
+    private int _notInJira;
+
+    private string BaseUrl => User.Connection?.BaseUrl ?? "";
+    private string Title => _month.ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+    private TimeSpan Total => _rows.Aggregate(TimeSpan.Zero, (t, r) => t + r.Hours);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _month = ExportLinks.Read(MonthParam) ?? MonthExport.MonthOf(Clock.Today()).From;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync(bool refresh = false)
+    {
+        if (!User.IsSignedIn || User.Connection is not { } c) return;
+        _loading = true;
+        _error = null;
+        _copied = false;
+        if (refresh) Log.Refresh();
+
+        var (from, to) = MonthExport.MonthOf(_month);
+        var logged = await Log.GetRangeAsync(from, to);
+        if (!logged.IsComplete)
+        {
+            (_error, _loading) = (logged.JiraError, false);
+            return;
+        }
+        var entries = logged.Between(from, to).Where(e => !e.DeletePending && e.Duration > TimeSpan.Zero).ToList();
+        IReadOnlyDictionary<string, string?> epics;
+        try
+        {
+            epics = await Issues.GetEpicsAsync(c, entries.Select(e => e.IssueKey));
+        }
+        catch (JiraException ex)
+        {
+            (_error, _loading) = (ex.Message, false);
+            return;
+        }
+
+        _rows = MonthExport.Rows(_month, entries, epics);
+        var epicKeys = _rows.Select(r => r.EpicKey).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var saved = await EpicValues.GetAsync(epicKeys);
+        _values = epicKeys.ToDictionary(k => k, k => saved.GetValueOrDefault(k) ?? new EpicExportValues { EpicKey = k.ToUpperInvariant() }, StringComparer.OrdinalIgnoreCase);
+        _noEpic = _rows.Where(r => r.IssueKey is not null && r.EpicKey is null).Select(r => r.IssueKey!).Distinct().Order(StringComparer.Ordinal).ToList();
+        _notInJira = entries.Count(e => e.SyncPending);
+        _loading = false;
+    }
+
+    private static string Text(ChangeEventArgs e) => e.Value?.ToString() ?? "";
+
+    private async Task SaveAsync(EpicExportValues values, Action<EpicExportValues> change)
+    {
+        change(values);
+        _copied = false;
+        try
+        {
+            await EpicValues.SaveAsync(values);
+            _saveError = null;
+        }
+        catch (IOException ex)
+        {
+            _saveError = $"Couldn't save the values for {values.EpicKey}: {ex.Message}";
+        }
+    }
+
+    private string Tsv() => MonthExport.ToTsv(_rows, BaseUrl, _values);
+
+    private async Task CopyAsync() => _copied = await JS.InvokeAsync<bool>("jiraExport.copy", Tsv());
+
+    private async Task DownloadAsync() =>
+        await JS.InvokeVoidAsync("jiraExport.download", $"timer-{_month:yyyy-MM}.tsv", Tsv());
+
+    private static string Plural(int n, string word) =>
+        n == 1 ? $"1 {word}" : word.EndsWith('y') ? $"{n} {word[..^1]}ies" : $"{n} {word}s";
+}

@@ -210,6 +210,7 @@ Domain/WorklogMatching.cs          worklogs as entries, waiting work laid over t
 Domain/RecentWork.cs               recent issues and comments for quick picks
 Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work hours
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount
+Domain/MonthExport.cs              the month export: rows per day and issue, tab-separated text
 Domain/LegacyData.cs               data from older versions and their backups
 Storage/                           document store interfaces + file-system implementation
 Services/SignInSession.cs          restores, connects and signs out a tab (uses the two below)
@@ -228,6 +229,7 @@ Services/WorklogSync.cs            saves a day or every unsaved day to Jira, que
 Services/PeriodLoader.cs           loads a period for the timesheet: time, days, picks, previous period
 Services/IssueStatuses.cs          current status of the issues a timesheet shows
 Services/JiraIssueLookup.cs        sprint and period issues and issue statuses, cached briefly
+Services/EpicExportStore.cs        Fase, Forordning and Hovedleverance per epic for the export
 Services/ExpiringCache.cs          small cache whose values expire
 Components/Layout/MainLayout.razor header + redirect to setup when not signed in
 Components/Pages/Setup/            Connect
@@ -235,6 +237,7 @@ Components/Pages/Timesheet.razor   shows a period: wires PeriodLoader, WorklogSy
 Components/Links.cs                builds and reads timesheet links (period, selected day)
 Components/Sheet/                  period header, reminders, grid, day list (phones), day header
 Components/MotionScript.cs         calls the animations in wwwroot/motion.js (styles: Styles/motion.css)
+Components/Pages/ExportPage.razor  a month in the agency's format: values per epic, Copy, Download .tsv (wwwroot/export.js)
 Components/Pages/SettingsPage.razor
 Components/Shared/                 DayEditor, IssuePicker, ThemeToggle, UserRow
 Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
