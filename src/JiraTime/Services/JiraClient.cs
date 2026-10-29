@@ -64,26 +64,8 @@ public class JiraClient(HttpClient http)
     }
 
     /// <summary>Current summary and status of the given issues. Keys Jira doesn't know are left out.</summary>
-    public async Task<IReadOnlyList<IssueWithStatus>> GetIssuesAsync(JiraConnection c, IReadOnlyCollection<string> keys, CancellationToken ct = default)
-    {
-        if (keys.Count == 0) return [];
-        try
-        {
-            return await SearchAsync(c, $"key in {Jql.List(keys)}", ct);
-        }
-        catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest && keys.Count > 1)
-        {
-            // One unknown key fails the whole query: ask one by one.
-            var found = new List<IssueWithStatus>();
-            foreach (var key in keys)
-                found.AddRange(await GetIssuesAsync(c, [key], ct));
-            return found;
-        }
-        catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest)
-        {
-            return [];
-        }
-    }
+    public async Task<IReadOnlyList<IssueWithStatus>> GetIssuesAsync(JiraConnection c, IReadOnlyCollection<string> keys, CancellationToken ct = default) =>
+        await ByKeysAsync(keys, some => SearchAsync(c, $"key in {Jql.List(some)}", ct));
 
     /// <summary>
     /// The epic of each issue, by key; null for issues with no epic (and for epics themselves). The epic is
@@ -127,30 +109,46 @@ public class JiraClient(HttpClient http)
 
     private async Task<Dictionary<string, IssueEpic>> ReadEpicsAsync(JiraConnection c, IReadOnlyCollection<string> keys, string? epicLink, CancellationToken ct)
     {
-        if (keys.Count == 0) return new(StringComparer.OrdinalIgnoreCase);
+        var found = new Dictionary<string, IssueEpic>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, epic) in await ByKeysAsync(keys, some => SearchEpicsAsync(c, some, epicLink, ct)))
+            found[key] = epic;
+        return found;
+    }
+
+    private async Task<IReadOnlyList<(string Key, IssueEpic Epic)>> SearchEpicsAsync(JiraConnection c, IReadOnlyCollection<string> keys, string? epicLink, CancellationToken ct)
+    {
         var fields = "issuetype,parent" + (epicLink is null ? "" : "," + epicLink);
+        var result = await _jira.GetAsync<JsonElement>(c,
+            $"{SearchPath(c)}?jql={Uri.EscapeDataString($"key in {Jql.List(keys)}")}&fields={fields}&maxResults=100", ct);
+        var found = new List<(string, IssueEpic)>();
+        if (result.TryGetProperty("issues", out var issues) && issues.ValueKind == JsonValueKind.Array)
+            foreach (var issue in issues.EnumerateArray())
+                if (issue.TryGetProperty("key", out var key) && key.GetString() is { } k)
+                    found.Add((k, issue.TryGetProperty("fields", out var f) ? EpicOf(f, epicLink) : new(null, null)));
+        return found;
+    }
+
+    /// <summary>
+    /// Searches for issues by key. One key Jira doesn't know fails the whole query, so then each key is
+    /// asked on its own; a single unknown key gives nothing.
+    /// </summary>
+    private static async Task<IReadOnlyList<T>> ByKeysAsync<T>(IReadOnlyCollection<string> keys, Func<IReadOnlyCollection<string>, Task<IReadOnlyList<T>>> search)
+    {
+        if (keys.Count == 0) return [];
         try
         {
-            var result = await _jira.GetAsync<JsonElement>(c,
-                $"{SearchPath(c)}?jql={Uri.EscapeDataString($"key in {Jql.List(keys)}")}&fields={fields}&maxResults=100", ct);
-            var found = new Dictionary<string, IssueEpic>(StringComparer.OrdinalIgnoreCase);
-            if (result.TryGetProperty("issues", out var issues) && issues.ValueKind == JsonValueKind.Array)
-                foreach (var issue in issues.EnumerateArray())
-                    if (issue.TryGetProperty("key", out var key) && key.GetString() is { } k)
-                        found[k] = issue.TryGetProperty("fields", out var f) ? EpicOf(f, epicLink) : new(null, null);
-            return found;
+            return await search(keys);
         }
         catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest && keys.Count > 1)
         {
-            // One unknown key fails the whole query: ask one by one.
-            var found = new Dictionary<string, IssueEpic>(StringComparer.OrdinalIgnoreCase);
+            var found = new List<T>();
             foreach (var key in keys)
-                foreach (var (k, v) in await ReadEpicsAsync(c, [key], epicLink, ct)) found[k] = v;
+                found.AddRange(await ByKeysAsync([key], search));
             return found;
         }
         catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest)
         {
-            return new(StringComparer.OrdinalIgnoreCase);
+            return [];
         }
     }
 

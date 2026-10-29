@@ -1,9 +1,10 @@
 ---
 id: TASK-71.3
 title: Write the unknown-key search fallback once in JiraClient
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 07:52'
+updated_date: '2026-10-29 08:00'
 labels:
   - refactor
 dependencies: []
@@ -20,6 +21,12 @@ GetIssuesAsync and ReadEpicsAsync both carry the same 'one unknown key fails the
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The fallback catch appears once in JiraClient.cs
-- [ ] #2 EpicLookupTests and status lookup tests pass unchanged
+- [x] #1 The fallback catch appears once in JiraClient.cs
+- [x] #2 EpicLookupTests and status lookup tests pass unchanged
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+GetIssuesAsync and the epic search both go through one ByKeysAsync helper that retries key by key when one unknown key fails the query.
+<!-- SECTION:FINAL_SUMMARY:END -->
