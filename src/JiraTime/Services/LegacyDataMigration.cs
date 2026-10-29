@@ -9,7 +9,7 @@ namespace JiraTime.Services;
 /// if none was recorded, whoever signs in first (there was only one user then). Time entries from
 /// before Jira became the source of truth are dropped once Jira has them (<see cref="RetireSyncedEntriesAsync"/>).
 /// </summary>
-public class LegacyDataMigration(IDocumentStore store)
+public class LegacyDataMigration(IDocumentStore store, TimeProvider clock)
 {
     private static readonly SemaphoreSlim Gate = new(1, 1);
 
@@ -36,7 +36,8 @@ public class LegacyDataMigration(IDocumentStore store)
             // Keep an untouched copy before changing anything.
             await _backups.UpsertAsync(new LegacyBackup
             {
-                Id = $"before-multi-user-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{user.Id[..8]}",
+                Id = $"before-multi-user-{clock.GetUtcNow():yyyyMMdd-HHmmss}-{user.Id[..8]}",
+                CreatedUtc = clock.GetUtcNow().UtcDateTime,
                 ClaimedBy = user,
                 Entries = entries.Select(e => e.Copy()).ToList(),
                 DaysOff = daysOff.Select(d => new DayOff { Id = d.Id, Date = d.Date, Reason = d.Reason }).ToList(),
@@ -80,7 +81,8 @@ public class LegacyDataMigration(IDocumentStore store)
 
             await _timeBackups.UpsertAsync(new TimeEntriesBackup
             {
-                Id = $"time-entries-{DateTime.UtcNow:yyyyMMdd-HHmmss}-{owner[..8]}",
+                Id = $"time-entries-{clock.GetUtcNow():yyyyMMdd-HHmmss}-{owner[..8]}",
+                CreatedUtc = clock.GetUtcNow().UtcDateTime,
                 Owner = owner,
                 Entries = all.Select(e => e.Copy()).ToList(),
             });

@@ -29,6 +29,16 @@ public class SaveDayTests : IDisposable
     }
 
     [Fact]
+    public async Task Saved_rows_are_stamped_with_the_clock()
+    {
+        var row = Row("ABC-1", 8);
+
+        await _h.SaveDayAsync(Day, [row]);
+
+        Assert.Equal(_h.Clock.Now.UtcDateTime, row.UpdatedUtc);
+    }
+
+    [Fact]
     public async Task Saving_again_updates_changed_rows_removes_missing_ones_and_leaves_the_rest()
     {
         await _h.SaveDayAsync(Day, [Row("ABC-1", 4), Row("ABC-2", 2), Row("ABC-3", 2)]);

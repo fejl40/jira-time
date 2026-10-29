@@ -35,12 +35,13 @@ public class JiraIdentityTests : IDisposable
     private readonly FileDocumentStore _store;
     private readonly FakeJira _jira = new();
     private readonly CurrentUser _user = new();
+    private readonly TestClock _clock = new();
     private readonly JiraIdentity _identity;
 
     public JiraIdentityTests()
     {
         _store = new FileDocumentStore(_dir.Path);
-        _identity = new JiraIdentity(new JiraClient(_jira.Client()), _store, _user, new LegacyDataMigration(_store));
+        _identity = new JiraIdentity(new JiraClient(_jira.Client()), _store, _user, new LegacyDataMigration(_store, _clock), _clock);
         Me("JIRAUSER1", "carl", "Carl Lilholm");
     }
 
@@ -238,6 +239,7 @@ public class DataSeparationTests : IDisposable
 public class LegacyDataMigrationTests : IDisposable
 {
     private readonly TempDir _dir = new();
+    private readonly TestClock _clock = new();
 
     public void Dispose() => _dir.Dispose();
 
@@ -274,7 +276,7 @@ public class LegacyDataMigrationTests : IDisposable
         await WriteOldDataAsync();
         using var store = Store();
 
-        Assert.True(await new LegacyDataMigration(store).ClaimAsync(TestUsers.Carl));
+        Assert.True(await new LegacyDataMigration(store, _clock).ClaimAsync(TestUsers.Carl));
 
         var entries = await StoredAsync(store, CurrentUser.SignedIn(TestUsers.Carl));
         Assert.Equal(["ABC-1", "ABC-2"], entries.Select(e => e.IssueKey));
@@ -299,11 +301,11 @@ public class LegacyDataMigrationTests : IDisposable
         await WriteOldDataAsync();
         using var store = Store();
 
-        Assert.False(await new LegacyDataMigration(store).ClaimAsync(TestUsers.Anna));
+        Assert.False(await new LegacyDataMigration(store, _clock).ClaimAsync(TestUsers.Anna));
 
         Assert.Empty(await StoredAsync(store, CurrentUser.SignedIn(TestUsers.Anna)));
         Assert.Empty(await store.Collection<LegacyBackup>().QueryAsync(_ => true));
-        Assert.True(await new LegacyDataMigration(store).ClaimAsync(TestUsers.Carl)); // still there for Carl
+        Assert.True(await new LegacyDataMigration(store, _clock).ClaimAsync(TestUsers.Carl)); // still there for Carl
     }
 
     [Fact]
@@ -311,7 +313,7 @@ public class LegacyDataMigrationTests : IDisposable
     {
         await WriteOldDataAsync();
         using var store = Store();
-        var migration = new LegacyDataMigration(store);
+        var migration = new LegacyDataMigration(store, _clock);
         await migration.ClaimAsync(TestUsers.Carl);
 
         Assert.False(await migration.ClaimAsync(TestUsers.Carl));
@@ -325,7 +327,7 @@ public class LegacyDataMigrationTests : IDisposable
         await WriteOldDataAsync(profileId: null);
         using var store = Store();
 
-        Assert.True(await new LegacyDataMigration(store).ClaimAsync(TestUsers.Anna));
+        Assert.True(await new LegacyDataMigration(store, _clock).ClaimAsync(TestUsers.Anna));
         Assert.Equal(2, (await StoredAsync(store, CurrentUser.SignedIn(TestUsers.Anna))).Count);
     }
 
@@ -334,7 +336,7 @@ public class LegacyDataMigrationTests : IDisposable
     {
         await WriteOldDataAsync();
         using (var store = Store())
-            await new LegacyDataMigration(store).ClaimAsync(TestUsers.Carl);
+            await new LegacyDataMigration(store, _clock).ClaimAsync(TestUsers.Carl);
 
         using var reopened = Store();
         Assert.Equal(2, (await StoredAsync(reopened, CurrentUser.SignedIn(TestUsers.Carl))).Count);
@@ -350,7 +352,7 @@ public class LegacyDataMigrationTests : IDisposable
         jira.Gets["/rest/api/2/myself"] = _ => new { key = "JIRAUSER1", name = "carl", displayName = "Carl Lilholm" };
         var user = new CurrentUser();
 
-        await new JiraIdentity(new JiraClient(jira.Client()), store, user, new LegacyDataMigration(store))
+        await new JiraIdentity(new JiraClient(jira.Client()), store, user, new LegacyDataMigration(store, _clock), _clock)
             .SignInAsync(new JiraConnection("https://jira.example.com", JiraAuthType.Pat, "t", null));
 
         // The entry Jira has is dropped after a backup; the one it doesn't have stays to be sent.

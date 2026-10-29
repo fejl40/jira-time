@@ -8,7 +8,7 @@ namespace JiraTime.Services;
 /// worklogs directly. When Jira can't be reached the change is kept in the local retry queue
 /// (<see cref="RetryQueue"/>), shown as not in Jira with the reason, and sent by <see cref="SyncRangeAsync"/>.
 /// </summary>
-public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log)
+public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log, TimeProvider clock)
 {
     /// <summary>Outcome of <see cref="SaveDayAsync"/>.</summary>
     /// <param name="Errors">Row id → why it is invalid; <see cref="DayError"/> for the day as a whole. Empty when saved.</param>
@@ -67,7 +67,7 @@ public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log)
                 row.JiraWorklogIssueKey = old.JiraWorklogIssueKey;
                 row.CreatedUtc = old.CreatedUtc;
             }
-            row.UpdatedUtc = DateTime.UtcNow;
+            row.UpdatedUtc = clock.GetUtcNow().UtcDateTime;
             if (await PushAsync(c, row, ct) is not null) failures++;
         }
         return new DayResult(errors, failures);

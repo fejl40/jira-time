@@ -37,7 +37,7 @@ public sealed class TimeHarness : IDisposable
         Queue = new RetryQueue(Store, user);
         Recent = new RecentWorklogIssues(Clock);
         Log = new TimeLog(client, Queue, user, Recent, Clock);
-        Sync = new WorklogSync(client, Queue, Log);
+        Sync = new WorklogSync(client, Queue, Log, Clock);
     }
 
     public DateOnly Today => DateOnly.FromDateTime(Clock.Now.UtcDateTime);

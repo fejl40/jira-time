@@ -8,7 +8,7 @@ namespace JiraTime.Services;
 /// Signs a browser tab in as the Jira user its token belongs to. The identity is whatever the chosen
 /// Jira host answers for /myself, never something the browser claims.
 /// </summary>
-public class JiraIdentity(JiraClient jira, IDocumentStore store, CurrentUser user, LegacyDataMigration legacy)
+public class JiraIdentity(JiraClient jira, IDocumentStore store, CurrentUser user, LegacyDataMigration legacy, TimeProvider clock)
 {
     private readonly IDocumentCollection<UserAccount> _accounts = store.Collection<UserAccount>();
 
@@ -57,7 +57,7 @@ public class JiraIdentity(JiraClient jira, IDocumentStore store, CurrentUser use
         var key = UserKey.For(c.BaseUrl, me.Id);
         var account = await _accounts.GetAsync(key.Id) ?? new UserAccount { Id = key.Id, Host = key.Host, JiraUserId = key.JiraUserId };
         account.Profile = me;
-        account.LastVerifiedUtc = DateTime.UtcNow;
+        account.LastVerifiedUtc = clock.GetUtcNow().UtcDateTime;
         var token = UserAccount.TokenHash(c);
         account.VerifiedTokens.Remove(token);
         account.VerifiedTokens.Insert(0, token);

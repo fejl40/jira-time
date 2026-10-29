@@ -10,6 +10,7 @@ public class RetireLocalTimeTests : IDisposable
     private static readonly DateOnly Day = new(2026, 10, 19);
 
     private readonly TempDir _dir = new();
+    private readonly TestClock _clock = new();
     private readonly FileDocumentStore _store;
 
     public RetireLocalTimeTests() => _store = new FileDocumentStore(_dir.Path);
@@ -42,7 +43,7 @@ public class RetireLocalTimeTests : IDisposable
         await Stored("NEW-1", TestUsers.Carl, null, pending: true);
         await Stored("GONE-1", TestUsers.Carl, "103", pending: true, delete: true);
 
-        var dropped = await new LegacyDataMigration(_store).RetireSyncedEntriesAsync(TestUsers.Carl);
+        var dropped = await new LegacyDataMigration(_store, _clock).RetireSyncedEntriesAsync(TestUsers.Carl);
 
         Assert.Equal(1, dropped);
         Assert.Equal(["CHANGED-1", "GONE-1", "NEW-1"], await Left(TestUsers.Carl));
@@ -57,7 +58,7 @@ public class RetireLocalTimeTests : IDisposable
         await Stored("NEW-1", TestUsers.Carl, null, pending: true);
         await Stored("ANNA-1", TestUsers.Anna, "201");
 
-        await new LegacyDataMigration(_store).RetireSyncedEntriesAsync(TestUsers.Carl);
+        await new LegacyDataMigration(_store, _clock).RetireSyncedEntriesAsync(TestUsers.Carl);
 
         var backup = Assert.Single(await _store.Collection<TimeEntriesBackup>().QueryAsync(_ => true));
         Assert.Equal(TestUsers.Carl.Id, backup.Owner);
@@ -70,7 +71,7 @@ public class RetireLocalTimeTests : IDisposable
     {
         await Stored("IN-1", TestUsers.Carl, "101");
         await Stored("NEW-1", TestUsers.Carl, null, pending: true);
-        var migration = new LegacyDataMigration(_store);
+        var migration = new LegacyDataMigration(_store, _clock);
         await migration.RetireSyncedEntriesAsync(TestUsers.Carl);
 
         Assert.Equal(0, await migration.RetireSyncedEntriesAsync(TestUsers.Carl));
