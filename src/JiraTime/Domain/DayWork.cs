@@ -42,16 +42,20 @@ public sealed class DayWork(DateOnly date)
     public bool IsBlank(TimeEntry draft) =>
         draft.Duration == TimeSpan.Zero && string.IsNullOrWhiteSpace(draft.Description) && !BadHours.ContainsKey(draft.Id);
 
-    public bool HasChanges(IReadOnlyList<TimeEntry> saved) =>
-        Drafts.Any(d => !IsBlank(d)) || BadHours.Count > 0
-        || saved.Any(s => Removed.Contains(s.Id) || IsChanged(s));
+    public bool HasChanges(IReadOnlyList<TimeEntry> saved) => HasChanges(saved, countSuggestions: true);
 
     /// <summary>
     /// Changes the user made: like <see cref="HasChanges"/> but without untouched suggestions, which
     /// are cheap to make again and not worth a "leave without saving?" question.
     /// </summary>
-    public bool HasOwnChanges(IReadOnlyList<TimeEntry> saved) =>
-        Drafts.Any(d => !IsBlank(d) && !Suggested.Contains(d.Id)) || BadHours.Count > 0
+    public bool HasOwnChanges(IReadOnlyList<TimeEntry> saved) => HasChanges(saved, countSuggestions: false);
+
+    /// <summary>True when the only new rows are untouched suggestions and no saved row was changed or removed.</summary>
+    public bool HasOnlySuggestions(IReadOnlyList<TimeEntry> saved) =>
+        Drafts.All(d => Suggested.Contains(d.Id)) && !saved.Any(IsChanged) && Removed.Count == 0;
+
+    private bool HasChanges(IReadOnlyList<TimeEntry> saved, bool countSuggestions) =>
+        Drafts.Any(d => !IsBlank(d) && (countSuggestions || !Suggested.Contains(d.Id))) || BadHours.Count > 0
         || saved.Any(s => Removed.Contains(s.Id) || IsChanged(s));
 
     /// <summary>The user changed a new row; a suggestion they edited counts as their own row.</summary>
@@ -111,6 +115,23 @@ public sealed class DayWork(DateOnly date)
     {
         text = text?.Trim();
         Editable(row, saved).Description = string.IsNullOrEmpty(text) ? null : text;
+    }
+
+    /// <summary>Adds suggested rows; they count as suggestions until the user changes them.</summary>
+    public void AddSuggestions(IEnumerable<TimeEntry> drafts)
+    {
+        foreach (var draft in drafts)
+        {
+            Drafts.Add(draft);
+            Suggested.Add(draft.Id);
+        }
+    }
+
+    /// <summary>The day's row on an issue as it stands (saved rows as edited, removed ones skipped); null when there is none.</summary>
+    public TimeEntry? RowOn(IReadOnlyList<TimeEntry> saved, string issueKey)
+    {
+        var kept = saved.Where(s => !IsRemoved(s)).Select(View);
+        return kept.Concat(Drafts).FirstOrDefault(e => string.Equals(e.IssueKey, issueKey, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>Adds an empty new row, optionally on an issue, and returns it.</summary>

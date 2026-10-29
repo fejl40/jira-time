@@ -1,9 +1,10 @@
 ---
 id: TASK-71.17
 title: Let DayWork own its suggestion rules
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 07:52'
+updated_date: '2026-10-29 07:55'
 labels:
   - refactor
 dependencies: []
@@ -20,7 +21,13 @@ PeriodSheet edits DayWork's Suggested and Drafts collections directly and builds
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 PeriodSheet no longer touches .Suggested, .Removed or .Drafts.Add
-- [ ] #2 HasChanges and HasOwnChanges share a helper
-- [ ] #3 A test covers DayWork.HasOnlySuggestions
+- [x] #1 PeriodSheet no longer touches .Suggested, .Removed or .Drafts.Add
+- [x] #2 HasChanges and HasOwnChanges share a helper
+- [x] #3 A test covers DayWork.HasOnlySuggestions
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DayWork now has AddSuggestions, HasOnlySuggestions(saved) and RowOn; PeriodSheet uses them and AddRow, and HasChanges/HasOwnChanges share one private helper.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -118,6 +118,47 @@ public class DayWorkTests
         Assert.True(work.HasOwnChanges([]));
     }
 
+    [Fact]
+    public void A_day_with_only_untouched_suggestions_has_only_suggestions()
+    {
+        var saved = Saved("ABC-1", 4);
+        var work = new DayWork(Day);
+        Assert.True(work.HasOnlySuggestions([saved]));
+
+        var suggestion = new TimeEntry { IssueKey = "ABC-2", Date = Day, Duration = TimeSpan.FromHours(4) };
+        work.AddSuggestions([suggestion]);
+        Assert.True(work.HasOnlySuggestions([saved]));
+
+        work.Touched(suggestion);
+        Assert.False(work.HasOnlySuggestions([saved]));
+    }
+
+    [Fact]
+    public void A_changed_or_removed_saved_row_is_more_than_suggestions()
+    {
+        var saved = Saved("ABC-1", 4);
+        var changed = new DayWork(Day);
+        changed.Edit(saved).Duration = TimeSpan.FromHours(5);
+        var removed = new DayWork(Day);
+        removed.Remove(saved, saved);
+
+        Assert.False(changed.HasOnlySuggestions([saved]));
+        Assert.False(removed.HasOnlySuggestions([saved]));
+    }
+
+    [Fact]
+    public void The_row_on_an_issue_skips_removed_rows_and_finds_drafts()
+    {
+        var saved = Saved("ABC-1", 4);
+        var work = new DayWork(Day);
+        var draft = work.AddRow(new JiraIssue("ABC-2", ""));
+
+        Assert.Same(saved, work.RowOn([saved], "abc-1"));
+        Assert.Same(draft, work.RowOn([saved], "ABC-2"));
+        work.Remove(saved, saved);
+        Assert.Null(work.RowOn([saved], "ABC-1"));
+    }
+
     private static TimeEntry Draft(DayWork work, string key = "ABC-1", double hours = 0)
     {
         var draft = work.AddRow(new JiraIssue(key, ""));

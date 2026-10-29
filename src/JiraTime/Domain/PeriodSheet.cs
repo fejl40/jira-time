@@ -124,8 +124,7 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
         var work = WorkFor(day);
         if (work.HasChanges(SavedOn(day)) || work.Drafts.Count > 0) return;
         var drafts = DayFiller.Propose(info, SavedOn(day), Sprint, PreviousWorkedDay(day)?.Rows);
-        foreach (var d in drafts) work.Suggested.Add(d.Id);
-        work.Drafts.AddRange(drafts);
+        work.AddSuggestions(drafts);
     }
 
     /// <summary>Suggests work for every short workday so far, including days saved or discarded before.</summary>
@@ -159,11 +158,7 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
     }
 
     /// <summary>True when the day's only unsaved changes are untouched suggestions (or there are none).</summary>
-    public bool HasOnlySuggestions(DateOnly day)
-    {
-        if (!_work.TryGetValue(day, out var work)) return true;
-        return work.Drafts.All(d => work.Suggested.Contains(d.Id)) && !SavedOn(day).Any(work.IsChanged) && work.Removed.Count == 0;
-    }
+    public bool HasOnlySuggestions(DateOnly day) => !_work.TryGetValue(day, out var work) || work.HasOnlySuggestions(SavedOn(day));
 
     /// <summary>A day's rows as they will be once saved: saved work plus unsaved changes (suggestions too).</summary>
     public IReadOnlyList<TimeEntry> RowsOn(DateOnly day) =>
@@ -182,12 +177,6 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
     {
         Suggest(day);
         var work = WorkFor(day);
-        var existing = SavedOn(day).Where(e => !work.IsRemoved(e)).Select(work.View)
-            .Concat(work.Drafts)
-            .FirstOrDefault(e => string.Equals(e.IssueKey, issueKey, StringComparison.OrdinalIgnoreCase));
-        if (existing is not null) return existing;
-        var row = new TimeEntry { IssueKey = issueKey, IssueSummary = issueSummary, Date = day };
-        work.Drafts.Add(row);
-        return row;
+        return work.RowOn(SavedOn(day), issueKey) ?? work.AddRow(new JiraIssue(issueKey, issueSummary));
     }
 }
