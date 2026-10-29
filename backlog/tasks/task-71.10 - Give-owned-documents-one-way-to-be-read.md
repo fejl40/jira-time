@@ -1,0 +1,26 @@
+---
+id: TASK-71.10
+title: Give owned documents one way to be read
+status: To Do
+assignee: []
+created_date: '2026-10-29 07:52'
+labels:
+  - refactor
+dependencies: []
+parent_task_id: TASK-71
+priority: medium
+ordinal: 85000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+The 'get by id, then check it is mine' check is hand-written in WorkCalendarService, EpicExportStore and RetryQueue. (Found in the TASK-71 review.)
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 An IOwnedDocument marker and one helper return null for another user's document
+- [ ] #2 No hand-written Owner check after GetAsync remains in Services
+- [ ] #3 The helper has a test; DataSeparationTests pass
+<!-- AC:END -->
