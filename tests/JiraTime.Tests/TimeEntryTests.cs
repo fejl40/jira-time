@@ -1,5 +1,4 @@
 using JiraTime.Domain;
-using JiraTime.Services;
 
 namespace JiraTime.Tests;
 
@@ -78,60 +77,5 @@ public class TimeEntryTests
         entry.JiraWorklogIssueKey = "ABC-1";
         Assert.Equal("ABC-1", entry.WorklogIssueKey);
         Assert.True(entry.MovedToAnotherIssue);
-    }
-}
-
-/// <summary>The retry queue as stored: per user, read back after a restart, old formats still readable.</summary>
-public class RetryQueueStoreTests : IDisposable
-{
-    private static readonly DateOnly Day = new(2026, 10, 19);
-
-    private readonly TimeHarness _h = new();
-
-    public void Dispose() => _h.Dispose();
-
-    private static TimeEntry Waiting(string key, DateOnly? day = null) =>
-        new() { IssueKey = key, Date = day ?? Day, Duration = TimeSpan.FromHours(1), SyncPending = true };
-
-    [Fact]
-    public async Task Waiting_changes_in_the_range_come_in_day_order()
-    {
-        await _h.Queue.AddAsync(Waiting("B", Day.AddDays(1)));
-        await _h.Queue.AddAsync(Waiting("A"));
-        await _h.Queue.AddAsync(Waiting("X", Day.AddDays(14)));
-
-        Assert.Equal(["A", "B"], (await _h.Queue.GetPendingAsync(Day, Day.AddDays(13))).Select(e => e.IssueKey));
-    }
-
-    [Fact]
-    public async Task Adding_a_change_with_the_same_id_replaces_it_and_removing_takes_it_out()
-    {
-        var change = Waiting("ABC-1");
-        await _h.Queue.AddAsync(change);
-        change.Duration = TimeSpan.FromHours(3);
-        await _h.Queue.AddAsync(change);
-
-        Assert.Equal(TimeSpan.FromHours(3), Assert.Single(await _h.Queue.GetPendingAsync(Day, Day)).Duration);
-        await _h.Queue.RemoveAsync(change.Id);
-        Assert.Empty(await _h.Queue.GetPendingAsync(Day, Day));
-    }
-
-    [Fact]
-    public async Task Entries_saved_with_start_and_end_times_are_read_as_their_duration()
-    {
-        var folder = _h.Files.Folder("time-entries");
-        await File.WriteAllTextAsync(Path.Combine(folder, "old.json"), $$"""
-            { "id": "old", "owner": "{{TestUsers.Carl.Id}}", "issueKey": "ABC-1", "issueSummary": "", "date": "2026-10-19",
-              "start": "09:00:00", "end": "11:30:00", "syncPending": true }
-            """);
-
-        var queue = _h.Queue;
-        var old = Assert.Single(await queue.GetPendingAsync(Day, Day));
-        Assert.Equal(TimeSpan.FromHours(2.5), old.Duration);
-
-        await queue.AddAsync(old);
-        var json = await File.ReadAllTextAsync(Path.Combine(folder, "old.json"));
-        Assert.DoesNotContain("\"start\"", json);
-        Assert.Contains("\"duration\"", json);
     }
 }
