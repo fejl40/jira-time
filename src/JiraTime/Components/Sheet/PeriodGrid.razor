@@ -1,5 +1,4 @@
 @* Period grid: one row per issue, one column per day, with day, week, unsaved and missing totals. *@
-@using System.Globalization
 @inject MotionScript Animations
 
 <div @ref="_grid" class="relative hidden overflow-x-auto rounded-xl bg-white dark:bg-slate-900 shadow-sm ring-1 ring-slate-200 dark:ring-slate-700 sm:block">
@@ -11,7 +10,7 @@
                 {
                     <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium" title="@DayTitle(day)" data-selected-day="@(day == Selected ? "" : null)">
                         <button type="button" class="relative w-full px-1 py-2" @onclick="() => OnSelectDay.InvokeAsync(day)">
-                            <div class="uppercase">@day.ToString("ddd", CultureInfo.InvariantCulture)[..2]</div>
+                            <div class="uppercase">@Format.TwoLetterWeekday(day)</div>
                             <div class="text-sm @(day == Sheet.Today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700 dark:text-slate-200")">@day.Day</div>
                             @if (Sheet.IsUnsaved(day))
                             {
@@ -21,7 +20,7 @@
                             {
                                 var complete = Sheet.IsComplete(day);
                                 <span class="mx-1.5 mt-1 block h-1 rounded-full bg-slate-200 dark:bg-slate-700 @(_complete.Fresh.Contains(day) ? "motion-pop" : "")" data-day-progress="@(complete ? "complete" : "")">
-                                    <span class="motion-bar block h-full rounded-full @(complete ? "bg-emerald-500" : "bg-blue-500")" style="width: @Percent(Sheet.Progress(day))"></span>
+                                    <span class="motion-bar block h-full rounded-full @(complete ? "bg-emerald-500" : "bg-blue-500")" style="width: @Format.Percent(Sheet.Progress(day))"></span>
                                 </span>
                             }
                         </button>
@@ -169,7 +168,6 @@
     /// <summary>Moves the selected day's highlight after every render, as columns can change width.</summary>
     protected override Task OnAfterRenderAsync(bool firstRender) => Animations.GlideAsync(_grid);
 
-    private static string Percent(double share) => (share * 100).ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) + "%";
 
     private IEnumerable<(DateOnly Day, int Index)> Days => Sheet.Period.Days.Select((d, i) => (d, i));
 
@@ -184,7 +182,7 @@
     private static string CellTitle(DateOnly day, PeriodRow row, IReadOnlyList<TimeEntry> entries)
     {
         if (row.Key == "") return "";
-        var title = $"{row.Key} on {day.ToString("ddd d MMM", CultureInfo.InvariantCulture)}";
+        var title = $"{row.Key} on {Format.ShortDay(day)}";
         var problems = entries.Where(e => !e.IsSynced).Select(e => e.SyncError ?? "Not sent to Jira yet").Distinct().ToList();
         return problems.Count == 0 ? title : $"{title}\nNot in Jira: {string.Join("; ", problems)}";
     }

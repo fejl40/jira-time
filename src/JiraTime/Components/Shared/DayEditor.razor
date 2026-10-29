@@ -101,8 +101,8 @@
         @if (Previous is { } previous)
         {
             <button type="button" class="btn-ghost" data-copy-previous
-                    title="Same issues and split as @previous.Date.ToString("dddd d MMM", System.Globalization.CultureInfo.InvariantCulture), scaled to the hours missing"
-                    @onclick="CopyPrevious">Copy @previous.Date.ToString("ddd d MMM", System.Globalization.CultureInfo.InvariantCulture)</button>
+                    title="Same issues and split as @Format.Day(previous.Date), scaled to the hours missing"
+                    @onclick="CopyPrevious">Copy @Format.ShortDay(previous.Date)</button>
         }
     </div>
 

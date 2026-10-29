@@ -45,6 +45,24 @@ public class FormatTests
         Assert.Equal("3 days", Format.Days(3));
     }
 
+    [Fact]
+    public void Days_are_written_in_english()
+    {
+        var day = new DateOnly(2025, 11, 3);
+        Assert.Equal("Monday 3 Nov", Format.Day(day));
+        Assert.Equal("Mon 3 Nov", Format.ShortDay(day));
+        Assert.Equal("Monday 3 November", Format.LongDay(day));
+        Assert.Equal("Mon 3", Format.WeekdayAndNumber(day));
+        Assert.Equal("Mo", Format.TwoLetterWeekday(day));
+        Assert.Equal("November 2025", Format.Month(day));
+    }
+
+    [Theory]
+    [InlineData(0, "0%")]
+    [InlineData(0.625, "62.5%")]
+    [InlineData(1, "100%")]
+    public void Shares_become_css_percentages(double share, string expected) => Assert.Equal(expected, Format.Percent(share));
+
     [Theory]
     [InlineData(1, "row", "1 row")]
     [InlineData(0, "row", "0 rows")]

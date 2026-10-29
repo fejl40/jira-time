@@ -1,8 +1,7 @@
 @* The selected day's title, hours, kind of day and time off. *@
-@using System.Globalization
 
 <div class="flex flex-wrap items-center gap-3">
-    <h2 class="text-lg font-semibold">@Date.ToString("dddd d MMMM", CultureInfo.InvariantCulture)</h2>
+    <h2 class="text-lg font-semibold">@Format.LongDay(Date)</h2>
     @if (Logged > TimeSpan.Zero)
     {
         <Count Value="Logged" Unit=" h" Class="text-sm text-slate-500 dark:text-slate-400" />

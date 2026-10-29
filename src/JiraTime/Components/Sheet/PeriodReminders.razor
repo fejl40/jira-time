@@ -1,10 +1,9 @@
 @* Reminders: the end of this period, and a previous period that isn't done. *@
-@using System.Globalization
 
 @if (EndReminder is { } end)
 {
     <div class="motion-pulse rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-200 dark:ring-amber-900" role="status" data-reminder="end">
-        The period ends @(Sheet.Period.End == Sheet.Today ? "today" : Sheet.Period.End.ToString("dddd d MMM", CultureInfo.InvariantCulture)): @end.
+        The period ends @(Sheet.Period.End == Sheet.Today ? "today" : Format.Day(Sheet.Period.End)): @end.
     </div>
 }
 @if (Previous is { } prev && !_previousHidden)

@@ -2,6 +2,7 @@ using System.Globalization;
 
 namespace JiraTime.Components;
 
+/// <summary>Numbers, hours and days written the way the app shows them.</summary>
 public static class Format
 {
     /// <summary>Decimal hours like myTE: 1.5, 0.25, 8.</summary>
@@ -28,8 +29,31 @@ public static class Format
 
     public static string Range(DateOnly a, DateOnly b) =>
         a.Year == b.Year
-            ? $"{a.ToString("d MMM", CultureInfo.InvariantCulture)} – {b.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}"
-            : $"{a.ToString("d MMM yyyy", CultureInfo.InvariantCulture)} – {b.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}";
+            ? $"{Text(a, "d MMM")} – {Text(b, "d MMM yyyy")}"
+            : $"{Text(a, "d MMM yyyy")} – {Text(b, "d MMM yyyy")}";
+
+    private static string Text(DateOnly d, string format) => d.ToString(format, CultureInfo.InvariantCulture);
+
+    /// <summary>"Monday 3 Nov".</summary>
+    public static string Day(DateOnly d) => Text(d, "dddd d MMM");
+
+    /// <summary>"Mon 3 Nov".</summary>
+    public static string ShortDay(DateOnly d) => Text(d, "ddd d MMM");
+
+    /// <summary>"Monday 3 November".</summary>
+    public static string LongDay(DateOnly d) => Text(d, "dddd d MMMM");
+
+    /// <summary>"Mon 3": weekday and day of the month, for a list of days in one month.</summary>
+    public static string WeekdayAndNumber(DateOnly d) => Text(d, "ddd d");
+
+    /// <summary>"Mo": the weekday in two letters, for narrow columns.</summary>
+    public static string TwoLetterWeekday(DateOnly d) => Text(d, "ddd")[..2];
+
+    /// <summary>"November 2026".</summary>
+    public static string Month(DateOnly d) => Text(d, "MMMM yyyy");
+
+    /// <summary>A share from 0 to 1 as a CSS percentage: 0.625 → "62.5%".</summary>
+    public static string Percent(double share) => (share * 100).ToString("0.#", CultureInfo.InvariantCulture) + "%";
 
     public static string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

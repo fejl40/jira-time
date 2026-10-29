@@ -1,5 +1,4 @@
 @page "/export"
-@using System.Globalization
 @inject CurrentUser User
 @inject TimeLog Log
 @inject JiraIssueLookup Issues
@@ -145,7 +144,7 @@
     private int _notInJira;
 
     private string BaseUrl => User.Connection?.BaseUrl ?? "";
-    private string Title => _month.ToString("MMMM yyyy", CultureInfo.InvariantCulture);
+    private string Title => Format.Month(_month);
     private TimeSpan Total => _rows.Select(r => r.Hours).Sum();
 
     protected override async Task OnParametersSetAsync()
