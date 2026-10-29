@@ -24,9 +24,7 @@ public class WorkCalendarService(IDocumentStore store, CurrentUser user)
 
     /// <summary>The user's settings; the standard week when they never changed them.</summary>
     public async Task<UserSettings> GetSettingsAsync() =>
-        await _settings.GetAsync(user.Owner) is { } s && s.Owner == user.Owner
-            ? s
-            : new UserSettings { Id = user.Owner, Owner = user.Owner };
+        await user.GetMineAsync(_settings, user.Owner) ?? new UserSettings { Id = user.Owner, Owner = user.Owner };
 
     /// <returns>Why the hours were not saved, or null.</returns>
     public async Task<string?> SaveWorkHoursAsync(IReadOnlyDictionary<DayOfWeek, TimeSpan> hours)

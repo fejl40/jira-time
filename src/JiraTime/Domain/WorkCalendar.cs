@@ -6,7 +6,7 @@ public enum DayOffReason { Vacation, Sick, Other }
 
 /// <summary>A workday the user marked as not worked (id = owner + date).</summary>
 [DocumentCollection("days-off")]
-public class DayOff : IDocument
+public class DayOff : IOwnedDocument
 {
     public string Id { get; set; } = "";
     /// <summary><see cref="UserKey.Id"/> of the user. Empty on data from before multi-user support.</summary>
@@ -47,7 +47,7 @@ public record DayInfo(DateOnly Date, DayKind Kind, string? Name)
 
 /// <summary>Hours each weekday needs, per user (id = owner).</summary>
 [DocumentCollection("user-settings")]
-public class UserSettings : IDocument
+public class UserSettings : IOwnedDocument
 {
     public string Id { get; set; } = "";
     public string? Owner { get; set; }

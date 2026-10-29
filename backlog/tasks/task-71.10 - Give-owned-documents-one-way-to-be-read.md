@@ -1,9 +1,10 @@
 ---
 id: TASK-71.10
 title: Give owned documents one way to be read
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 07:52'
+updated_date: '2026-10-29 08:05'
 labels:
   - refactor
 dependencies: []
@@ -20,7 +21,13 @@ The 'get by id, then check it is mine' check is hand-written in WorkCalendarServ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 An IOwnedDocument marker and one helper return null for another user's document
-- [ ] #2 No hand-written Owner check after GetAsync remains in Services
-- [ ] #3 The helper has a test; DataSeparationTests pass
+- [x] #1 An IOwnedDocument marker and one helper return null for another user's document
+- [x] #2 No hand-written Owner check after GetAsync remains in Services
+- [x] #3 The helper has a test; DataSeparationTests pass
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+IOwnedDocument (Domain/Users.cs) marks DayOff, UserSettings, EpicExportValues and TimeEntry; CurrentUser.GetMineAsync and Owns replace the hand-written owner checks in WorkCalendarService, EpicExportStore and RetryQueue, with a test. UserAccount is keyed by the owner itself, so it doesn't implement it.
+<!-- SECTION:FINAL_SUMMARY:END -->

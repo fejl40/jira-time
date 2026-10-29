@@ -14,7 +14,7 @@ public class EpicExportStore(IDocumentStore store, CurrentUser user)
         var owner = user.Owner;
         var found = new Dictionary<string, EpicExportValues>(StringComparer.OrdinalIgnoreCase);
         foreach (var epic in epicKeys.Distinct(StringComparer.OrdinalIgnoreCase))
-            if (await _values.GetAsync(EpicExportValues.IdFor(owner, epic)) is { } v && v.Owner == owner)
+            if (await user.GetMineAsync(_values, EpicExportValues.IdFor(owner, epic)) is { } v)
                 found[epic] = v;
         return found;
     }

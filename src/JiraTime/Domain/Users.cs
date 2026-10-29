@@ -29,6 +29,13 @@ public sealed record UserKey(string Host, string JiraUserId)
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..24];
 }
 
+/// <summary>A document that belongs to one user: only that user may read or change it.</summary>
+public interface IOwnedDocument : IDocument
+{
+    /// <summary><see cref="UserKey.Id"/> of the user. Empty on data from before multi-user support.</summary>
+    string? Owner { get; }
+}
+
 /// <summary>A user Jira has confirmed at least once (id = <see cref="UserKey.Id"/>).</summary>
 [DocumentCollection("users")]
 public class UserAccount : IDocument

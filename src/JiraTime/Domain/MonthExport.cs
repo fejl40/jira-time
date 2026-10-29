@@ -8,7 +8,7 @@ namespace JiraTime.Domain;
 /// the user (id = owner + epic key).
 /// </summary>
 [DocumentCollection("epic-export-values")]
-public class EpicExportValues : IDocument
+public class EpicExportValues : IOwnedDocument
 {
     public string Id { get; set; } = "";
     public string Owner { get; set; } = "";

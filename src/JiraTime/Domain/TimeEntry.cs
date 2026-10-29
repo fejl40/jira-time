@@ -5,7 +5,7 @@ namespace JiraTime.Domain;
 
 /// <summary>One block of work on one Jira issue, on one day.</summary>
 [DocumentCollection("time-entries")]
-public class TimeEntry : IDocument
+public class TimeEntry : IOwnedDocument
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
 

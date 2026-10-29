@@ -24,7 +24,7 @@ public class RetryQueue(IDocumentStore store, CurrentUser user)
     /// <exception cref="InvalidOperationException">The id belongs to someone else's change.</exception>
     public async Task AddAsync(TimeEntry entry)
     {
-        if (await _docs.GetAsync(entry.Id) is { } stored && stored.Owner != user.Owner)
+        if (await _docs.GetAsync(entry.Id) is { } stored && !user.Owns(stored))
             throw new InvalidOperationException("This entry belongs to someone else.");
         entry.Owner = user.Owner;
         await _docs.UpsertAsync(entry);
@@ -33,6 +33,6 @@ public class RetryQueue(IDocumentStore store, CurrentUser user)
     /// <summary>Takes the change out of the queue, if it is the signed-in user's.</summary>
     public async Task RemoveAsync(string id)
     {
-        if (await _docs.GetAsync(id) is { } e && e.Owner == user.Owner) await _docs.DeleteAsync(id);
+        if (await user.GetMineAsync(_docs, id) is not null) await _docs.DeleteAsync(id);
     }
 }

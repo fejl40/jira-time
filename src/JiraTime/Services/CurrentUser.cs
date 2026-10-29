@@ -1,4 +1,5 @@
 using JiraTime.Domain;
+using JiraTime.Storage;
 
 namespace JiraTime.Services;
 
@@ -22,6 +23,14 @@ public sealed class CurrentUser
     public string Owner => Key?.Id ?? throw new InvalidOperationException("No verified user in this session.");
 
     public event Action? Changed;
+
+    /// <summary>True when the document is this user's.</summary>
+    /// <exception cref="InvalidOperationException">Nobody is signed in.</exception>
+    public bool Owns(IOwnedDocument document) => document.Owner == Owner;
+
+    /// <summary>The document with this id when it is this user's; null when there is none or it is someone else's.</summary>
+    public async Task<T?> GetMineAsync<T>(IDocumentCollection<T> collection, string id) where T : class, IOwnedDocument =>
+        await collection.GetAsync(id) is { } document && Owns(document) ? document : null;
 
     internal void Set(UserKey key, JiraProfile profile, JiraConnection connection, bool offline)
     {
