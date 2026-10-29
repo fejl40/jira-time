@@ -38,7 +38,10 @@ public class UserAccount : IDocument
     public string JiraUserId { get; set; } = "";
     public JiraProfile Profile { get; set; } = new("", null, "", null);
 
-    /// <summary>Hashes of tokens Jira confirmed for this user, so they still work while Jira can't be reached.</summary>
+    /// <summary>How many confirmed tokens to remember per user (old ones are dropped).</summary>
+    public const int RememberedTokens = 5;
+
+    /// <summary>Hashes of tokens Jira confirmed for this user, newest first, so they still work while Jira can't be reached.</summary>
     public List<string> VerifiedTokens { get; set; } = [];
 
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
@@ -46,6 +49,19 @@ public class UserAccount : IDocument
 
     [JsonIgnore]
     public UserKey Key => new(Host, JiraUserId);
+
+    /// <summary>
+    /// Records that Jira just confirmed the token with hash <paramref name="tokenHash"/> for this user: the profile
+    /// is Jira's, the token moves to the front and only the latest <see cref="RememberedTokens"/> are kept.
+    /// </summary>
+    public void Confirm(JiraProfile profile, string tokenHash, DateTime nowUtc)
+    {
+        Profile = profile;
+        LastVerifiedUtc = nowUtc;
+        VerifiedTokens.Remove(tokenHash);
+        VerifiedTokens.Insert(0, tokenHash);
+        if (VerifiedTokens.Count > RememberedTokens) VerifiedTokens.RemoveRange(RememberedTokens, VerifiedTokens.Count - RememberedTokens);
+    }
 
     public static string TokenHash(JiraConnection c) => UserKey.Hash($"{UserKey.NormalizeHost(c.BaseUrl)}|{c.Email}|{c.Token}");
 }

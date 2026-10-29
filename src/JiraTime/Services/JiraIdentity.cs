@@ -12,9 +12,6 @@ public class JiraIdentity(JiraClient jira, IDocumentStore store, CurrentUser use
 {
     private readonly IDocumentCollection<UserAccount> _accounts = store.Collection<UserAccount>();
 
-    /// <summary>How many confirmed tokens to remember per user (old ones are dropped).</summary>
-    public const int RememberedTokens = 5;
-
     public record Result(bool SignedIn, string? Error, bool Rejected)
     {
         public static readonly Result Ok = new(true, null, false);
@@ -31,21 +28,9 @@ public class JiraIdentity(JiraClient jira, IDocumentStore store, CurrentUser use
         {
             me = await jira.GetMyselfAsync(c, ct);
         }
-        catch (JiraException ex) when (ex.Status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-        {
-            await ForgetTokenAsync(c);
-            user.Clear();
-            return new Result(false, ex.Message, Rejected: true);
-        }
         catch (JiraException ex)
         {
-            if (allowOffline && IsUnreachable(ex) && await FindByTokenAsync(c) is { } known)
-            {
-                user.Set(known.Key, known.Profile, c, offline: true);
-                return Result.Ok;
-            }
-            user.Clear();
-            return new Result(false, ex.Message, Rejected: false);
+            return await NotConfirmedAsync(c, ex, allowOffline);
         }
 
         if (string.IsNullOrEmpty(me.Id))
@@ -56,18 +41,34 @@ public class JiraIdentity(JiraClient jira, IDocumentStore store, CurrentUser use
 
         var key = UserKey.For(c.BaseUrl, me.Id);
         var account = await _accounts.GetAsync(key.Id) ?? new UserAccount { Id = key.Id, Host = key.Host, JiraUserId = key.JiraUserId };
-        account.Profile = me;
-        account.LastVerifiedUtc = clock.GetUtcNow().UtcDateTime;
-        var token = UserAccount.TokenHash(c);
-        account.VerifiedTokens.Remove(token);
-        account.VerifiedTokens.Insert(0, token);
-        if (account.VerifiedTokens.Count > RememberedTokens) account.VerifiedTokens.RemoveRange(RememberedTokens, account.VerifiedTokens.Count - RememberedTokens);
+        account.Confirm(me, UserAccount.TokenHash(c), clock.GetUtcNow().UtcDateTime);
         await _accounts.UpsertAsync(account);
 
         await legacy.ClaimAsync(key);
         await legacy.RetireSyncedEntriesAsync(key);
         user.Set(key, me, c, offline: false);
         return Result.Ok;
+    }
+
+    /// <summary>
+    /// Jira didn't confirm the token. A token it rejects is forgotten; when Jira can't be reached, a token
+    /// it confirmed before still signs in (offline) if <paramref name="allowOffline"/> is set.
+    /// </summary>
+    private async Task<Result> NotConfirmedAsync(JiraConnection c, JiraException ex, bool allowOffline)
+    {
+        if (ex.Status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            await ForgetTokenAsync(c);
+            user.Clear();
+            return new Result(false, ex.Message, Rejected: true);
+        }
+        if (allowOffline && IsUnreachable(ex) && await FindByTokenAsync(c) is { } known)
+        {
+            user.Set(known.Key, known.Profile, c, offline: true);
+            return Result.Ok;
+        }
+        user.Clear();
+        return new Result(false, ex.Message, Rejected: false);
     }
 
     public void SignOut() => user.Clear();

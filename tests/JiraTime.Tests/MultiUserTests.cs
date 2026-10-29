@@ -27,6 +27,37 @@ public class UserKeyTests
     }
 }
 
+public class UserAccountTests
+{
+    private static readonly JiraProfile Carl = new("JIRAUSER1", "carl", "Carl Lilholm", null);
+
+    [Fact]
+    public void Confirming_takes_Jiras_profile_and_puts_the_token_first()
+    {
+        var account = new UserAccount { VerifiedTokens = ["a", "b"] };
+        var now = new DateTime(2026, 10, 27, 12, 0, 0, DateTimeKind.Utc);
+
+        account.Confirm(Carl, "b", now);
+
+        Assert.Equal(["b", "a"], account.VerifiedTokens);
+        Assert.Equal(Carl, account.Profile);
+        Assert.Equal(now, account.LastVerifiedUtc);
+    }
+
+    [Fact]
+    public void Confirming_keeps_only_the_latest_tokens()
+    {
+        var account = new UserAccount();
+
+        for (var i = 0; i < UserAccount.RememberedTokens + 2; i++)
+            account.Confirm(Carl, $"t{i}", DateTime.UnixEpoch);
+
+        Assert.Equal(UserAccount.RememberedTokens, account.VerifiedTokens.Count);
+        Assert.Equal($"t{UserAccount.RememberedTokens + 1}", account.VerifiedTokens[0]);
+        Assert.DoesNotContain("t0", account.VerifiedTokens);
+    }
+}
+
 public class JiraIdentityTests : IDisposable
 {
     private static readonly JiraConnection Server = new("https://jira.example.com", JiraAuthType.Pat, "token-1", null);
@@ -150,12 +181,12 @@ public class JiraIdentityTests : IDisposable
     [Fact]
     public async Task Only_the_latest_tokens_are_remembered()
     {
-        for (var i = 0; i < JiraIdentity.RememberedTokens + 2; i++)
+        for (var i = 0; i < UserAccount.RememberedTokens + 2; i++)
             await _identity.SignInAsync(Server with { Token = $"t{i}" });
 
         var account = (await _store.Collection<UserAccount>().GetAsync(TestUsers.Carl.Id))!;
-        Assert.Equal(JiraIdentity.RememberedTokens, account.VerifiedTokens.Count);
-        Assert.Equal(UserAccount.TokenHash(Server with { Token = $"t{JiraIdentity.RememberedTokens + 1}" }), account.VerifiedTokens[0]);
+        Assert.Equal(UserAccount.RememberedTokens, account.VerifiedTokens.Count);
+        Assert.Equal(UserAccount.TokenHash(Server with { Token = $"t{UserAccount.RememberedTokens + 1}" }), account.VerifiedTokens[0]);
     }
 }
 
