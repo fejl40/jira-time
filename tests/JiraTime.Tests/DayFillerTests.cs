@@ -99,7 +99,7 @@ public class DayFillerTests
         var copy = DayFiller.Copy(Monday.AddDays(1), source, TimeSpan.FromHours(target));
 
         Assert.Equal(expected, Show(copy));
-        Assert.Equal(TimeSpan.FromHours(target), copy.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration));
+        Assert.Equal(TimeSpan.FromHours(target), TimeEntry.Total(copy));
         Assert.All(copy, e => Assert.Equal(Monday.AddDays(1), e.Date));
     }
 

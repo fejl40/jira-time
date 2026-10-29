@@ -1,9 +1,10 @@
 ---
 id: TASK-71.16
 title: Add up hours with one TimeEntry.Total helper
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 07:52'
+updated_date: '2026-10-29 07:54'
 labels:
   - refactor
 dependencies: []
@@ -20,7 +21,13 @@ ordinal: 91000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 One TimeEntry.Total (and a TimeSpan Sum if needed) replaces every copy
-- [ ] #2 PeriodSheet has no static Total or HasSyncProblem
-- [ ] #3 Build and tests pass
+- [x] #1 One TimeEntry.Total (and a TimeSpan Sum if needed) replaces every copy
+- [x] #2 PeriodSheet has no static Total or HasSyncProblem
+- [x] #3 Build and tests pass
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+TimeEntry.Total, TimeEntry.HasSyncProblem and a TimeSpan Sum extension replace the Aggregate copies in Domain and Components; WorklogSync.cs keeps its copy until its rewrite lands.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -23,7 +23,7 @@ public sealed class PeriodSummary
     public static PeriodSummary For(Period period, IReadOnlyDictionary<DateOnly, DayInfo> days, IReadOnlyList<TimeEntry> entries, DateOnly today)
     {
         var logged = entries.Where(e => period.Contains(e.Date)).GroupBy(e => e.Date)
-            .ToDictionary(g => g.Key, g => g.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration));
+            .ToDictionary(g => g.Key, g => TimeEntry.Total(g));
         TimeSpan LoggedOn(DateOnly d) => logged.GetValueOrDefault(d);
         TimeSpan ExpectedOn(DateOnly d) => days.TryGetValue(d, out var info) ? info.Expected : TimeSpan.Zero;
         TimeSpan MissingOn(DateOnly d) => days.TryGetValue(d, out var info) ? info.MissingWith(LoggedOn(d)) : TimeSpan.Zero;
@@ -39,14 +39,14 @@ public sealed class PeriodSummary
         var weeks = period.Days
             .GroupBy(d => d.AddDays(-(((int)d.DayOfWeek + 6) % 7))) // Monday of the week
             .Select(g => new WeekTotal(g.First(), g.Last(),
-                g.Aggregate(TimeSpan.Zero, (t, d) => t + LoggedOn(d)),
-                g.Aggregate(TimeSpan.Zero, (t, d) => t + ExpectedOn(d))))
+                g.Select(LoggedOn).Sum(),
+                g.Select(ExpectedOn).Sum()))
             .ToList();
 
         return new PeriodSummary
         {
             Period = period,
-            Logged = logged.Values.Aggregate(TimeSpan.Zero, (t, h) => t + h),
+            Logged = logged.Values.Sum(),
             Missing = missing,
             StillToLog = still,
             Weeks = weeks,

@@ -46,18 +46,14 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
 
     public IReadOnlyList<TimeEntry> SavedOn(DateOnly day) => Entries.Where(e => e.Date == day).ToList();
 
-    public static TimeSpan Total(IEnumerable<TimeEntry> entries) => entries.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
-
-    public static bool HasSyncProblem(IEnumerable<TimeEntry> entries) => entries.Any(e => !e.IsSynced);
-
     /// <summary>Hours missing on a day; only counted up to today.</summary>
     public TimeSpan Missing(DateOnly day) =>
-        !HoursKnown || day > Today || !Days.TryGetValue(day, out var info) ? TimeSpan.Zero : info.MissingWith(Total(SavedOn(day)));
+        !HoursKnown || day > Today || !Days.TryGetValue(day, out var info) ? TimeSpan.Zero : info.MissingWith(TimeEntry.Total(SavedOn(day)));
 
     /// <summary>Saved hours as a share of the hours the day needs, from 0 to 1; 0 on days that need none.</summary>
     public double Progress(DateOnly day) =>
         Days.GetValueOrDefault(day) is { Expected: var expected } && expected > TimeSpan.Zero
-            ? Math.Min(1, Total(SavedOn(day)) / expected)
+            ? Math.Min(1, TimeEntry.Total(SavedOn(day)) / expected)
             : 0;
 
     /// <summary>A day that needs hours and has them all saved.</summary>
@@ -82,7 +78,7 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
         _work.Where(w => w.Value.HasOwnChanges(SavedOn(w.Key))).Select(w => w.Key).ToList();
 
     /// <summary>Hours the unsaved days will have once saved.</summary>
-    public TimeSpan UnsavedTotal => UnsavedDays.Aggregate(TimeSpan.Zero, (t, d) => t + UnsavedDayTotal(d));
+    public TimeSpan UnsavedTotal => UnsavedDays.Select(UnsavedDayTotal).Sum();
 
     /// <summary>Hours a day will have once its changes are saved.</summary>
     public TimeSpan UnsavedDayTotal(DateOnly day) => WorkFor(day).Total(SavedOn(day));
@@ -98,7 +94,7 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
         var saved = SavedOn(day);
         if (!work.HasChanges(saved)) return null;
         var after = work.TotalFor(saved, issueKey);
-        return after == Total(saved.Where(e => e.IssueKey == issueKey)) ? null : after;
+        return after == TimeEntry.Total(saved.Where(e => e.IssueKey == issueKey)) ? null : after;
     }
 
     /// <summary>One row per issue with saved or unsaved time in the period; issues by key, a row without an issue last.</summary>

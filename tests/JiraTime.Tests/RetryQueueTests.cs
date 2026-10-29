@@ -28,7 +28,7 @@ public class RetryQueueTests : IDisposable
 
         var time = await _h.Log.GetRangeAsync(From, To);
         Assert.False(time.IsComplete); // Jira can't be read either
-        Assert.Equal(TimeSpan.FromHours(8), PeriodSheet.Total(time.Entries));
+        Assert.Equal(TimeSpan.FromHours(8), TimeEntry.Total(time.Entries));
     }
 
     [Fact]

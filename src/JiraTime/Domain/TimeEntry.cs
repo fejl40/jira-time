@@ -93,4 +93,16 @@ public class TimeEntry : IOwnedDocument
     [JsonIgnore]
     public bool MovedToAnotherIssue =>
         JiraWorklogId is not null && !string.Equals(JiraWorklogIssueKey, IssueKey, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>The hours of the entries added up.</summary>
+    public static TimeSpan Total(IEnumerable<TimeEntry> entries) => entries.Select(e => e.Duration).Sum();
+
+    /// <summary>True when any of the entries is not (fully) in Jira.</summary>
+    public static bool HasSyncProblem(IEnumerable<TimeEntry> entries) => entries.Any(e => !e.IsSynced);
+}
+
+/// <summary>Adding up spans of time.</summary>
+public static class TimeSpanSum
+{
+    public static TimeSpan Sum(this IEnumerable<TimeSpan> spans) => spans.Aggregate(TimeSpan.Zero, (total, span) => total + span);
 }

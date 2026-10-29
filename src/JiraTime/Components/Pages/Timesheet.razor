@@ -46,7 +46,7 @@
 
     @* Selected day *@
     <section class="card p-6">
-        <DayHeader Date="_selectedDay" Info="sheet.Day(_selectedDay)" Logged="PeriodSheet.Total(DayEntries)" Missing="sheet.Missing(_selectedDay)"
+        <DayHeader Date="_selectedDay" Info="sheet.Day(_selectedDay)" Logged="TimeEntry.Total(DayEntries)" Missing="sheet.Missing(_selectedDay)"
                    OnMarkOff="MarkDayOffAsync" OnUnmarkOff="UnmarkDayOffAsync" />
 
         @if (_notice is not null)

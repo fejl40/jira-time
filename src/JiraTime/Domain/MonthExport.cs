@@ -61,7 +61,7 @@ public static class MonthExport
             .ToDictionary(g => g.Key, g => g
                 .GroupBy(e => e.IssueKey.ToUpperInvariant())
                 .OrderBy(i => i.Key, StringComparer.Ordinal)
-                .Select(i => new ExportRow(g.Key, i.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration), i.Key, epics.GetValueOrDefault(i.Key)))
+                .Select(i => new ExportRow(g.Key, TimeEntry.Total(i), i.Key, epics.GetValueOrDefault(i.Key)))
                 .ToList());
 
         var rows = new List<ExportRow>();

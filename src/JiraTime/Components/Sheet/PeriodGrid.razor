@@ -52,9 +52,9 @@
                     @foreach (var (day, i) in Days)
                     {
                         var cellEntries = row.Entries.Where(e => e.Date == day).ToList();
-                        var saved = PeriodSheet.Total(cellEntries);
+                        var saved = TimeEntry.Total(cellEntries);
                         <td class="@DayCellClass(day, i) relative cursor-pointer p-2 text-center tabular-nums" @onclick="() => OnCellClicked.InvokeAsync((day, row))" title="@CellTitle(day, row, cellEntries)">
-                            @if (PeriodSheet.HasSyncProblem(cellEntries))
+                            @if (TimeEntry.HasSyncProblem(cellEntries))
                             {
                                 <span class="absolute right-1 top-1 size-1.5 rounded-full bg-amber-500" data-not-in-jira></span>
                             }
@@ -74,7 +74,7 @@
                             }
                         </td>
                     }
-                    <td class="px-3 py-2 text-right font-medium tabular-nums"><Count Value="PeriodSheet.Total(row.Entries)" /></td>
+                    <td class="px-3 py-2 text-right font-medium tabular-nums"><Count Value="TimeEntry.Total(row.Entries)" /></td>
                 </tr>
             }
             @if (Rows.Count == 0)
@@ -89,9 +89,9 @@
                 <td class="@FooterLabel text-slate-500 dark:text-slate-400">Day total</td>
                 @foreach (var (day, i) in Days)
                 {
-                    <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums"><Count Value="PeriodSheet.Total(Sheet.SavedOn(day))" /></td>
+                    <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums"><Count Value="TimeEntry.Total(Sheet.SavedOn(day))" /></td>
                 }
-                <td class="px-3 py-2 text-right tabular-nums"><Count Value="PeriodSheet.Total(Sheet.Entries)" /></td>
+                <td class="px-3 py-2 text-right tabular-nums"><Count Value="TimeEntry.Total(Sheet.Entries)" /></td>
             </tr>
             <tr class="bg-slate-50 dark:bg-slate-800/60 text-xs" data-week-totals>
                 <td class="@FooterLabel font-semibold text-slate-500 dark:text-slate-400">Week</td>

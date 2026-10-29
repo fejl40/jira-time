@@ -21,7 +21,7 @@ public static class DayFiller
     public static IReadOnlyList<TimeEntry> Propose(DayInfo day, IReadOnlyList<TimeEntry> logged, IReadOnlyList<IssueWithStatus> sprint,
         IReadOnlyList<TimeEntry>? previous = null)
     {
-        var total = logged.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
+        var total = TimeEntry.Total(logged);
         var missing = day.Expected - total;
         if (missing <= TimeSpan.Zero) return [];
 
@@ -51,16 +51,16 @@ public static class DayFiller
         var issues = source
             .Where(e => e.IssueKey != "" && e.Duration > TimeSpan.Zero)
             .GroupBy(e => e.IssueKey)
-            .Select(g => (Key: g.Key, Summary: g.First().IssueSummary, Hours: g.Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration)))
+            .Select(g => (Key: g.Key, Summary: g.First().IssueSummary, Hours: TimeEntry.Total(g)))
             .ToList();
-        var total = issues.Aggregate(TimeSpan.Zero, (t, i) => t + i.Hours);
+        var total = issues.Select(i => i.Hours).Sum();
         if (total == TimeSpan.Zero || target <= TimeSpan.Zero) return [];
 
         var want = target ?? total;
         var shares = issues.Select(i => RoundToStep(i.Hours * (want / total))).ToList();
         // Put the rounding difference on the biggest share so the copy adds up exactly.
         var biggest = shares.IndexOf(shares.Max());
-        shares[biggest] += want - shares.Aggregate(TimeSpan.Zero, (t, s) => t + s);
+        shares[biggest] += want - shares.Sum();
 
         return issues.Zip(shares)
             .Where(x => x.Second > TimeSpan.Zero)

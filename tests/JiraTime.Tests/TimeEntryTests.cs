@@ -22,6 +22,23 @@ public class TimeEntryTests
     public void Hours_must_be_positive(double hours) => Assert.NotNull(TimeEntry.Validate(Entry("ABC-1", hours)));
 
     [Fact]
+    public void Total_adds_up_the_hours_of_the_entries() =>
+        Assert.Equal(TimeSpan.FromHours(2.25), TimeEntry.Total([Entry("ABC-1", 1.5), Entry("ABC-2", 0.75)]));
+
+    [Fact]
+    public void Total_of_no_entries_is_zero() => Assert.Equal(TimeSpan.Zero, TimeEntry.Total([]));
+
+    [Fact]
+    public void Entries_not_in_Jira_are_a_sync_problem()
+    {
+        var synced = Entry("ABC-1", 1);
+        synced.JiraWorklogId = "10";
+        synced.SyncPending = false;
+        Assert.False(TimeEntry.HasSyncProblem([synced]));
+        Assert.True(TimeEntry.HasSyncProblem([synced, Entry("ABC-2", 1)]));
+    }
+
+    [Fact]
     public void Hours_must_be_whole_minutes() =>
         Assert.NotNull(TimeEntry.Validate(new TimeEntry { IssueKey = "ABC-1", Date = Day, Duration = TimeSpan.FromSeconds(90) }));
 

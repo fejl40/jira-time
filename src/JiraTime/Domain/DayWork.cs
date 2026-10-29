@@ -65,11 +65,11 @@ public sealed class DayWork(DateOnly date)
 
     /// <summary>Hours the day will have once saved.</summary>
     public TimeSpan Total(IReadOnlyList<TimeEntry> saved) =>
-        RowsToSave(saved).Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
+        TimeEntry.Total(RowsToSave(saved));
 
     /// <summary>Hours on one issue once saved.</summary>
     public TimeSpan TotalFor(IReadOnlyList<TimeEntry> saved, string issueKey) =>
-        RowsToSave(saved).Where(e => e.IssueKey == issueKey).Aggregate(TimeSpan.Zero, (t, e) => t + e.Duration);
+        TimeEntry.Total(RowsToSave(saved).Where(e => e.IssueKey == issueKey));
 
     /// <summary>
     /// The entry to change for a row: the copy of the saved entry, or the new row itself (which then
