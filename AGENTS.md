@@ -50,18 +50,19 @@ Paths below are relative to `src/JiraTime/`.
 ```
 Program.cs                         DI: storage, data protection, Jira clients
 Domain/TimeEntry.cs                one block of work on an issue on a day
-Domain/Period.cs                   semi-monthly periods
+Domain/Period.cs                   semi-monthly periods, today from the clock
 Domain/Jira.cs                     connection, profile, issues and worklogs as Jira has them
 Domain/PeriodSheet.cs              a period being worked on: saved data, unsaved changes per day, rules
 Domain/DayWork.cs                  one day's unsaved changes and the row edits that make them
 Domain/TypedHours.cs               reading hours as the user types them (1.5, 1,5, 1:30)
 Domain/DayFiller.cs                suggestions for a day's missing hours
 Domain/PeriodSummary.cs            logged, missing and weekly hours of a period
-Domain/IssueChoices.cs             what the issue picker offers, in which group
+Domain/IssueChoices.cs             what the issue picker offers, in which group, and filtering it as the user types
 Domain/WorklogMatching.cs          worklogs as entries, waiting work laid over them, comparing the two, the day save plan
 Domain/RecentWork.cs               recent issues and comments for quick picks
 Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work hours
-Domain/Users.cs                    UserKey (host + Jira user id), UserAccount
+Domain/Milestones.cs               things reached while the user watches (a day becoming complete), to celebrate once
+Domain/Users.cs                    UserKey (host + Jira user id), UserAccount, IOwnedDocument
 Domain/MonthExport.cs              the month export: rows per day and issue, tab-separated text
 Storage/IDocumentStore.cs          the document store interfaces
 Storage/FileDocumentStore.cs       the file store: one JSON file per document
