@@ -71,6 +71,19 @@ public static class MonthExport
         return byIssue.Select(i => new ExportRow(date, TimeEntry.Total(i), i.Key, epics.GetValueOrDefault(i.Key))).ToList();
     }
 
+    /// <summary>Hours of all rows added up.</summary>
+    public static TimeSpan Total(IEnumerable<ExportRow> rows) => rows.Select(r => r.Hours).Sum();
+
+    /// <summary>Rows with an issue (not the date-only rows of days without time).</summary>
+    public static int IssueRowCount(IEnumerable<ExportRow> rows) => rows.Count(r => r.IssueKey is not null);
+
+    /// <summary>Issues in the rows that have no epic, each once, by key.</summary>
+    public static IReadOnlyList<string> IssuesWithoutEpic(IEnumerable<ExportRow> rows)
+    {
+        var keys = rows.Where(r => r.IssueKey is not null && r.EpicKey is null).Select(r => r.IssueKey!);
+        return keys.Distinct().Order(StringComparer.Ordinal).ToList();
+    }
+
     /// <summary>The row's eight cells, in <see cref="Header"/> order.</summary>
     /// <param name="values">Epic key → the user's values for it.</param>
     public static IReadOnlyList<string> Cells(ExportRow row, string baseUrl, IReadOnlyDictionary<string, EpicExportValues> values)

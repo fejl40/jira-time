@@ -1,7 +1,6 @@
 @page "/export"
 @inject CurrentUser User
-@inject TimeLog Log
-@inject JiraIssueLookup Issues
+@inject MonthExportLoader Loader
 @inject EpicExportStore EpicValues
 @inject TimeProvider Clock
 @inject IJSRuntime JS
@@ -24,7 +23,7 @@
                 }
                 else if (_error is null)
                 {
-                    <span><span class="font-semibold text-slate-800 dark:text-slate-100">@Format.Hours(Total) h</span> on @Format.Count(_rows.Count(r => r.IssueKey is not null), "row")</span>
+                    <span><span class="font-semibold text-slate-800 dark:text-slate-100">@Format.Hours(MonthExport.Total(_rows)) h</span> on @Format.Count(MonthExport.IssueRowCount(_rows), "row")</span>
                     <span> · <a class="underline" href="@Links.To(Period.For(_month))">timesheet</a></span>
                 }
             </p>
@@ -139,13 +138,12 @@
     private bool _loading = true, _copied;
     private string? _error, _saveError;
     private IReadOnlyList<ExportRow> _rows = [];
-    private Dictionary<string, EpicExportValues> _values = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyDictionary<string, EpicExportValues> _values = new Dictionary<string, EpicExportValues>();
     private IReadOnlyList<string> _noEpic = [];
     private int _notInJira;
 
     private string BaseUrl => User.Connection?.BaseUrl ?? "";
     private string Title => Format.Month(_month);
-    private TimeSpan Total => _rows.Select(r => r.Hours).Sum();
 
     protected override async Task OnParametersSetAsync()
     {
@@ -155,37 +153,12 @@
 
     private async Task LoadAsync(bool refresh = false)
     {
-        if (!User.IsSignedIn || User.Connection is not { } c) return;
+        if (!User.IsSignedIn || User.Connection is null) return;
         _loading = true;
         _error = null;
         _copied = false;
-        if (refresh) Log.Refresh();
-
-        var (from, to) = MonthExport.MonthOf(_month);
-        var logged = await Log.GetRangeAsync(from, to);
-        if (!logged.IsComplete)
-        {
-            (_error, _loading) = (logged.JiraError, false);
-            return;
-        }
-        var entries = logged.Between(from, to).Where(e => !e.DeletePending && e.Duration > TimeSpan.Zero).ToList();
-        IReadOnlyDictionary<string, string?> epics;
-        try
-        {
-            epics = await Issues.GetEpicsAsync(c, entries.Select(e => e.IssueKey));
-        }
-        catch (JiraException ex)
-        {
-            (_error, _loading) = (ex.Message, false);
-            return;
-        }
-
-        _rows = MonthExport.Rows(_month, entries, epics);
-        var epicKeys = _rows.Select(r => r.EpicKey).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var saved = await EpicValues.GetAsync(epicKeys);
-        _values = epicKeys.ToDictionary(k => k, k => saved.GetValueOrDefault(k) ?? new EpicExportValues { EpicKey = k.ToUpperInvariant() }, StringComparer.OrdinalIgnoreCase);
-        _noEpic = _rows.Where(r => r.IssueKey is not null && r.EpicKey is null).Select(r => r.IssueKey!).Distinct().Order(StringComparer.Ordinal).ToList();
-        _notInJira = entries.Count(e => e.SyncPending);
+        var loaded = await Loader.LoadAsync(_month, refresh);
+        (_rows, _values, _noEpic, _notInJira, _error) = (loaded.Rows, loaded.Values, loaded.NoEpic, loaded.NotInJira, loaded.JiraError);
         _loading = false;
     }
 

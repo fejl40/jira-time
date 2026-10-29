@@ -46,6 +46,13 @@ public sealed class TimeHarness : IDisposable
     public (PeriodLoader Loader, IssueStatuses Statuses) PeriodLoading() =>
         (new PeriodLoader(Log, Calendar, Issues, User), new IssueStatuses(Issues, User));
 
+    /// <summary>A month export loader and the epic values store over the same fake Jira and store.</summary>
+    public (MonthExportLoader Loader, EpicExportStore Values) ExportLoading()
+    {
+        var values = new EpicExportStore(Store, User);
+        return (new MonthExportLoader(Log, Issues, values, User), values);
+    }
+
     /// <summary>The day's work as the timesheet reads it.</summary>
     public async Task<IReadOnlyList<TimeEntry>> DayAsync(DateOnly day) => (await Log.GetRangeAsync(day, day)).Entries;
 

@@ -84,6 +84,7 @@ Services/PeriodLoader.cs           loads a period for the timesheet: time, days,
 Services/IssueStatuses.cs          current status of the issues a timesheet shows
 Services/JiraIssueLookup.cs        sprint and period issues and issue statuses, cached briefly
 Services/EpicExportStore.cs        Fase, Forordning and Hovedleverance per epic for the export
+Services/MonthExportLoader.cs      loads a month for the export: time, epics, values per epic
 Services/ExpiringCache.cs          small cache whose values expire
 Components/Layout/MainLayout.razor header + redirect to setup when not signed in
 Components/Pages/Setup/            Connect

@@ -99,6 +99,22 @@ public class MonthExportTests
         Assert.Equal(28 + 2, lines.Length); // header, 28 days, and the trailing line break
     }
 
+    [Fact]
+    public void Totals_count_hours_issue_rows_and_issues_without_an_epic()
+    {
+        ExportRow[] rows =
+        [
+            new(new DateOnly(2026, 2, 1)),
+            new(new DateOnly(2026, 2, 2), TimeSpan.FromHours(5), "BAC-2"),
+            new(new DateOnly(2026, 2, 2), TimeSpan.FromHours(3), "BAC-1", "BAC-500"),
+            new(new DateOnly(2026, 2, 3), TimeSpan.FromHours(1), "BAC-2"),
+        ];
+
+        Assert.Equal(TimeSpan.FromHours(9), MonthExport.Total(rows));
+        Assert.Equal(3, MonthExport.IssueRowCount(rows));
+        Assert.Equal(["BAC-2"], MonthExport.IssuesWithoutEpic(rows));
+    }
+
     [Theory]
     [InlineData("https://jira.uim.dk")]
     [InlineData("https://jira.uim.dk/")]
