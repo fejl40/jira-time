@@ -126,7 +126,7 @@ public sealed class DaySave
             r.Date = date;
             if (TimeEntry.Validate(r) is { } error) errors[r.Id] = error;
         }
-        if (rows.Aggregate(TimeSpan.Zero, (t, r) => t + r.Duration) > TimeEntry.MaxDuration)
+        if (TimeEntry.Total(rows) > TimeEntry.MaxDuration)
             errors[DayError] = TimeEntry.TooManyHours;
         return errors;
     }
