@@ -90,11 +90,11 @@ Components/Layout/MainLayout.razor header + redirect to setup when not signed in
 Components/Pages/Setup/            Connect
 Components/Pages/Timesheet.razor   shows a period: wires PeriodLoader, WorklogSync and the parts below
 Components/Links.cs                builds and reads timesheet links (period, selected day) and export links
-Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, DayKeys (keyboard shortcuts)
+Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, DayKeys (keyboard shortcuts)
 Components/Motion.cs               animation classes (Styles/motion.css), MotionScript (calls wwwroot/motion.js), SaveMotion
 Components/Pages/ExportPage.razor  a month in the agency's format: values per epic, Copy, Download .tsv (wwwroot/export.js)
 Components/Pages/SettingsPage.razor
-Components/Shared/                 DayEditor, IssuePicker, StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow
+Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow
 Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
 ```
 

@@ -159,6 +159,48 @@ public class DayWorkTests
         Assert.Null(work.RowOn([saved], "ABC-1"));
     }
 
+    [Fact]
+    public void Rows_show_each_state()
+    {
+        var inJira = Saved("ABC-1", 1);
+        var changed = Saved("ABC-2", 1);
+        var removed = Saved("ABC-3", 1);
+        var notInJira = Saved("ABC-4", 1);
+        notInJira.SyncPending = true;
+        notInJira.SyncError = "Jira said no";
+        var work = new DayWork(Day);
+        work.Edit(changed).Duration = TimeSpan.FromHours(2);
+        work.Remove(removed, removed);
+        var added = work.AddRow();
+        work.AddSuggestions([new TimeEntry { IssueKey = "ABC-5", Date = Day, Duration = TimeSpan.FromHours(1) }]);
+
+        var rows = work.Rows([inJira, changed, removed, notInJira]);
+
+        Assert.Equal(
+            [RowState.InJira, RowState.Changed, RowState.Removed, RowState.NotInJira, RowState.New, RowState.Suggested],
+            rows.Select(r => r.State));
+        Assert.Equal(TimeSpan.FromHours(2), rows[1].Entry.Duration);
+        Assert.Same(added, rows[4].Entry);
+        Assert.Null(rows[4].Saved);
+    }
+
+    [Fact]
+    public void Jira_s_reason_shows_only_on_untouched_rows_Jira_does_not_have()
+    {
+        var notInJira = Saved("ABC-1", 1);
+        notInJira.SyncPending = true;
+        notInJira.SyncError = "Jira said no";
+        var waiting = Saved("ABC-2", 1);
+        waiting.SyncPending = true;
+        var work = new DayWork(Day);
+
+        Assert.True(work.Rows([notInJira])[0].ShowsSyncError);
+        Assert.False(work.Rows([waiting])[0].ShowsSyncError);
+
+        work.Edit(notInJira).Duration = TimeSpan.FromHours(3);
+        Assert.False(work.Rows([notInJira])[0].ShowsSyncError);
+    }
+
     private static TimeEntry Draft(DayWork work, string key = "ABC-1", double hours = 0)
     {
         var draft = work.AddRow(new JiraIssue(key, ""));

@@ -1,5 +1,30 @@
-
 namespace JiraTime.Domain;
+
+/// <summary>Where a row of the day editor stands.</summary>
+public enum RowState
+{
+    /// <summary>A saved row marked for removal; saving deletes it.</summary>
+    Removed,
+    /// <summary>A row the user added.</summary>
+    New,
+    /// <summary>A row suggested for missing hours, untouched so far.</summary>
+    Suggested,
+    /// <summary>A saved row the user edited.</summary>
+    Changed,
+    InJira,
+    /// <summary>A saved row Jira doesn't have yet (it waits in the retry queue).</summary>
+    NotInJira,
+}
+
+/// <summary>A row of a day's work as the day editor shows it: the entry as edited, the stored entry (null for a new row), and its state.</summary>
+public sealed record WorkRow(TimeEntry Entry, TimeEntry? Saved, RowState State)
+{
+    public bool IsDraft => Saved is null;
+    public bool Removed => State == RowState.Removed;
+
+    /// <summary>Jira's reason for not taking the row is worth showing (not once the user changed or removed it).</summary>
+    public bool ShowsSyncError => State == RowState.NotInJira && Entry.SyncError is not null;
+}
 
 /// <summary>
 /// Unsaved changes to one day: edited copies of saved rows, saved rows marked for removal, and new
@@ -57,6 +82,20 @@ public sealed class DayWork(DateOnly date)
     private bool HasChanges(IReadOnlyList<TimeEntry> saved, bool countSuggestions) =>
         Drafts.Any(d => !IsBlank(d) && (countSuggestions || !Suggested.Contains(d.Id))) || BadHours.Count > 0
         || saved.Any(s => Removed.Contains(s.Id) || IsChanged(s));
+
+    /// <summary>The day's rows as the editor shows them: saved rows (as edited, or removed), then new rows.</summary>
+    public IReadOnlyList<WorkRow> Rows(IReadOnlyList<TimeEntry> saved)
+    {
+        var rows = saved.Select(s => new WorkRow(View(s), s, SavedState(s))).ToList();
+        rows.AddRange(Drafts.Select(d => new WorkRow(d, null, Suggested.Contains(d.Id) ? RowState.Suggested : RowState.New)));
+        return rows;
+    }
+
+    private RowState SavedState(TimeEntry saved) =>
+        IsRemoved(saved) ? RowState.Removed
+        : IsChanged(saved) ? RowState.Changed
+        : View(saved).IsSynced ? RowState.InJira
+        : RowState.NotInJira;
 
     /// <summary>The user changed a new row; a suggestion they edited counts as their own row.</summary>
     public void Touched(TimeEntry row) => Suggested.Remove(row.Id);

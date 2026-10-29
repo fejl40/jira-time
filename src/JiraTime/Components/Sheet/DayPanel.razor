@@ -15,7 +15,7 @@
     {
         <div class="mt-4">
             <DayEditor @ref="_editor" Date="Day" Saved="Saved" Work="Sheet.WorkFor(Day)"
-                       Recent="Extras.Recent" Comments="Extras.Comments" Sprint="Sheet.Sprint" Earlier="Extras.Earlier" Statuses="Statuses.Known"
+                       Choices="Choices" Comments="Extras.Comments"
                        OnIssuePicked="key => Statuses.LookUpAsync([key])" Connection="connection" Expected="@(Sheet.Day(Day)?.Expected ?? TimeSpan.Zero)"
                        Previous="Sheet.PreviousWorkedDay(Day)"
                        OnChanged="OnChanged" OnSaved="OnSaved" OnChangedInJira="OnReload" OnDiscard="DiscardAsync" />
@@ -45,6 +45,8 @@
     private DayEditor? _editor;
 
     private IReadOnlyList<TimeEntry> Saved => Sheet.SavedOn(Day);
+
+    private IssueChoices Choices => new() { Sprint = Sheet.Sprint, Earlier = Extras.Earlier, Recent = Extras.Recent, Statuses = Statuses.Known };
 
     /// <summary>Saves the day, for the Ctrl+S shortcut.</summary>
     public Task SaveAsync() => _editor?.SaveAsync() ?? Task.CompletedTask;

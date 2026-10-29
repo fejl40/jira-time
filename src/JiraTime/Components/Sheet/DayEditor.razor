@@ -1,0 +1,194 @@
+@* One day's work as editable rows. Nothing is written until Save day, which also updates Jira.
+   The unsaved changes live in a DayWork owned by the page, so they survive picking another day. *@
+@inject JiraClient Jira
+@inject WorklogSync Sync
+@inject MotionScript Animations
+
+<div>
+    <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+        @foreach (var row in Rows)
+        {
+            <DayRow @key="row.Entry.Id" Row="row" Work="Work" Choices="Choices" Search="Search" Errors="_errors" Picked="row.Entry.Id == _picked"
+                    OnPicked="issue => PickedAsync(row, issue)" OnChanged="Changed" />
+        }
+        @if (Rows.Count == 0)
+        {
+            <li class="py-6 text-center text-sm text-slate-500 dark:text-slate-400">No work on this day.</li>
+        }
+    </ul>
+
+    @* Recent comments per issue, suggested by the comment fields. *@
+    @foreach (var key in RowIssues)
+    {
+        @if (Comments.GetValueOrDefault(key) is { Count: > 0 } comments)
+        {
+            <datalist id="@DayRow.CommentListId(key)">
+                @foreach (var c in comments)
+                {
+                    <option value="@c"></option>
+                }
+            </datalist>
+        }
+    }
+
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+        <button type="button" class="btn-secondary" @onclick="() => AddRowAsync()">+ Add issue</button>
+        @if (Expected > TimeSpan.Zero && Total < Expected)
+        {
+            <button type="button" class="btn-ghost" @onclick="FillRest">Fill the rest (@Format.Hours(Expected - Total) h)</button>
+        }
+        @if (Previous is { } previous)
+        {
+            <button type="button" class="btn-ghost" data-copy-previous
+                    title="Same issues and split as @Format.Day(previous.Date), scaled to the hours missing"
+                    @onclick="CopyPrevious">Copy @Format.ShortDay(previous.Date)</button>
+        }
+    </div>
+
+    @if (_errors.GetValueOrDefault(WorklogSync.DayResult.DayError) is { } dayError)
+    {
+        <div class="alert-error" role="alert">@dayError</div>
+    }
+    @if (_notice is not null)
+    {
+        <div class="mt-3 text-sm text-amber-700 dark:text-amber-400" role="status">@_notice</div>
+    }
+
+    <div class="mt-5 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
+        <span class="text-sm">
+            <Count Value="Total" Zero="0" Unit=" h" Class="@($"font-semibold tabular-nums {(Expected > TimeSpan.Zero && Total != Expected ? "text-amber-700 dark:text-amber-400" : "")}")" data-day-total />
+            @if (Expected > TimeSpan.Zero)
+            {
+                <span class="text-slate-500 dark:text-slate-400"> of @Format.Hours(Expected) h</span>
+            }
+        </span>
+        @if (HasChanges)
+        {
+            <span class="text-xs text-blue-700 dark:text-blue-300">Unsaved changes</span>
+            <button type="button" class="btn-secondary ml-auto" disabled="@_busy" @onclick="ResetAsync">Discard changes</button>
+        }
+        <button type="button" class="btn-primary @(HasChanges ? "" : "ml-auto")" disabled="@(_busy || !CanSave)" @onclick="SaveAsync" data-save-day>
+            @(_busy ? "Saving…" : "Save day")
+        </button>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public DateOnly Date { get; set; }
+    /// <summary>The day's saved entries.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<TimeEntry> Saved { get; set; } = [];
+    /// <summary>The day's unsaved changes. Owned by the page, so the grid shows them and they outlive this editor.</summary>
+    [Parameter, EditorRequired] public DayWork Work { get; set; } = default!;
+    /// <summary>What the issue picker offers (sprint, earlier this period, recent); its statuses mark rows on Done issues.</summary>
+    [Parameter, EditorRequired] public IssueChoices Choices { get; set; } = default!;
+    /// <summary>Recent comments per issue key, newest first.</summary>
+    [Parameter] public IReadOnlyDictionary<string, IReadOnlyList<string>> Comments { get; set; } = new Dictionary<string, IReadOnlyList<string>>();
+    /// <summary>Raised with the key when an issue is picked, so the page can look up its status.</summary>
+    [Parameter] public EventCallback<string> OnIssuePicked { get; set; }
+    [Parameter, EditorRequired] public JiraConnection Connection { get; set; } = default!;
+    /// <summary>Hours the day should have (zero on weekends, holidays and days off).</summary>
+    [Parameter] public TimeSpan Expected { get; set; }
+    /// <summary>The latest earlier day with work, offered to copy.</summary>
+    [Parameter] public (DateOnly Date, IReadOnlyList<TimeEntry> Rows)? Previous { get; set; }
+    /// <summary>Raised after rows were added, edited or removed.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+    /// <summary>Raised after the day was saved.</summary>
+    [Parameter] public EventCallback<WorklogSync.DayResult> OnSaved { get; set; }
+    /// <summary>Raised when nothing was saved because Jira changed meanwhile, so the page reads the day again.</summary>
+    [Parameter] public EventCallback OnChangedInJira { get; set; }
+    /// <summary>Raised when the user discards the unsaved changes.</summary>
+    [Parameter] public EventCallback OnDiscard { get; set; }
+
+    private DateOnly? _loadedDate;
+    private Dictionary<string, string> _errors = [];
+    private string? _notice;
+    private bool _busy;
+
+    private IReadOnlyList<WorkRow> Rows => Work.Rows(Saved);
+
+    /// <summary>Issues on the day's rows, each once, for their recent comments.</summary>
+    private IEnumerable<string> RowIssues => Rows.Select(r => r.Entry.IssueKey).Where(k => k != "").Distinct();
+
+    private Task<IReadOnlyList<JiraIssue>> Search(string query, CancellationToken ct) => Jira.SearchIssuesAsync(Connection, query, ct);
+
+    private TimeSpan Total => Work.Total(Saved);
+
+    private bool HasChanges => Work.HasChanges(Saved);
+
+    /// <summary>Save day also retries saved work that Jira doesn't have yet.</summary>
+    private bool CanSave => HasChanges || Saved.Any(s => !s.IsSynced);
+
+    protected override void OnParametersSet()
+    {
+        if (_loadedDate == Date) return;
+        _loadedDate = Date;
+        _picked = null;
+        _errors = [];
+        _notice = null;
+    }
+
+    /// <summary>The row whose issue was just picked; its dot pops.</summary>
+    private string? _picked;
+
+    private async Task PickedAsync(WorkRow row, JiraIssue issue)
+    {
+        _picked = row.Entry.Id;
+        await Changed();
+        if (issue.Key != "") await OnIssuePicked.InvokeAsync(issue.Key);
+    }
+
+    /// <summary>Adds an empty row, optionally on an issue. Returns it so the caller can focus it.</summary>
+    public async Task<TimeEntry> AddRowAsync(JiraIssue? issue = null)
+    {
+        var draft = Work.AddRow(issue);
+        await Changed();
+        return draft;
+    }
+
+    private Task FillRest()
+    {
+        Work.FillRest(Saved, Expected, Choices.Sprint);
+        return Changed();
+    }
+
+    private Task CopyPrevious()
+    {
+        if (Previous is not { } previous) return Task.CompletedTask;
+        Work.CopyDay(Saved, Expected, previous.Rows);
+        return Changed();
+    }
+
+    private Task Changed()
+    {
+        _notice = null;
+        return OnChanged.InvokeAsync();
+    }
+
+    private async Task ResetAsync()
+    {
+        _errors = [];
+        _notice = null;
+        await OnDiscard.InvokeAsync();
+    }
+
+    /// <summary>Saves the day's rows and updates Jira. Public for the Ctrl+S shortcut.</summary>
+    public async Task SaveAsync()
+    {
+        if (_busy || !CanSave) return;
+        foreach (var (id, _) in Work.BadHours) _errors[id] = "Enter the hours, e.g. 1.5 or 1:30.";
+        if (Work.BadHours.Count > 0) return;
+
+        _busy = true;
+        var result = await Sync.SaveDayAsync(Connection, Date, Work.RowsToSave(Saved), Saved);
+        _busy = false;
+        _errors = result.Errors.ToDictionary();
+        if (result.ChangedInJira) await OnChangedInJira.InvokeAsync();
+        if (!result.Saved) return;
+
+        _notice = result.SyncFailures > 0
+            ? $"Saved, but {result.SyncFailures} {(result.SyncFailures == 1 ? "change" : "changes")} could not be sent to Jira yet. {(result.SyncFailures == 1 ? "It is" : "They are")} kept here and sent with Sync now."
+            : null;
+        await Animations.CollapseAsync(MotionScript.RemovedRows);
+        await OnSaved.InvokeAsync(result);
+    }
+}

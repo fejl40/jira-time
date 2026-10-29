@@ -50,12 +50,8 @@
 @code {
     /// <summary>The chosen issue; empty key when none.</summary>
     [Parameter] public JiraIssue Value { get; set; } = new("", "");
-    [Parameter] public IReadOnlyList<IssueWithStatus> Sprint { get; set; } = [];
-    [Parameter] public IReadOnlyList<JiraIssue> Recent { get; set; } = [];
-    /// <summary>Issues assigned to the user that were to do earlier in the period, maybe Done now.</summary>
-    [Parameter] public IReadOnlyList<IssueWithStatus> Earlier { get; set; } = [];
-    /// <summary>Known current statuses by issue key, shown next to issues.</summary>
-    [Parameter] public IReadOnlyDictionary<string, IssueWithStatus> Statuses { get; set; } = new Dictionary<string, IssueWithStatus>();
+    /// <summary>The sprint, earlier and recent issues to offer, with known statuses shown next to issues.</summary>
+    [Parameter] public IssueChoices Choices { get; set; } = new();
     [Parameter, EditorRequired] public Func<string, CancellationToken, Task<IReadOnlyList<JiraIssue>>> Search { get; set; } = default!;
     [Parameter] public EventCallback<JiraIssue> OnSelected { get; set; }
     [Parameter] public string? Id { get; set; }
@@ -77,8 +73,6 @@
         _shown = Value;
         if (!_open) _text = Display(Value);
     }
-
-    private IssueChoices Choices => new() { Sprint = Sprint, Earlier = Earlier, Recent = Recent, Statuses = Statuses };
 
     private IReadOnlyList<IssueGroup> Groups => Choices.For(_query, _jira);
 
