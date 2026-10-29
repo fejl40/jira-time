@@ -35,6 +35,7 @@ builder.Services.AddScoped<PeriodLoader>();
 builder.Services.AddTransient<IssueStatuses>();
 builder.Services.AddSingleton<RecentWorklogIssues>();
 builder.Services.AddScoped<WorkCalendarService>();
+builder.Services.AddScoped<EpicExportStore>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<JiraIssueLookup>();
 builder.Services.AddHttpClient<JiraClient>(c => c.Timeout = TimeSpan.FromSeconds(30));
