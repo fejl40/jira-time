@@ -9,7 +9,7 @@ public class PeriodSummaryTests
     private static readonly DateOnly Today = new(2026, 10, 21); // Wednesday
 
     private static IReadOnlyDictionary<DateOnly, DayInfo> Days(Period p) =>
-        p.Days.ToDictionary(d => d, d => DanishHolidays.Classify(d, new Dictionary<DateOnly, DayOff>()));
+        p.Days.ToDictionary(d => d, d => DayInfo.For(d, new Dictionary<DateOnly, DayOff>()));
 
     private static TimeEntry E(string date, double hours) =>
         new() { IssueKey = "ABC-1", Date = DateOnly.Parse(date), Duration = TimeSpan.FromHours(hours) };

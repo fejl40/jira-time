@@ -40,7 +40,7 @@ public class WorkCalendarTests
     [InlineData("2026-04-03", DayKind.Holiday)]  // Good Friday
     [InlineData("2026-12-25", DayKind.Holiday)]  // Christmas, a Friday
     public void Classify(string date, DayKind expected) =>
-        Assert.Equal(expected, DanishHolidays.Classify(D(date), new Dictionary<DateOnly, DayOff>()).Kind);
+        Assert.Equal(expected, DayInfo.For(D(date), new Dictionary<DateOnly, DayOff>()).Kind);
 
     [Fact]
     public void Expected_hours_are_8_on_workdays_only()

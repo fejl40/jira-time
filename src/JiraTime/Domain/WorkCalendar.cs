@@ -43,6 +43,22 @@ public record DayInfo(DateOnly Date, DayKind Kind, string? Name)
 
     /// <summary>Hours still missing when <paramref name="logged"/> is logged: expected minus logged, never negative.</summary>
     public TimeSpan MissingWith(TimeSpan logged) => Expected > logged ? Expected - logged : TimeSpan.Zero;
+
+    /// <summary>The kind of day and its hours, given the user's days off and work hours (default: 8 h Monday to Friday).</summary>
+    public static DayInfo For(DateOnly date, IReadOnlyDictionary<DateOnly, DayOff> daysOff, UserSettings? settings = null)
+    {
+        if (DanishHolidays.NameOf(date) is { } holiday) return new DayInfo(date, DayKind.Holiday, holiday) { Hours = TimeSpan.Zero };
+        var hours = (settings ?? new UserSettings()).HoursOn(date.DayOfWeek);
+        if (hours <= TimeSpan.Zero)
+            return new DayInfo(date, DayKind.Weekend, date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? null : "No work hours") { Hours = TimeSpan.Zero };
+        if (daysOff.TryGetValue(date, out var off))
+        {
+            if (off.Hours is not { } partial || partial >= hours)
+                return new DayInfo(date, DayKind.DayOff, off.Reason.ToString()) { Hours = hours, Off = hours };
+            return new DayInfo(date, DayKind.Workday, off.Reason.ToString()) { Hours = hours, Off = partial };
+        }
+        return new DayInfo(date, DayKind.Workday, null) { Hours = hours };
+    }
 }
 
 /// <summary>Hours each weekday needs, per user (id = owner).</summary>
@@ -108,21 +124,5 @@ public static class DanishHolidays
         int m = (a + 11 * h + 22 * l) / 451;
         int month = (h + l - 7 * m + 114) / 31, day = (h + l - 7 * m + 114) % 31 + 1;
         return new DateOnly(year, month, day);
-    }
-
-    /// <summary>The kind of day and its hours, given the user's days off and work hours (default: 8 h Monday to Friday).</summary>
-    public static DayInfo Classify(DateOnly date, IReadOnlyDictionary<DateOnly, DayOff> daysOff, UserSettings? settings = null)
-    {
-        if (NameOf(date) is { } holiday) return new DayInfo(date, DayKind.Holiday, holiday) { Hours = TimeSpan.Zero };
-        var hours = (settings ?? new UserSettings()).HoursOn(date.DayOfWeek);
-        if (hours <= TimeSpan.Zero)
-            return new DayInfo(date, DayKind.Weekend, date.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday ? null : "No work hours") { Hours = TimeSpan.Zero };
-        if (daysOff.TryGetValue(date, out var off))
-        {
-            if (off.Hours is not { } partial || partial >= hours)
-                return new DayInfo(date, DayKind.DayOff, off.Reason.ToString()) { Hours = hours, Off = hours };
-            return new DayInfo(date, DayKind.Workday, off.Reason.ToString()) { Hours = hours, Off = partial };
-        }
-        return new DayInfo(date, DayKind.Workday, null) { Hours = hours };
     }
 }

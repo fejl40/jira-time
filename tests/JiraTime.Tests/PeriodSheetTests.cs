@@ -18,7 +18,7 @@ public class PeriodSheetTests
     private static PeriodSheet Sheet(params TimeEntry[] entries)
     {
         var sheet = new PeriodSheet(Period, () => Tuesday) { Sprint = [Doing] };
-        var days = Period.Days.ToDictionary(d => d, d => DanishHolidays.Classify(d, new Dictionary<DateOnly, DayOff>()));
+        var days = Period.Days.ToDictionary(d => d, d => DayInfo.For(d, new Dictionary<DateOnly, DayOff>()));
         sheet.Load(entries, [], days);
         return sheet;
     }
@@ -148,7 +148,7 @@ public class PeriodSheetTests
     public void Without_Jira_hours_are_unknown_so_nothing_is_missing_or_suggested()
     {
         var sheet = new PeriodSheet(Period, () => Tuesday) { Sprint = [Doing] };
-        var days = Period.Days.ToDictionary(d => d, d => DanishHolidays.Classify(d, new Dictionary<DateOnly, DayOff>()));
+        var days = Period.Days.ToDictionary(d => d, d => DayInfo.For(d, new Dictionary<DateOnly, DayOff>()));
         sheet.Load([], [], days, hoursKnown: false);
 
         Assert.Equal(TimeSpan.Zero, sheet.Missing(Monday));

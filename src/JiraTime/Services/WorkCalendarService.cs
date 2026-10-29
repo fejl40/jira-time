@@ -19,7 +19,7 @@ public class WorkCalendarService(IDocumentStore store, CurrentUser user)
         var settings = await GetSettingsAsync();
         return Enumerable.Range(0, to.DayNumber - from.DayNumber + 1)
             .Select(from.AddDays)
-            .ToDictionary(d => d, d => DanishHolidays.Classify(d, off, settings));
+            .ToDictionary(d => d, d => DayInfo.For(d, off, settings));
     }
 
     /// <summary>The user's settings; the standard week when they never changed them.</summary>

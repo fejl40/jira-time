@@ -1,9 +1,10 @@
 ---
 id: TASK-71.13
 title: Move Classify out of DanishHolidays
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 07:52'
+updated_date: '2026-10-29 08:06'
 labels:
   - refactor
 dependencies: []
@@ -20,7 +21,13 @@ DanishHolidays.Classify decides a day's kind from work hours and days off, which
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 DayInfo.For replaces DanishHolidays.Classify
-- [ ] #2 DanishHolidays has no reference to UserSettings or DayOff
-- [ ] #3 WorkCalendarTests unchanged and passing
+- [x] #1 DayInfo.For replaces DanishHolidays.Classify
+- [x] #2 DanishHolidays has no reference to UserSettings or DayOff
+- [x] #3 WorkCalendarTests unchanged and passing
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DanishHolidays.Classify became DayInfo.For in Domain/WorkCalendar.cs; DanishHolidays now only knows the holidays. Callers and tests switched to the new name.
+<!-- SECTION:FINAL_SUMMARY:END -->
