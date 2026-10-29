@@ -7,9 +7,13 @@
 (() => {
   let page = null;
 
+  // The hours fields of the day editor's rows, in order.
+  const HOURS = 'li[data-row] input[data-hours]';
+
   const isField = el => el instanceof HTMLElement && el.matches('input, textarea, select, [contenteditable]');
 
-  const focusHours = el => { if (el) { el.focus(); el.select?.(); } };
+  /** Focuses a field and selects its text, so typing replaces it. */
+  const focusAndSelect = el => { if (el) { el.focus(); el.select?.(); } };
 
   const onKeyDown = e => {
     if (!page) return;
@@ -28,11 +32,11 @@
       if (e.key === 'Escape' && !target.closest('[data-issue-picker]')) target.blur();
       if (e.key === 'Enter' && target.matches('[data-hours], [data-comment]')) {
         e.preventDefault();
-        const rows = [...document.querySelectorAll('li[data-row] input[data-hours]')];
+        const rows = [...document.querySelectorAll(HOURS)];
         const row = target.closest('li[data-row]');
         const index = rows.findIndex(h => h.closest('li[data-row]') === row);
         const next = rows[index + 1];
-        if (next) focusHours(next);
+        if (next) focusAndSelect(next);
         else target.blur();
       }
       return;
@@ -52,10 +56,7 @@
     attach: ref => { page = ref; },
     detach: () => { page = null; },
     /** Focuses an element by id, or else the first hours field of the day. */
-    focus: id => {
-      const el = (id && document.getElementById(id)) || document.querySelector('li[data-row] input[data-hours]');
-      if (el) { el.focus(); el.select?.(); }
-    },
+    focus: id => focusAndSelect((id && document.getElementById(id)) || document.querySelector(HOURS)),
   };
   document.addEventListener('keydown', onKeyDown);
 })();
