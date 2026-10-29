@@ -11,8 +11,15 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
     private readonly SemaphoreSlim _lock = new(1, 1);
     private readonly FileSystemWatcher _watcher;
 
-    /// <summary>id → raw JSON. Raw so callers always get their own copy to mutate.</summary>
+    /// <summary>
+    /// id → raw JSON. Raw so callers always get their own copy to mutate. A published dictionary is never
+    /// changed: readers enumerate it without the lock, so writers swap in a changed copy instead.
+    /// The file watcher sets it to null from its own thread at any moment.
+    /// </summary>
     private Dictionary<string, string>? _cache;
+
+    /// <summary>Counts changes the watcher saw, so a load that raced one isn't kept.</summary>
+    private int _changesOnDisk;
 
     public FileDocumentCollection(string dir)
     {
@@ -21,11 +28,16 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
 
         // Drop the cache if files change on disk (hand edits, restores from backup, ...).
         _watcher = new FileSystemWatcher(dir, "*.json") { EnableRaisingEvents = true };
-        FileSystemEventHandler reset = (_, _) => _cache = null;
-        _watcher.Changed += reset;
-        _watcher.Created += reset;
-        _watcher.Deleted += reset;
-        _watcher.Renamed += (_, _) => _cache = null;
+        _watcher.Changed += (_, _) => Forget();
+        _watcher.Created += (_, _) => Forget();
+        _watcher.Deleted += (_, _) => Forget();
+        _watcher.Renamed += (_, _) => Forget();
+    }
+
+    private void Forget()
+    {
+        Interlocked.Increment(ref _changesOnDisk);
+        Volatile.Write(ref _cache, null);
     }
 
     public async Task<T?> GetAsync(string id, CancellationToken ct = default)
@@ -54,7 +66,7 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
             var tmp = path + ".tmp";
             await File.WriteAllTextAsync(tmp, json, ct);
             File.Move(tmp, path, overwrite: true);
-            if (_cache is not null) _cache[document.Id] = json;
+            Remember(cache => cache[document.Id] = json);
         }
         finally
         {
@@ -71,7 +83,7 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
             var path = PathFor(id);
             if (!File.Exists(path)) return false;
             File.Delete(path);
-            _cache?.Remove(id);
+            Remember(cache => cache.Remove(id));
             return true;
         }
         finally
@@ -82,21 +94,36 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
 
     private async Task<Dictionary<string, string>> LoadAsync(CancellationToken ct)
     {
-        if (_cache is { } cached) return cached;
+        if (Volatile.Read(ref _cache) is { } cached) return cached;
 
         await _lock.WaitAsync(ct);
         try
         {
-            if (_cache is { } c) return c;
+            if (Volatile.Read(ref _cache) is { } c) return c;
+            var changesBefore = Volatile.Read(ref _changesOnDisk);
             var docs = new Dictionary<string, string>();
             foreach (var file in Directory.EnumerateFiles(_dir, "*.json"))
                 docs[Path.GetFileNameWithoutExtension(file)] = await File.ReadAllTextAsync(file, ct);
-            return _cache = docs;
+            // A file that changed while we read may be missing or old here: use it once, don't keep it.
+            if (Volatile.Read(ref _changesOnDisk) == changesBefore) Interlocked.CompareExchange(ref _cache, docs, null);
+            return docs;
         }
         finally
         {
             _lock.Release();
         }
+    }
+
+    /// <summary>
+    /// Applies a write to a copy of the cache and publishes it, unless the watcher dropped the cache
+    /// meanwhile: then it stays dropped and the next read loads from disk. Call while holding the lock.
+    /// </summary>
+    private void Remember(Action<Dictionary<string, string>> write)
+    {
+        if (Volatile.Read(ref _cache) is not { } cached) return;
+        var changed = new Dictionary<string, string>(cached);
+        write(changed);
+        Interlocked.CompareExchange(ref _cache, changed, cached);
     }
 
     private static T Deserialize(string json) =>
