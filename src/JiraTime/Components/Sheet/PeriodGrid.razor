@@ -43,7 +43,7 @@
                             }
                             else
                             {
-                                <a href="@($"{JiraBaseUrl}/browse/{row.Key}")" target="_blank" rel="noopener"
+                                <a href="@JiraIssue.Url(JiraBaseUrl ?? "", row.Key)" target="_blank" rel="noopener"
                                    class="font-semibold text-blue-700 dark:text-blue-400 hover:underline">@row.Key</a>
                             }
                             <span class="truncate text-slate-600 dark:text-slate-300" title="@row.Summary">@row.Summary</span>

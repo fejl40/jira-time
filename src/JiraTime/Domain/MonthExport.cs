@@ -85,7 +85,7 @@ public static class MonthExport
             v?.Forordning ?? "",
             v?.HovedleveranceNr ?? "",
             v?.HovedleveranceLink ?? "",
-            row.EpicKey is null ? "" : IssueUrl(baseUrl, row.EpicKey),
+            row.EpicKey is null ? "" : JiraIssue.Url(baseUrl, row.EpicKey),
             row.IssueKey,
         ];
     }
@@ -97,8 +97,6 @@ public static class MonthExport
     /// <summary>Hours with a decimal comma: 7,5 and 0,25.</summary>
     public static string Hours(TimeSpan hours) =>
         Math.Round(hours.TotalHours, 2).ToString("0.##", CultureInfo.InvariantCulture).Replace('.', ',');
-
-    public static string IssueUrl(string baseUrl, string key) => $"{baseUrl.TrimEnd('/')}/browse/{key}";
 
     private static string Line(IEnumerable<string> cells) =>
         string.Join('\t', cells.Select(c => c.Replace("\r\n", " ").Replace('\t', ' ').Replace('\n', ' ').Replace('\r', ' ').Trim()));

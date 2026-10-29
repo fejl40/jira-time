@@ -83,7 +83,7 @@
                                 @foreach (var v in _values.Values.OrderBy(v => v.EpicKey, StringComparer.Ordinal))
                                 {
                                     <tr @key="v.EpicKey" data-epic="@v.EpicKey">
-                                        <td class="py-1 pr-3 whitespace-nowrap"><a class="underline" href="@MonthExport.IssueUrl(BaseUrl, v.EpicKey)" target="_blank" rel="noopener">@v.EpicKey</a></td>
+                                        <td class="py-1 pr-3 whitespace-nowrap"><a class="underline" href="@JiraIssue.Url(BaseUrl, v.EpicKey)" target="_blank" rel="noopener">@v.EpicKey</a></td>
                                         <td class="py-1 pr-3"><input class="field py-1.5 text-sm" aria-label="@v.EpicKey Fase" value="@v.Fase" @onchange="e => SaveAsync(v, x => x.Fase = Text(e))" /></td>
                                         <td class="py-1 pr-3"><input class="field py-1.5 text-sm" aria-label="@v.EpicKey Forordning" value="@v.Forordning" @onchange="e => SaveAsync(v, x => x.Forordning = Text(e))" /></td>
                                         <td class="py-1 pr-3"><input class="field py-1.5 text-sm" aria-label="@v.EpicKey Hovedleverance nr." value="@v.HovedleveranceNr" @onchange="e => SaveAsync(v, x => x.HovedleveranceNr = Text(e))" /></td>

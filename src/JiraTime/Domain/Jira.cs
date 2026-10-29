@@ -30,7 +30,12 @@ public record JiraProfile(string Id, string? Username, string DisplayName, strin
     public string Subtitle => string.Join(" · ", new[] { Username, Email }.Where(s => !string.IsNullOrEmpty(s)));
 }
 
-public record JiraIssue(string Key, string Summary);
+/// <summary>A Jira issue: its key and summary.</summary>
+public record JiraIssue(string Key, string Summary)
+{
+    /// <summary>The issue's page in Jira.</summary>
+    public static string Url(string baseUrl, string key) => $"{baseUrl.TrimEnd('/')}/browse/{key}";
+}
 
 /// <summary>A worklog as Jira has it.</summary>
 /// <param name="Created">When it was logged; orders a day's work. Null when Jira didn't say.</param>
