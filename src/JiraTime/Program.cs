@@ -22,7 +22,6 @@ if (OperatingSystem.IsWindows())
     dataProtection.ProtectKeysWithDpapi();
 
 // Per browser tab: who is signed in (verified with Jira), and that user's data.
-builder.Services.AddScoped<ConnectionState>();
 builder.Services.AddScoped<CurrentUser>();
 builder.Services.AddScoped<JiraIdentity>();
 builder.Services.AddScoped<SignInSession>();

@@ -67,8 +67,7 @@ Domain/LegacyData.cs               data from older versions and their backups
 Storage/IDocumentStore.cs          the document store interfaces
 Storage/FileDocumentStore.cs       the file store: one JSON file per document
 Storage/FileDocumentCollection.cs  one collection of the file store, cached in memory
-Services/SignInSession.cs          restores, connects and signs out a tab (uses the two below)
-Services/ConnectionState.cs        encrypted connection in browser localStorage (per tab/circuit)
+Services/SignInSession.cs          restores, connects and signs out a tab; the encrypted connection in browser localStorage
 Services/JiraIdentity.cs           signs a tab in as the user Jira says the token belongs to
 Services/CurrentUser.cs            the verified user of this tab; data services filter by it
 Services/LegacyDataMigration.cs    moves data saved by older versions (owners, entries Jira has)
