@@ -5,18 +5,18 @@ using JiraTime.Storage;
 namespace JiraTime.Tests;
 
 /// <summary>
-/// The services that read and write logged time, wired to a fake Jira and a temporary store:
-/// Jira is the source of truth, the store holds only the retry queue.
+/// The app's services wired to a fake Jira and a temporary store, signed in as Carl:
+/// Jira is the source of truth, the store holds the retry queue, days off and settings.
 /// </summary>
 public sealed class TimeHarness : IDisposable
 {
     public static readonly JiraConnection Server = new("https://jira.example.com", JiraAuthType.Pat, "token", null);
     public static readonly JiraConnection Cloud = new("https://acme.atlassian.net", JiraAuthType.Cloud, "token", "carl@example.com");
 
-    private readonly TempDir _dir = new();
-    public FileDocumentStore Store { get; }
+    public TempStore Files { get; } = new();
+    public FileDocumentStore Store => Files.Store;
     public FakeJira Jira { get; } = new();
-    public TestClock Clock { get; } = new(new DateTimeOffset(2026, 10, 27, 12, 0, 0, TimeSpan.Zero));
+    public TestClock Clock { get; } = new();
     public RetryQueue Queue { get; }
     public RecentWorklogIssues Recent { get; }
     public TimeLog Log { get; }
@@ -25,14 +25,15 @@ public sealed class TimeHarness : IDisposable
     public CurrentUser User { get; }
     public JiraIssueLookup Issues { get; }
     public WorkCalendarService Calendar { get; }
+    public LegacyDataMigration Legacy { get; }
 
     public TimeHarness(JiraConnection? connection = null)
     {
         Connection = connection ?? Server;
-        Store = new FileDocumentStore(_dir.Path);
         var user = User = CurrentUser.SignedIn(TestUsers.Carl, connection: Connection);
         Issues = new JiraIssueLookup(new JiraClient(Jira.Client()), Clock);
         Calendar = new WorkCalendarService(Store, user);
+        Legacy = new LegacyDataMigration(Store, Clock);
         var client = new JiraWorklogClient(Jira.Client());
         Queue = new RetryQueue(Store, user);
         Recent = new RecentWorklogIssues(Clock);
@@ -41,6 +42,16 @@ public sealed class TimeHarness : IDisposable
     }
 
     public DateOnly Today => DateOnly.FromDateTime(Clock.Now.UtcDateTime);
+
+    /// <summary>Another user's stored data, over the same store.</summary>
+    public UserData For(UserKey key)
+    {
+        var user = CurrentUser.SignedIn(key, connection: Connection);
+        return new UserData(new RetryQueue(Store, user), new WorkCalendarService(Store, user), new EpicExportStore(Store, user));
+    }
+
+    /// <summary>Signing in through the fake Jira; <paramref name="tab"/> becomes the user Jira confirms.</summary>
+    public JiraIdentity Identity(CurrentUser tab) => new(new JiraClient(Jira.Client()), Store, tab, Legacy, Clock);
 
     /// <summary>A period loader and status book over the same fake Jira and store.</summary>
     public (PeriodLoader Loader, IssueStatuses Statuses) PeriodLoading() =>
@@ -72,9 +83,53 @@ public sealed class TimeHarness : IDisposable
     public static TimeEntry Row(string key, double hours, string? comment = null) =>
         new() { IssueKey = key, IssueSummary = $"Summary of {key}", Duration = TimeSpan.FromHours(hours), Description = comment };
 
+    public void Dispose() => Files.Dispose();
+}
+
+/// <summary>One user's stored data: the retry queue, days and work hours, and export values per epic.</summary>
+public sealed record UserData(RetryQueue Queue, WorkCalendarService Calendar, EpicExportStore ExportValues);
+
+/// <summary>Two users on <see cref="TimeHarness.Server"/>.</summary>
+public static class TestUsers
+{
+    public static readonly UserKey Carl = UserKey.For(TimeHarness.Server.BaseUrl, "JIRAUSER1");
+    public static readonly UserKey Anna = UserKey.For(TimeHarness.Server.BaseUrl, "JIRAUSER2");
+
+    public static CurrentUser SignedIn(UserKey? key = null) => CurrentUser.SignedIn(key ?? Carl);
+}
+
+/// <summary>A clock tests can set and move. Without a time it is noon UTC on Tuesday 27 October 2026.</summary>
+public sealed class TestClock(DateTimeOffset now) : TimeProvider
+{
+    public TestClock() : this(new DateTimeOffset(2026, 10, 27, 12, 0, 0, TimeSpan.Zero)) { }
+
+    public DateTimeOffset Now { get; set; } = now;
+    public override DateTimeOffset GetUtcNow() => Now;
+    public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
+    public void Advance(TimeSpan by) => Now += by;
+}
+
+/// <summary>A file document store in its own temp folder, deleted after the test.</summary>
+public sealed class TempStore : IDisposable
+{
+    public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "jiratime-tests-" + Guid.NewGuid().ToString("N"));
+    public FileDocumentStore Store { get; private set; }
+
+    public TempStore() => Store = new FileDocumentStore(Path);
+
+    /// <summary>The folder of one collection, for writing files the way older versions did.</summary>
+    public string Folder(string collection) => Directory.CreateDirectory(System.IO.Path.Combine(Path, collection)).FullName;
+
+    /// <summary>Closes the store and opens a new one on the same folder, as after a restart.</summary>
+    public FileDocumentStore Reopen()
+    {
+        Store.Dispose();
+        return Store = new FileDocumentStore(Path);
+    }
+
     public void Dispose()
     {
         Store.Dispose();
-        _dir.Dispose();
+        try { Directory.Delete(Path, recursive: true); } catch (IOException) { }
     }
 }

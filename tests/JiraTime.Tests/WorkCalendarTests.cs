@@ -1,6 +1,4 @@
 using JiraTime.Domain;
-using JiraTime.Services;
-using JiraTime.Storage;
 
 namespace JiraTime.Tests;
 
@@ -66,9 +64,8 @@ public class WorkCalendarTests
     [Fact]
     public async Task Days_off_can_be_marked_and_unmarked()
     {
-        using var dir = new TempDir();
-        using var store = new FileDocumentStore(dir.Path);
-        var calendar = new WorkCalendarService(store, TestUsers.SignedIn());
+        using var h = new TimeHarness();
+        var calendar = h.Calendar;
         var day = D("2026-10-20");
 
         await calendar.MarkDayOffAsync(day, DayOffReason.Vacation);
@@ -81,18 +78,11 @@ public class WorkCalendarTests
         Assert.Equal(DayKind.Workday, (await calendar.GetDayAsync(day)).Kind);
     }
 
-    private static (TempDir, FileDocumentStore, WorkCalendarService) Calendar()
-    {
-        var dir = new TempDir();
-        var store = new FileDocumentStore(dir.Path);
-        return (dir, store, new WorkCalendarService(store, TestUsers.SignedIn()));
-    }
-
     [Fact]
     public async Task A_partial_day_off_lowers_the_expected_hours()
     {
-        var (dir, store, calendar) = Calendar();
-        using var _ = dir; using var __ = store;
+        using var h = new TimeHarness();
+        var calendar = h.Calendar;
         var day = D("2026-10-20");
 
         await calendar.MarkDayOffAsync(day, DayOffReason.Other, TimeSpan.FromHours(3));
@@ -113,8 +103,8 @@ public class WorkCalendarTests
     [InlineData(10)]
     public async Task Time_off_of_the_whole_day_or_more_is_a_day_off(double hours)
     {
-        var (dir, store, calendar) = Calendar();
-        using var _ = dir; using var __ = store;
+        using var h = new TimeHarness();
+        var calendar = h.Calendar;
         var day = D("2026-10-20");
 
         await calendar.MarkDayOffAsync(day, DayOffReason.Sick, TimeSpan.FromHours(hours));
@@ -127,8 +117,8 @@ public class WorkCalendarTests
     [Fact]
     public async Task Work_hours_per_weekday_are_saved_per_user_and_used_for_every_day()
     {
-        var (dir, store, calendar) = Calendar();
-        using var _ = dir; using var __ = store;
+        using var h = new TimeHarness();
+        var calendar = h.Calendar;
         var week = UserSettings.StandardWeek();
         week[DayOfWeek.Friday] = TimeSpan.FromHours(5);
         week[DayOfWeek.Monday] = TimeSpan.FromHours(7.5);
@@ -145,15 +135,15 @@ public class WorkCalendarTests
         Assert.Equal(TimeSpan.FromHours(2), days[D("2026-10-24")].Expected);
         Assert.Equal(TimeSpan.Zero, days[D("2026-10-25")].Expected);           // Sunday
 
-        var anna = new WorkCalendarService(store, TestUsers.SignedIn(TestUsers.Anna));
+        var anna = h.For(TestUsers.Anna).Calendar;
         Assert.Equal(TimeSpan.FromHours(8), (await anna.GetDayAsync(D("2026-10-23"))).Expected);
     }
 
     [Fact]
     public async Task Partial_time_off_is_taken_from_the_users_hours_for_that_day()
     {
-        var (dir, store, calendar) = Calendar();
-        using var _ = dir; using var __ = store;
+        using var h = new TimeHarness();
+        var calendar = h.Calendar;
         var week = UserSettings.StandardWeek();
         week[DayOfWeek.Friday] = TimeSpan.FromHours(6);
         await calendar.SaveWorkHoursAsync(week);
@@ -166,8 +156,8 @@ public class WorkCalendarTests
     [Fact]
     public async Task Holidays_need_no_hours_whatever_the_work_hours()
     {
-        var (dir, store, calendar) = Calendar();
-        using var _ = dir; using var __ = store;
+        using var h = new TimeHarness();
+        var calendar = h.Calendar;
 
         var goodFriday = await calendar.GetDayAsync(D("2026-04-03"));
 
@@ -181,8 +171,8 @@ public class WorkCalendarTests
     [InlineData(7.501)]
     public async Task Invalid_work_hours_are_not_saved(double hours)
     {
-        var (dir, store, calendar) = Calendar();
-        using var _ = dir; using var __ = store;
+        using var h = new TimeHarness();
+        var calendar = h.Calendar;
         var week = UserSettings.StandardWeek();
         week[DayOfWeek.Monday] = TimeSpan.FromHours(hours);
 

@@ -1,6 +1,5 @@
 using JiraTime.Domain;
 using JiraTime.Services;
-using JiraTime.Storage;
 
 namespace JiraTime.Tests;
 
@@ -124,12 +123,11 @@ public class MonthExportTests
 
 public class EpicExportStoreTests : IDisposable
 {
-    private readonly TempDir _dir = new();
-    private readonly FileDocumentStore _store;
+    private readonly TimeHarness _h = new();
 
-    public EpicExportStoreTests() => _store = new FileDocumentStore(_dir.Path);
+    public void Dispose() => _h.Dispose();
 
-    private EpicExportStore For(UserKey user) => new(_store, CurrentUser.SignedIn(user));
+    private EpicExportStore For(UserKey user) => _h.For(user).ExportValues;
 
     [Fact]
     public async Task Values_are_saved_and_read_back_per_epic()
@@ -165,11 +163,5 @@ public class EpicExportStoreTests : IDisposable
         await carl.SaveAsync(new EpicExportValues { EpicKey = "BAC-500", Fase = " " });
 
         Assert.Empty(await carl.GetAsync(["BAC-500"]));
-    }
-
-    public void Dispose()
-    {
-        _store.Dispose();
-        _dir.Dispose();
     }
 }

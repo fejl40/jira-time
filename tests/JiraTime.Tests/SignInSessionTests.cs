@@ -1,7 +1,6 @@
 using System.Net;
 using JiraTime.Domain;
 using JiraTime.Services;
-using JiraTime.Storage;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.JSInterop;
@@ -11,34 +10,20 @@ namespace JiraTime.Tests;
 /// <summary>Signing a tab in and out: what is remembered in the browser follows what Jira says.</summary>
 public class SignInSessionTests : IDisposable
 {
-    private static readonly JiraConnection Server = new("https://jira.example.com", JiraAuthType.Pat, "token-1", null);
+    private static readonly JiraConnection Server = TimeHarness.Server with { Token = "token-1" };
 
-    private readonly TempDir _dir = new();
-    private readonly FileDocumentStore _store;
-    private readonly FakeJira _jira = new();
+    private readonly TimeHarness _h = new();
     private readonly FakeLocalStorage _browser = new();
     private readonly EphemeralDataProtectionProvider _keys = new();
     private readonly CurrentUser _user = new();
 
-    public SignInSessionTests()
-    {
-        _store = new FileDocumentStore(_dir.Path);
-        _jira.Gets["/rest/api/2/myself"] = _ => new { key = "JIRAUSER1", name = "carl", displayName = "Carl Lilholm" };
-    }
+    public SignInSessionTests() =>
+        _h.Jira.Gets["/rest/api/2/myself"] = _ => new { key = "JIRAUSER1", name = "carl", displayName = "Carl Lilholm" };
 
-    public void Dispose()
-    {
-        _store.Dispose();
-        _dir.Dispose();
-    }
+    public void Dispose() => _h.Dispose();
 
     /// <summary>A new tab (circuit) over the same browser storage, server keys and store.</summary>
-    private SignInSession NewTab()
-    {
-        var clock = new TestClock();
-        var identity = new JiraIdentity(new JiraClient(_jira.Client()), _store, _user, new LegacyDataMigration(_store, clock), clock);
-        return new SignInSession(new ProtectedLocalStorage(_browser, _keys), identity);
-    }
+    private SignInSession NewTab() => new(new ProtectedLocalStorage(_browser, _keys), _h.Identity(_user));
 
     [Fact]
     public async Task A_confirmed_connection_is_remembered_and_restores_in_a_new_tab()
@@ -57,7 +42,7 @@ public class SignInSessionTests : IDisposable
     [Fact]
     public async Task A_connection_Jira_does_not_confirm_is_not_remembered()
     {
-        _jira.FailWith = HttpStatusCode.Unauthorized;
+        _h.Jira.FailWith = HttpStatusCode.Unauthorized;
 
         Assert.NotNull(await NewTab().ConnectAsync(Server));
 
@@ -69,7 +54,7 @@ public class SignInSessionTests : IDisposable
     public async Task A_remembered_token_Jira_rejects_is_forgotten()
     {
         await NewTab().ConnectAsync(Server);
-        _jira.FailWith = HttpStatusCode.Unauthorized;
+        _h.Jira.FailWith = HttpStatusCode.Unauthorized;
         var tab = NewTab();
 
         Assert.Null(await tab.RestoreAsync());

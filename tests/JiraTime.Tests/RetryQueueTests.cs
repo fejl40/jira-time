@@ -52,7 +52,7 @@ public class RetryQueueTests : IDisposable
         _h.Jira.Offline = true;
         await _h.SaveDayAsync(Day, [Row("ABC-1", 6)]);
 
-        var again = new JiraTime.Services.RetryQueue(_h.Store, TestUsers.SignedIn());
+        var again = new JiraTime.Services.RetryQueue(_h.Files.Reopen(), TestUsers.SignedIn());
 
         Assert.Single(await again.GetPendingAsync(From, To));
     }

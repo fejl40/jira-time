@@ -1,6 +1,5 @@
 using JiraTime.Domain;
 using JiraTime.Services;
-using JiraTime.Storage;
 
 namespace JiraTime.Tests;
 
@@ -87,18 +86,9 @@ public class RetryQueueStoreTests : IDisposable
 {
     private static readonly DateOnly Day = new(2026, 10, 19);
 
-    private readonly TempDir _dir = new();
-    private readonly FileDocumentStore _store;
+    private readonly TimeHarness _h = new();
 
-    public RetryQueueStoreTests() => _store = new FileDocumentStore(_dir.Path);
-
-    public void Dispose()
-    {
-        _store.Dispose();
-        _dir.Dispose();
-    }
-
-    private RetryQueue Queue(UserKey? user = null) => new(_store, TestUsers.SignedIn(user));
+    public void Dispose() => _h.Dispose();
 
     private static TimeEntry Waiting(string key, DateOnly? day = null) =>
         new() { IssueKey = key, Date = day ?? Day, Duration = TimeSpan.FromHours(1), SyncPending = true };
@@ -106,38 +96,36 @@ public class RetryQueueStoreTests : IDisposable
     [Fact]
     public async Task Waiting_changes_in_the_range_come_in_day_order()
     {
-        await Queue().AddAsync(Waiting("B", Day.AddDays(1)));
-        await Queue().AddAsync(Waiting("A"));
-        await Queue().AddAsync(Waiting("X", Day.AddDays(14)));
+        await _h.Queue.AddAsync(Waiting("B", Day.AddDays(1)));
+        await _h.Queue.AddAsync(Waiting("A"));
+        await _h.Queue.AddAsync(Waiting("X", Day.AddDays(14)));
 
-        Assert.Equal(["A", "B"], (await Queue().GetPendingAsync(Day, Day.AddDays(13))).Select(e => e.IssueKey));
+        Assert.Equal(["A", "B"], (await _h.Queue.GetPendingAsync(Day, Day.AddDays(13))).Select(e => e.IssueKey));
     }
 
     [Fact]
     public async Task Adding_a_change_with_the_same_id_replaces_it_and_removing_takes_it_out()
     {
         var change = Waiting("ABC-1");
-        await Queue().AddAsync(change);
+        await _h.Queue.AddAsync(change);
         change.Duration = TimeSpan.FromHours(3);
-        await Queue().AddAsync(change);
+        await _h.Queue.AddAsync(change);
 
-        Assert.Equal(TimeSpan.FromHours(3), Assert.Single(await Queue().GetPendingAsync(Day, Day)).Duration);
-        await Queue().RemoveAsync(change.Id);
-        Assert.Empty(await Queue().GetPendingAsync(Day, Day));
+        Assert.Equal(TimeSpan.FromHours(3), Assert.Single(await _h.Queue.GetPendingAsync(Day, Day)).Duration);
+        await _h.Queue.RemoveAsync(change.Id);
+        Assert.Empty(await _h.Queue.GetPendingAsync(Day, Day));
     }
 
     [Fact]
     public async Task Entries_saved_with_start_and_end_times_are_read_as_their_duration()
     {
-        var folder = Path.Combine(_dir.Path, "time-entries");
-        Directory.CreateDirectory(folder);
+        var folder = _h.Files.Folder("time-entries");
         await File.WriteAllTextAsync(Path.Combine(folder, "old.json"), $$"""
             { "id": "old", "owner": "{{TestUsers.Carl.Id}}", "issueKey": "ABC-1", "issueSummary": "", "date": "2026-10-19",
               "start": "09:00:00", "end": "11:30:00", "syncPending": true }
             """);
 
-        using var store = new FileDocumentStore(_dir.Path);
-        var queue = new RetryQueue(store, TestUsers.SignedIn());
+        var queue = _h.Queue;
         var old = Assert.Single(await queue.GetPendingAsync(Day, Day));
         Assert.Equal(TimeSpan.FromHours(2.5), old.Duration);
 

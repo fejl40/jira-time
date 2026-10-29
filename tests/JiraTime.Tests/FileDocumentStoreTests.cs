@@ -5,11 +5,9 @@ namespace JiraTime.Tests;
 
 public class FileDocumentStoreTests : IDisposable
 {
-    private readonly TempDir _dir = new();
+    private readonly TempStore _files = new();
 
-    public void Dispose() => _dir.Dispose();
-
-    private FileDocumentStore NewStore() => new(_dir.Path);
+    public void Dispose() => _files.Dispose();
 
     private static TimeEntry Entry(string key, DateOnly date) =>
         new() { IssueKey = key, Date = date, Duration = TimeSpan.FromHours(1) };
@@ -17,19 +15,17 @@ public class FileDocumentStoreTests : IDisposable
     [Fact]
     public async Task Upsert_writes_one_json_file_per_document_in_the_collection_folder()
     {
-        using var store = NewStore();
         var entry = Entry("ABC-1", new(2026, 10, 19));
 
-        await store.Collection<TimeEntry>().UpsertAsync(entry);
+        await _files.Store.Collection<TimeEntry>().UpsertAsync(entry);
 
-        Assert.True(File.Exists(Path.Combine(_dir.Path, "time-entries", entry.Id + ".json")));
+        Assert.True(File.Exists(Path.Combine(_files.Path, "time-entries", entry.Id + ".json")));
     }
 
     [Fact]
     public async Task Get_returns_the_stored_document_or_null()
     {
-        using var store = NewStore();
-        var docs = store.Collection<TimeEntry>();
+        var docs = _files.Store.Collection<TimeEntry>();
         var entry = Entry("ABC-1", new(2026, 10, 19));
         await docs.UpsertAsync(entry);
 
@@ -44,10 +40,9 @@ public class FileDocumentStoreTests : IDisposable
     public async Task Documents_survive_a_new_store_instance()
     {
         var entry = Entry("ABC-2", new(2026, 10, 20));
-        using (var store = NewStore())
-            await store.Collection<TimeEntry>().UpsertAsync(entry);
+        await _files.Store.Collection<TimeEntry>().UpsertAsync(entry);
 
-        using var reopened = NewStore();
+        var reopened = _files.Reopen();
         var loaded = await reopened.Collection<TimeEntry>().GetAsync(entry.Id);
 
         Assert.NotNull(loaded);
@@ -58,8 +53,7 @@ public class FileDocumentStoreTests : IDisposable
     [Fact]
     public async Task Query_filters_with_the_predicate()
     {
-        using var store = NewStore();
-        var docs = store.Collection<TimeEntry>();
+        var docs = _files.Store.Collection<TimeEntry>();
         await docs.UpsertAsync(Entry("A-1", new(2026, 10, 19)));
         await docs.UpsertAsync(Entry("A-2", new(2026, 10, 20)));
         await docs.UpsertAsync(Entry("A-3", new(2026, 10, 21)));
@@ -74,26 +68,24 @@ public class FileDocumentStoreTests : IDisposable
     [Fact]
     public async Task Delete_removes_the_document_and_reports_whether_it_existed()
     {
-        using var store = NewStore();
-        var docs = store.Collection<TimeEntry>();
+        var docs = _files.Store.Collection<TimeEntry>();
         var entry = Entry("A-1", new(2026, 10, 19));
         await docs.UpsertAsync(entry);
 
         Assert.True(await docs.DeleteAsync(entry.Id));
         Assert.False(await docs.DeleteAsync(entry.Id));
         Assert.Null(await docs.GetAsync(entry.Id));
-        Assert.False(File.Exists(Path.Combine(_dir.Path, "time-entries", entry.Id + ".json")));
+        Assert.False(File.Exists(Path.Combine(_files.Path, "time-entries", entry.Id + ".json")));
     }
 
     [Fact]
     public async Task Writes_and_reads_at_the_same_time_while_files_change_on_disk_all_succeed()
     {
-        using var store = NewStore();
-        var docs = store.Collection<TimeEntry>();
+        var docs = _files.Store.Collection<TimeEntry>();
         var day = new DateOnly(2026, 10, 19);
         var edited = Entry("B-1", day);
         await docs.UpsertAsync(edited);
-        var editedFile = Path.Combine(_dir.Path, "time-entries", edited.Id + ".json");
+        var editedFile = Path.Combine(_files.Path, "time-entries", edited.Id + ".json");
         var editedJson = await File.ReadAllTextAsync(editedFile);
 
         // Each write and each hand edit makes the file watcher drop the cache on another thread.
@@ -115,11 +107,10 @@ public class FileDocumentStoreTests : IDisposable
     [Fact]
     public async Task A_document_edited_by_hand_is_read_again()
     {
-        using var store = NewStore();
-        var docs = store.Collection<TimeEntry>();
+        var docs = _files.Store.Collection<TimeEntry>();
         var entry = Entry("A-1", new(2026, 10, 19));
         await docs.UpsertAsync(entry);
-        var file = Path.Combine(_dir.Path, "time-entries", entry.Id + ".json");
+        var file = Path.Combine(_files.Path, "time-entries", entry.Id + ".json");
 
         var text = (await File.ReadAllTextAsync(file)).Replace("A-1", "A-2");
         await File.WriteAllTextAsync(file + ".edit", text);
