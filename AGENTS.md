@@ -63,14 +63,13 @@ Domain/RecentWork.cs               recent issues and comments for quick picks
 Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work hours
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount
 Domain/MonthExport.cs              the month export: rows per day and issue, tab-separated text
-Domain/LegacyData.cs               data from older versions and their backups
 Storage/IDocumentStore.cs          the document store interfaces
 Storage/FileDocumentStore.cs       the file store: one JSON file per document
 Storage/FileDocumentCollection.cs  one collection of the file store, cached in memory
 Services/SignInSession.cs          restores, connects and signs out a tab; the encrypted connection in browser localStorage
 Services/JiraIdentity.cs           signs a tab in as the user Jira says the token belongs to
 Services/CurrentUser.cs            the verified user of this tab; data services filter by it
-Services/LegacyDataMigration.cs    moves data saved by older versions (owners, entries Jira has)
+Services/LegacyDataMigration.cs    moves data saved by older versions (owners, entries Jira has); their documents and backups
 Services/TimeLog.cs                logged time: Jira worklogs plus the retry queue, cached briefly
 Services/RecentWorklogIssues.cs    issues just saved on, read directly while Jira's search catches up
 Services/RetryQueue.cs             the retry queue: changes Jira couldn't take yet

@@ -9,7 +9,7 @@ The app has four layers, each in its own folder under `src/JiraTime/`:
 
 | Folder | Holds | May use |
 |---|---|---|
-| `Domain/` | The rules: periods, days, entries, fill suggestions, the export. Plain C#, no I/O, no Blazor. | Nothing else in the app |
+| `Domain/` | The rules: periods, days, entries, fill suggestions, the export. Plain C#, no I/O, no Blazor. | Only `IDocument` and `[DocumentCollection]` from `Storage`, to mark what is stored |
 | `Services/` | Talking to Jira, the document store and the signed-in user. All I/O lives here. | `Domain`, `Storage` |
 | `Storage/` | The document store interface and its file implementation. | Nothing else in the app |
 | `Components/` | The UI: `Pages/`, `Sheet/` (the timesheet parts), `Shared/`, `Layout/`. | `Services`, `Domain` |
