@@ -46,14 +46,12 @@ public class JiraWorklogClient(HttpClient http)
         var result = new List<JiraWorklog>();
         for (var startAt = 0; ; )
         {
-            var page = await _jira.GetAsync<WorklogPage>(c,
-                $"{Api(c)}/issue/{Uri.EscapeDataString(issue.Key)}/worklog?startAt={startAt}&maxResults=1000", ct);
+            var page = await _jira.GetAsync<WorklogPage>(c, $"{WorklogUrl(c, issue.Key)}?startAt={startAt}&maxResults=1000", ct);
             foreach (var w in page.Worklogs)
             {
-                if (w.Id is null || !IsAuthor(w.Author, profile) || ParseStarted(w.Started) is not { } date) continue;
-                if (date < from || date > to) continue;
-                result.Add(new JiraWorklog(w.Id, issue.Key, issue.Summary, date,
-                    WholeMinutes(w.TimeSpentSeconds), AtlassianDocument.ToPlainText(w.Comment), ParseCreated(w.Created)));
+                if (w.Id is null || !IsAuthor(w.Author, profile) || ToWorklog(w, w.Id, issue) is not { } worklog) continue;
+                if (worklog.Date < from || worklog.Date > to) continue;
+                result.Add(worklog);
             }
             startAt += page.Worklogs.Count;
             if (page.Worklogs.Count == 0 || startAt >= page.Total) break;
@@ -66,17 +64,24 @@ public class JiraWorklogClient(HttpClient http)
     {
         try
         {
-            var w = await _jira.GetAsync<RawJiraWorklog>(c,
-                $"{Api(c)}/issue/{Uri.EscapeDataString(issueKey)}/worklog/{Uri.EscapeDataString(worklogId)}", ct);
-            return ParseStarted(w.Started) is { } date
-                ? new JiraWorklog(w.Id ?? worklogId, issueKey, "", date, WholeMinutes(w.TimeSpentSeconds), AtlassianDocument.ToPlainText(w.Comment), ParseCreated(w.Created))
-                : null;
+            var w = await _jira.GetAsync<RawJiraWorklog>(c, WorklogUrl(c, issueKey, worklogId), ct);
+            return ToWorklog(w, w.Id ?? worklogId, new JiraIssue(issueKey, ""));
         }
         catch (JiraException ex) when (ex.Status == HttpStatusCode.NotFound)
         {
             return null;
         }
     }
+
+    /// <summary>The worklog as the app keeps it; null when its day can't be read.</summary>
+    private static JiraWorklog? ToWorklog(RawJiraWorklog w, string id, JiraIssue issue) =>
+        ParseStarted(w.Started) is { } date
+            ? new JiraWorklog(id, issue.Key, issue.Summary, date, WholeMinutes(w.TimeSpentSeconds), AtlassianDocument.ToPlainText(w.Comment), ParseCreated(w.Created))
+            : null;
+
+    /// <summary>The URL of the issue's worklogs, or of one of them.</summary>
+    private static string WorklogUrl(JiraConnection c, string issueKey, string? worklogId = null) =>
+        $"{Api(c)}/issue/{Uri.EscapeDataString(issueKey)}/worklog" + (worklogId is null ? "" : "/" + Uri.EscapeDataString(worklogId));
 
     /// <summary>Worklog time in whole minutes (at least one), the unit entries are kept in.</summary>
     public static TimeSpan WholeMinutes(int seconds) => TimeSpan.FromMinutes(Math.Max(1, Math.Round(seconds / 60.0)));
@@ -123,19 +128,19 @@ public class JiraWorklogClient(HttpClient http)
     public async Task<string> AddWorklogAsync(JiraConnection c, TimeEntry entry, CancellationToken ct = default)
     {
         var created = await _jira.SendAsync<RawWorklog>(c, HttpMethod.Post,
-            $"{Api(c)}/issue/{Uri.EscapeDataString(entry.IssueKey)}/worklog?adjustEstimate=auto", WorklogBody(c, entry), ct);
+            $"{WorklogUrl(c, entry.IssueKey)}?adjustEstimate=auto", WorklogBody(c, entry), ct);
         return created?.Id ?? throw new JiraException("Jira did not return a worklog id.");
     }
 
     /// <summary>Overwrites an existing worklog on <paramref name="issueKey"/> with the entry's time and comment.</summary>
     public Task UpdateWorklogAsync(JiraConnection c, string issueKey, string worklogId, TimeEntry entry, CancellationToken ct = default) =>
         _jira.SendAsync<RawWorklog>(c, HttpMethod.Put,
-            $"{Api(c)}/issue/{Uri.EscapeDataString(issueKey)}/worklog/{Uri.EscapeDataString(worklogId)}?adjustEstimate=auto", WorklogBody(c, entry), ct);
+            $"{WorklogUrl(c, issueKey, worklogId)}?adjustEstimate=auto", WorklogBody(c, entry), ct);
 
     /// <summary>Deletes a worklog on <paramref name="issueKey"/>.</summary>
     public Task DeleteWorklogAsync(JiraConnection c, string issueKey, string worklogId, CancellationToken ct = default) =>
         _jira.SendAsync<object>(c, HttpMethod.Delete,
-            $"{Api(c)}/issue/{Uri.EscapeDataString(issueKey)}/worklog/{Uri.EscapeDataString(worklogId)}?adjustEstimate=auto", null, ct);
+            $"{WorklogUrl(c, issueKey, worklogId)}?adjustEstimate=auto", null, ct);
 
     /// <summary>Jira's worklog "started" format, e.g. 2026-10-19T09:00:00.000+0200 (offset without a colon).</summary>
     public static string FormatStarted(DateOnly date, TimeOnly time, TimeZoneInfo? zone = null)
