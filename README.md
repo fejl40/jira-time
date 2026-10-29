@@ -42,4 +42,4 @@ If Jira is down, your changes wait and are sent when you press **Sync now**.
 
 ## For developers
 
-How to build, test and change the app is in [AGENTS.md](AGENTS.md). How the code is written is in [PRINCIPLES.md](PRINCIPLES.md). Tasks are in `backlog/`.
+How to build, test and change the app is in [AGENTS.md](AGENTS.md). How the code is written is in [the coding principles](<backlog/docs/doc-1 - Coding-principles.md>). Tasks are in `backlog/`.

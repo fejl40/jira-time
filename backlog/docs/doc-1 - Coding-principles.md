@@ -1,4 +1,11 @@
-# Coding principles
+---
+id: doc-1
+title: Coding principles
+type: guide
+created_date: '2026-10-29 08:33'
+---
+
+
 
 The goal: anyone can open any file in Jira Time and understand it in a few minutes.
 When two options both work, pick the one a newcomer would understand faster.

@@ -6,7 +6,7 @@ everything about building it and how it works inside lives here.
 Jira Time is a local Blazor (Interactive Server, .NET 10) + Tailwind CSS v4 timesheet. Jira is the source of
 truth for logged time (the user's worklogs); days off, work hours and export values are kept in the app.
 
-**Read [PRINCIPLES.md](PRINCIPLES.md) before changing code and follow it.** It sets the structure, file sizes and style.
+**Read [the coding principles](<backlog/docs/doc-1 - Coding-principles.md>) (Backlog.md document doc-1, `backlog doc view doc-1`) before changing code and follow it.** It sets the structure, file sizes and style.
 
 ## Build and test
 
