@@ -1,9 +1,10 @@
 ---
 id: TASK-70
 title: Bring the code in line with the coding principles
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 07:46'
+updated_date: '2026-10-29 08:46'
 labels:
   - refactor
 dependencies:
@@ -20,7 +21,13 @@ Go through the app and tests and fix what breaks PRINCIPLES.md: long files, scat
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No file over the size limit in PRINCIPLES.md, or a noted reason
-- [ ] #2 Folder structure matches PRINCIPLES.md
-- [ ] #3 Build and all tests pass; app checked in the browser
+- [x] #1 No file over the size limit in PRINCIPLES.md, or a noted reason
+- [x] #2 Folder structure matches PRINCIPLES.md
+- [x] #3 Build and all tests pass; app checked in the browser
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Done through TASK-71 and its subtasks: no file over 250 lines, structure matches the principles, build and tests pass, browser checked.
+<!-- SECTION:FINAL_SUMMARY:END -->
