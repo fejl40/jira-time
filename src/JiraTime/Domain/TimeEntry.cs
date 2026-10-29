@@ -84,4 +84,13 @@ public class TimeEntry : IDocument
 
     [JsonIgnore]
     public bool IsSynced => JiraWorklogId is not null && !SyncPending;
+
+    /// <summary>The issue the entry's worklog is on in Jira: where it was logged, else the entry's own issue.</summary>
+    [JsonIgnore]
+    public string WorklogIssueKey => JiraWorklogIssueKey ?? IssueKey;
+
+    /// <summary>True when the entry's worklog is on another issue than the entry. Worklogs can't move, so it is logged again.</summary>
+    [JsonIgnore]
+    public bool MovedToAnotherIssue =>
+        JiraWorklogId is not null && !string.Equals(JiraWorklogIssueKey, IssueKey, StringComparison.OrdinalIgnoreCase);
 }

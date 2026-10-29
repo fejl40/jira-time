@@ -58,7 +58,7 @@ Domain/TypedHours.cs               reading hours as the user types them (1.5, 1,
 Domain/DayFiller.cs                suggestions for a day's missing hours
 Domain/PeriodSummary.cs            logged, missing and weekly hours of a period
 Domain/IssueChoices.cs             what the issue picker offers, in which group
-Domain/WorklogMatching.cs          worklogs as entries, waiting work laid over them, comparing the two
+Domain/WorklogMatching.cs          worklogs as entries, waiting work laid over them, comparing the two, the day save plan
 Domain/RecentWork.cs               recent issues and comments for quick picks
 Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work hours
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount
@@ -79,7 +79,8 @@ Services/WorkCalendarService.cs    days and work hours of the signed-in user
 Services/JiraClient.cs             Jira REST calls about issues (myself, issue picker, searches)
 Services/JiraWorklogClient.cs      Jira REST calls that read and write worklogs
 Services/Jira/                     HTTP transport, JQL quoting, comment format, raw JSON shapes
-Services/WorklogSync.cs            saves a day or every unsaved day to Jira, queues what fails, sends the queue
+Services/WorklogSync.cs            saves a day or every unsaved day to Jira, sends the retry queue
+Services/WorklogWriter.cs          writes or deletes one worklog in Jira, queues what fails
 Services/PeriodLoader.cs           loads a period for the timesheet: time, days, picks, previous period
 Services/IssueStatuses.cs          current status of the issues a timesheet shows
 Services/JiraIssueLookup.cs        sprint and period issues and issue statuses, cached briefly

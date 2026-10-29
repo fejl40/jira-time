@@ -31,6 +31,23 @@ public class TimeEntryTests
         Assert.Null(TimeEntry.Validate(Entry("ABC-1", 24)));
         Assert.Equal(TimeEntry.TooManyHours, TimeEntry.Validate(Entry("ABC-1", 24.5)));
     }
+
+    [Fact]
+    public void The_worklog_issue_is_where_it_was_logged_else_the_entrys_own()
+    {
+        var entry = Entry("ABC-2", 1);
+        Assert.Equal("ABC-2", entry.WorklogIssueKey);
+        Assert.False(entry.MovedToAnotherIssue); // not in Jira yet
+
+        entry.JiraWorklogId = "10";
+        entry.JiraWorklogIssueKey = "abc-2";
+        Assert.Equal("abc-2", entry.WorklogIssueKey);
+        Assert.False(entry.MovedToAnotherIssue); // case doesn't count
+
+        entry.JiraWorklogIssueKey = "ABC-1";
+        Assert.Equal("ABC-1", entry.WorklogIssueKey);
+        Assert.True(entry.MovedToAnotherIssue);
+    }
 }
 
 /// <summary>The retry queue as stored: per user, read back after a restart, old formats still readable.</summary>

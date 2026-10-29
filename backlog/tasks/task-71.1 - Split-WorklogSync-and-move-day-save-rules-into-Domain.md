@@ -1,9 +1,10 @@
 ---
 id: TASK-71.1
 title: Split WorklogSync and move day-save rules into Domain
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 07:52'
+updated_date: '2026-10-29 07:59'
 labels:
   - refactor
 dependencies: []
@@ -20,8 +21,14 @@ WorklogSync.cs is 258 lines and mixes planning a day save with writing entries t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 WorklogSync.cs is at most 200 lines; methods about 30 lines
-- [ ] #2 The save plan lives in Domain with direct tests
-- [ ] #3 `?? entry.IssueKey` no longer appears in WorklogSync
-- [ ] #4 SaveDayTests and RetryQueueTests pass unchanged
+- [x] #1 WorklogSync.cs is at most 200 lines; methods about 30 lines
+- [x] #2 The save plan lives in Domain with direct tests
+- [x] #3 `?? entry.IssueKey` no longer appears in WorklogSync
+- [x] #4 SaveDayTests and RetryQueueTests pass unchanged
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The day save plan (validation, 24h total, removed/changed/checked rows, bookkeeping copy) is DaySave in Domain/WorklogMatching.cs with direct tests; per-entry Jira writes moved to Services/WorklogWriter.cs, leaving WorklogSync.cs at 124 lines. Added TimeEntry.WorklogIssueKey and MovedToAnotherIssue.
+<!-- SECTION:FINAL_SUMMARY:END -->
