@@ -4,11 +4,7 @@
 @inject CurrentUser User
 
 <div class="flex flex-wrap items-center gap-x-4 gap-y-3">
-    <div class="flex items-center gap-1.5">
-        <a class="btn-secondary px-3" href="@Links.To(Period.Previous)" title="Previous period">‹</a>
-        <a class="btn-secondary" href="" title="Go to today">Today</a>
-        <a class="btn-secondary px-3" href="@Links.To(Period.Next)" title="Next period">›</a>
-    </div>
+    <StepNav Unit="period" PreviousHref="@Links.To(Period.Previous)" NextHref="@Links.To(Period.Next)" CurrentLabel="Today" CurrentTitle="Go to today" />
     <div>
         <h1 @key="Period" class="motion-fade text-xl font-semibold leading-tight outline-none">@Format.Range(Period.Start, Period.End)</h1>
         <p class="text-sm text-slate-500 dark:text-slate-400" data-period-status>

@@ -94,7 +94,7 @@ Components/Sheet/                  period header (with confetti), reminders, gri
 Components/Motion.cs               animation classes (Styles/motion.css), MotionScript (calls wwwroot/motion.js), SaveMotion
 Components/Pages/ExportPage.razor  a month in the agency's format: values per epic, Copy, Download .tsv (wwwroot/export.js)
 Components/Pages/SettingsPage.razor
-Components/Shared/                 DayEditor, IssuePicker, ThemeToggle, UserRow
+Components/Shared/                 DayEditor, IssuePicker, StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow
 Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
 ```
 

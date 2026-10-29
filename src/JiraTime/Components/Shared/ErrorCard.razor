@@ -1,0 +1,28 @@
+@* A card saying what couldn't be done, Jira's error, and the actions to take (such as Try again). *@
+
+<div class="card @Class">
+    @if (Compact)
+    {
+        <h2 class="font-semibold">@Title</h2>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">@ChildContent</p>
+    }
+    else
+    {
+        <h1 class="text-lg font-semibold">@Title</h1>
+        <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">@ChildContent</p>
+    }
+    <div class="alert-error" role="alert">@Error</div>
+    <div class="@(Compact ? "mt-4 flex justify-end" : "mt-6 flex justify-end gap-2")">@Actions</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    /// <summary>What went wrong, in a sentence that leads to the error.</summary>
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public string? Error { get; set; }
+    [Parameter] public RenderFragment? Actions { get; set; }
+    /// <summary>A card inside a page (heading level 2, tighter spacing) instead of one that is the page.</summary>
+    [Parameter] public bool Compact { get; set; }
+    /// <summary>Extra classes for the card, such as its width.</summary>
+    [Parameter] public string? Class { get; set; }
+}

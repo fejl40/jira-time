@@ -35,15 +35,13 @@
     <main class="flex-1 px-4 py-8 sm:px-6">
         @if (_verifyError is not null && !OnSetup)
         {
-            <div class="card mx-auto max-w-lg">
-                <h1 class="text-lg font-semibold">Can't check who you are</h1>
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">Jira Time asks your Jira who your token belongs to before showing your hours, and that didn't work:</p>
-                <div class="alert-error" role="alert">@_verifyError</div>
-                <div class="mt-6 flex justify-end gap-2">
+            <ErrorCard Class="mx-auto max-w-lg" Title="Can't check who you are" Error="@_verifyError">
+                <ChildContent>Jira Time asks your Jira who your token belongs to before showing your hours, and that didn't work:</ChildContent>
+                <Actions>
                     <a href="setup/connect" class="btn-secondary">Connect again</a>
                     <button class="btn-primary" disabled="@_verifying" @onclick="VerifyAsync">@(_verifying ? "Checking…" : "Try again")</button>
-                </div>
-            </div>
+                </Actions>
+            </ErrorCard>
         }
         else if (_ready)
         {

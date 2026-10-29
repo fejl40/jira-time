@@ -1,0 +1,18 @@
+@* ‹ current › buttons that step through periods or months. *@
+
+<div class="flex items-center gap-1.5">
+    <a class="btn-secondary px-3" href="@PreviousHref" title="Previous @Unit">‹</a>
+    <a class="btn-secondary" href="@CurrentHref" title="@CurrentTitle">@CurrentLabel</a>
+    <a class="btn-secondary px-3" href="@NextHref" title="Next @Unit">›</a>
+</div>
+
+@code {
+    /// <summary>What one step is, for the button titles: "period" or "month".</summary>
+    [Parameter, EditorRequired] public string Unit { get; set; } = "";
+    [Parameter, EditorRequired] public string PreviousHref { get; set; } = "";
+    [Parameter, EditorRequired] public string NextHref { get; set; } = "";
+    /// <summary>The link to the step that holds today.</summary>
+    [Parameter] public string CurrentHref { get; set; } = "";
+    [Parameter, EditorRequired] public string CurrentLabel { get; set; } = "";
+    [Parameter] public string? CurrentTitle { get; set; }
+}
