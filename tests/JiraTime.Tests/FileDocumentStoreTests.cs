@@ -120,4 +120,23 @@ public class FileDocumentStoreTests : IDisposable
         for (var i = 0; i < 100 && (await docs.GetAsync(entry.Id))!.IssueKey != "A-2"; i++) await Task.Delay(20);
         Assert.Equal("A-2", (await docs.GetAsync(entry.Id))!.IssueKey);
     }
+
+    [Fact]
+    public void Collections_that_are_never_read_hold_no_file_watcher()
+    {
+        // Each file watcher takes an inotify instance on Linux, often limited to 128 per user.
+        var stores = new List<TempStore>();
+        try
+        {
+            for (var i = 0; i < 200; i++)
+            {
+                stores.Add(new TempStore());
+                stores[^1].Store.Collection<TimeEntry>();
+            }
+        }
+        finally
+        {
+            stores.ForEach(s => s.Dispose());
+        }
+    }
 }

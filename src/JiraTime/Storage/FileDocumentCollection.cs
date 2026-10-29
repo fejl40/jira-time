@@ -9,7 +9,7 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
 {
     private readonly string _dir;
     private readonly SemaphoreSlim _lock = new(1, 1);
-    private readonly FileSystemWatcher _watcher;
+    private FileSystemWatcher? _watcher;
 
     /// <summary>
     /// id → raw JSON. Raw so callers always get their own copy to mutate. A published dictionary is never
@@ -25,13 +25,20 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
     {
         _dir = dir;
         Directory.CreateDirectory(dir);
+    }
 
-        // Drop the cache if files change on disk (hand edits, restores from backup, ...).
-        _watcher = new FileSystemWatcher(dir, "*.json") { EnableRaisingEvents = true };
-        _watcher.Changed += (_, _) => Forget();
-        _watcher.Created += (_, _) => Forget();
-        _watcher.Deleted += (_, _) => Forget();
-        _watcher.Renamed += (_, _) => Forget();
+    /// <summary>
+    /// Drops the cache when files change on disk (hand edits, restores from backup, ...). Started on the
+    /// first read, since only a cache needs it: each watcher holds an OS handle (an inotify instance on Linux).
+    /// </summary>
+    private FileSystemWatcher Watch()
+    {
+        var watcher = new FileSystemWatcher(_dir, "*.json") { EnableRaisingEvents = true };
+        watcher.Changed += (_, _) => Forget();
+        watcher.Created += (_, _) => Forget();
+        watcher.Deleted += (_, _) => Forget();
+        watcher.Renamed += (_, _) => Forget();
+        return watcher;
     }
 
     private void Forget()
@@ -100,6 +107,7 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
         try
         {
             if (Volatile.Read(ref _cache) is { } c) return c;
+            _watcher ??= Watch();
             var changesBefore = Volatile.Read(ref _changesOnDisk);
             var docs = new Dictionary<string, string>();
             foreach (var file in Directory.EnumerateFiles(_dir, "*.json"))
@@ -144,7 +152,7 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
 
     public void Dispose()
     {
-        _watcher.Dispose();
+        _watcher?.Dispose();
         _lock.Dispose();
     }
 }

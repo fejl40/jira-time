@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json.Nodes;
-using System.Web;
 using JiraTime.Domain;
 
 namespace JiraTime.Tests;
@@ -14,21 +13,10 @@ public class MonthExportLoaderTests : IDisposable
     {
         _h.Jira.Gets["/rest/api/2/field"] = _ => new JsonArray(
             new JsonObject { ["id"] = "customfield_10008", ["name"] = "Epic Link", ["schema"] = new JsonObject { ["custom"] = "com.pyxis.greenhopper.jira:gh-epic-link" } });
-        // One search answers both the worklog search and the epic lookup: ABC-1 is in epic BAC-577.
-        _h.Jira.Gets["/rest/api/2/search"] = uri =>
-        {
-            var jql = HttpUtility.ParseQueryString(uri.Query)["jql"]!;
-            var keys = jql.Contains("worklogAuthor") ? _h.Jira.Worklogs.Keys.ToList() : ["ABC-1", "ABC-2"];
-            return new JsonObject
-            {
-                ["startAt"] = 0, ["total"] = keys.Count,
-                ["issues"] = new JsonArray(keys.Select(k => (JsonNode)new JsonObject
-                {
-                    ["key"] = k,
-                    ["fields"] = new JsonObject { ["summary"] = $"Summary of {k}", ["issuetype"] = new JsonObject { ["name"] = "Story" }, ["customfield_10008"] = k == "ABC-1" ? "BAC-577" : null },
-                }).ToArray()),
-            };
-        };
+        // ABC-1 is in epic BAC-577, ABC-2 has no epic.
+        _h.Jira.AddIssue("ABC-1", "Summary of ABC-1");
+        _h.Jira.Issues["ABC-1"]["customfield_10008"] = "BAC-577";
+        _h.Jira.AddIssue("ABC-2", "Summary of ABC-2");
     }
 
     public void Dispose() => _h.Dispose();

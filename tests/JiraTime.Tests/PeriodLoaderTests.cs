@@ -63,11 +63,7 @@ public class PeriodLoaderTests : IDisposable
     public async Task Statuses_of_logged_issues_are_looked_up()
     {
         _h.Jira.AddWorklog("ABC-1", "2026-10-26T09:00:00.000+0100", 3600);
-        _h.Jira.Gets["/rest/api/2/search"] = _ => new
-        {
-            startAt = 0, total = 1,
-            issues = new[] { new { key = "ABC-1", fields = new { summary = "Login", issuetype = new { name = "Story" }, status = new { name = "Done", statusCategory = new { key = "done" } } } } },
-        };
+        _h.Jira.AddIssue("ABC-1", "Login", status: "Done", category: "done");
         var (loader, statuses) = _h.PeriodLoading();
 
         await loader.LoadAsync(Sheet(), statuses);

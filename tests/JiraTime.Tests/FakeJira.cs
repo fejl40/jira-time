@@ -2,11 +2,12 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Web;
 
 namespace JiraTime.Tests;
 
 /// <summary>
-/// In-memory stand-in for Jira's worklog endpoints, plugged into HttpClient.
+/// In-memory stand-in for Jira's worklog and issue search endpoints, plugged into HttpClient.
 /// Records every request so tests can check what was sent.
 /// </summary>
 public sealed class FakeJira : HttpMessageHandler
@@ -34,6 +35,27 @@ public sealed class FakeJira : HttpMessageHandler
 
     /// <summary>Issues the worklog search does not return yet (Jira's search index lagging behind).</summary>
     public HashSet<string> NotIndexed { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// issue key → fields, as the issue searches return them (sprint, period, status and epic lookups).
+    /// A <c>key in (...)</c> query gets only the keys it names. The worklog search returns the issues
+    /// that have worklogs instead, with their fields from here when they have any.
+    /// </summary>
+    public Dictionary<string, JsonObject> Issues { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Adds an issue with a summary, type and status to <see cref="Issues"/>.</summary>
+    public void AddIssue(string key, string summary, string type = "Story", string status = "To Do", string category = "new") =>
+        Issues[key] = new JsonObject
+        {
+            ["summary"] = summary, ["issuetype"] = new JsonObject { ["name"] = type },
+            ["status"] = new JsonObject { ["name"] = status, ["statusCategory"] = new JsonObject { ["key"] = category } },
+        };
+
+    /// <summary>The JQL of a search request.</summary>
+    public static string Jql(Uri uri) => HttpUtility.ParseQueryString(uri.Query)["jql"] ?? "";
+
+    /// <summary>The JQL of a recorded search request.</summary>
+    public static string Jql(Request request) => Jql(new Uri("http://jira" + request.Path));
 
     /// <summary>Adds a worklog as if someone logged it in Jira directly.</summary>
     public string AddWorklog(string issueKey, string started, int seconds, string? comment = null, JsonObject? author = null)
@@ -66,16 +88,8 @@ public sealed class FakeJira : HttpMessageHandler
         if (req.Method == HttpMethod.Get && Gets.TryGetValue(path, out var get))
             return Json(HttpStatusCode.OK, get(req.RequestUri));
 
-        // Worklog search: issues that have worklogs.
         if (req.Method == HttpMethod.Get && (path.EndsWith("/search") || path.EndsWith("/search/jql")))
-        {
-            var keys = Worklogs.Where(w => w.Value.Count > 0 && !NotIndexed.Contains(w.Key)).Select(w => w.Key).ToList();
-            return Json(HttpStatusCode.OK, new
-            {
-                startAt = 0, total = keys.Count,
-                issues = keys.Select(k => new { key = k, fields = new { summary = $"Summary of {k}" } }),
-            });
-        }
+            return Json(HttpStatusCode.OK, Search(Jql(req.RequestUri)));
 
         var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         // rest/api/{v}/issue/{key}/worklog[/{id}]
@@ -113,6 +127,19 @@ public sealed class FakeJira : HttpMessageHandler
             }
         }
         return Json(HttpStatusCode.NotFound, new { errorMessages = new[] { "No such endpoint" } });
+    }
+
+    private JsonObject Search(string jql)
+    {
+        var keys = jql.Contains("worklogAuthor")
+            ? Worklogs.Where(w => w.Value.Count > 0 && !NotIndexed.Contains(w.Key)).Select(w => w.Key).ToList()
+            : Issues.Keys.Where(k => !jql.StartsWith("key in") || jql.Contains($"\"{k}\"", StringComparison.OrdinalIgnoreCase)).ToList();
+        var issues = keys.Select(k => (JsonNode)new JsonObject
+        {
+            ["key"] = k,
+            ["fields"] = Issues.TryGetValue(k, out var fields) ? fields.DeepClone() : new JsonObject { ["summary"] = $"Summary of {k}" },
+        });
+        return new JsonObject { ["startAt"] = 0, ["total"] = keys.Count, ["issues"] = new JsonArray(issues.ToArray()) };
     }
 
     private JsonObject WithIdAndAuthor(string id, JsonNode body)
