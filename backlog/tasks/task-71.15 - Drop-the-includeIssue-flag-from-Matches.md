@@ -1,9 +1,10 @@
 ---
 id: TASK-71.15
 title: Drop the includeIssue flag from Matches
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 07:52'
+updated_date: '2026-10-29 07:56'
 labels:
   - refactor
 dependencies: []
@@ -20,6 +21,12 @@ WorklogMatching.Matches has a bool flag; production code only uses includeIssue:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No boolean parameter on Matches
-- [ ] #2 WorklogSync behaviour unchanged; tests pass
+- [x] #1 No boolean parameter on Matches
+- [x] #2 WorklogSync behaviour unchanged; tests pass
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Matches now always compares day, hours and comment only, the way WorklogSync used it; the flag and its issue-key tests are gone.
+<!-- SECTION:FINAL_SUMMARY:END -->

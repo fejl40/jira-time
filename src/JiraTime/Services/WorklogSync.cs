@@ -125,7 +125,7 @@ public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log, 
             foreach (var e in read)
             {
                 var now = await jira.GetWorklogAsync(c, e.JiraWorklogIssueKey ?? e.IssueKey, e.JiraWorklogId!, ct);
-                if (now is null || !e.Matches(now, includeIssue: false)) return true;
+                if (now is null || !e.Matches(now)) return true;
             }
         }
         catch (JiraException)

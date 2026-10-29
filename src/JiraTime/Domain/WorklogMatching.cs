@@ -4,12 +4,11 @@ namespace JiraTime.Domain;
 public static class WorklogMatching
 {
     /// <summary>
-    /// True when the entry already has the worklog's day, hours and comment (a missing comment equals an empty one).
-    /// With <paramref name="includeIssue"/> the issue key must match too, ignoring case.
+    /// True when the entry still has the worklog's day, hours and comment (a missing comment equals an empty one).
+    /// The issue is not compared: a worklog read by its issue and id is on that issue.
     /// </summary>
-    public static bool Matches(this TimeEntry entry, JiraWorklog worklog, bool includeIssue = true) =>
-        (!includeIssue || string.Equals(entry.IssueKey, worklog.IssueKey, StringComparison.OrdinalIgnoreCase))
-        && entry.Date == worklog.Date
+    public static bool Matches(this TimeEntry entry, JiraWorklog worklog) =>
+        entry.Date == worklog.Date
         && entry.Duration == worklog.Duration
         && (entry.Description ?? "") == (worklog.Comment ?? "");
 

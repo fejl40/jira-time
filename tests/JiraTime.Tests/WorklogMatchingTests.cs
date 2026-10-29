@@ -20,10 +20,9 @@ public class WorklogMatchingTests
     };
 
     [Fact]
-    public void Matches_ignores_issue_key_case_and_treats_no_comment_as_empty()
+    public void Matches_treats_no_comment_as_empty()
     {
         var e = Entry();
-        e.IssueKey = "abc-1";
         Assert.True(e.Matches(Worklog));
 
         e.Description = null;
@@ -31,17 +30,16 @@ public class WorklogMatchingTests
     }
 
     [Fact]
-    public void Matches_spots_a_different_day_hours_comment_or_issue()
+    public void Matches_spots_a_different_day_hours_or_comment()
     {
         Assert.False(Entry().Matches(Worklog with { Date = Day.AddDays(1) }));
         Assert.False(Entry().Matches(Worklog with { Duration = TimeSpan.FromHours(3) }));
         Assert.False(Entry().Matches(Worklog with { Comment = "Other" }));
-        Assert.False(Entry().Matches(Worklog with { IssueKey = "ABC-2" }));
     }
 
     [Fact]
-    public void Matches_without_issue_skips_the_issue_key() =>
-        Assert.True(Entry().Matches(Worklog with { IssueKey = "ABC-2" }, includeIssue: false));
+    public void Matches_skips_the_issue_key() =>
+        Assert.True(Entry().Matches(Worklog with { IssueKey = "ABC-2" }));
 
     [Fact]
     public void ToEntry_makes_a_synced_entry_from_Jira()
