@@ -28,18 +28,9 @@ public class JiraIssueLookup(JiraClient jira, TimeProvider clock)
     /// <summary>Current status of each key Jira knows; looked up once per key while cached, unknown keys included.</summary>
     public async Task<IReadOnlyDictionary<string, IssueWithStatus>> GetStatusesAsync(JiraConnection c, IEnumerable<string> keys, CancellationToken ct = default)
     {
-        string Key(string issue) => $"{c.BaseUrl}|{issue.ToUpperInvariant()}";
-        var wanted = keys.Where(k => k != "").Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var missing = wanted.Where(k => !_statuses.TryGet(Key(k), out _)).ToList();
-        if (missing.Count > 0)
-        {
-            var found = (await jira.GetIssuesAsync(c, missing, ct)).ToDictionary(i => i.Key, StringComparer.OrdinalIgnoreCase);
-            foreach (var k in missing) _statuses.Set(Key(k), found.GetValueOrDefault(k));
-        }
-        return wanted
-            .Select(k => _statuses.TryGet(Key(k), out var issue) ? issue : null)
-            .OfType<IssueWithStatus>()
-            .ToDictionary(i => i.Key, StringComparer.OrdinalIgnoreCase);
+        var statuses = await PerKeyAsync(_statuses, c, keys, async missing =>
+            (await jira.GetIssuesAsync(c, missing, ct)).ToDictionary(i => i.Key, i => (IssueWithStatus?)i, StringComparer.OrdinalIgnoreCase));
+        return statuses.Select(s => s.Value).OfType<IssueWithStatus>().ToDictionary(i => i.Key, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -48,15 +39,29 @@ public class JiraIssueLookup(JiraClient jira, TimeProvider clock)
     /// </summary>
     public async Task<IReadOnlyDictionary<string, string?>> GetEpicsAsync(JiraConnection c, IEnumerable<string> keys, CancellationToken ct = default)
     {
-        string Key(string issue) => $"{c.BaseUrl}|{issue.ToUpperInvariant()}";
-        var wanted = keys.Where(k => k != "").Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var missing = wanted.Where(k => !_epics.TryGet(Key(k), out _)).ToList();
-        if (missing.Count > 0)
+        var epics = await PerKeyAsync(_epics, c, keys, async missing =>
         {
             var field = await _epicLinkFields.GetOrLoadAsync(c.BaseUrl, () => jira.GetEpicLinkFieldAsync(c, ct));
-            var found = await jira.GetEpicsAsync(c, missing, field, ct);
-            foreach (var k in missing) _epics.Set(Key(k), found.GetValueOrDefault(k));
+            return await jira.GetEpicsAsync(c, missing, field, ct);
+        });
+        return epics.ToDictionary(e => e.Key, e => e.Value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The cached value of each issue key, after loading the keys not cached yet in one go. A key the load
+    /// leaves out is cached as null, so it isn't asked again while cached.
+    /// </summary>
+    private static async Task<IReadOnlyList<(string Key, T? Value)>> PerKeyAsync<T>(ExpiringCache<T?> cache, JiraConnection c,
+        IEnumerable<string> keys, Func<IReadOnlyCollection<string>, Task<IReadOnlyDictionary<string, T?>>> load) where T : class
+    {
+        string CacheKey(string issue) => $"{c.BaseUrl}|{issue.ToUpperInvariant()}";
+        var wanted = keys.Where(k => k != "").Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var missing = wanted.Where(k => !cache.TryGet(CacheKey(k), out _)).ToList();
+        if (missing.Count > 0)
+        {
+            var found = await load(missing);
+            foreach (var k in missing) cache.Set(CacheKey(k), found.GetValueOrDefault(k));
         }
-        return wanted.ToDictionary(k => k, k => _epics.TryGet(Key(k), out var epic) ? epic : null, StringComparer.OrdinalIgnoreCase);
+        return wanted.Select(k => (k, cache.TryGet(CacheKey(k), out var value) ? value : null)).ToList();
     }
 }
