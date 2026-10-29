@@ -5,7 +5,15 @@ using Microsoft.AspNetCore.WebUtilities;
 namespace JiraTime.Components;
 
 /// <summary>Where a timesheet link goes: the period shown and, when the link names one, the selected day.</summary>
-public sealed record TimesheetLink(Period Period, DateOnly? Day);
+public sealed record TimesheetLink(Period Period, DateOnly? Day)
+{
+    /// <summary>The day to select: the link's day when it is in the period, else today when it is, else the period's first day.</summary>
+    public DateOnly Selected(DateOnly today)
+    {
+        if (Day is { } day && Period.Contains(day)) return day;
+        return Period.Contains(today) ? today : Period.Start;
+    }
+}
 
 /// <summary>App-relative links to timesheet pages, built and read.</summary>
 public static class Links

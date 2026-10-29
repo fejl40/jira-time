@@ -31,6 +31,29 @@ public class LinksTests
         Assert.Equal(day is null ? null : DateOnly.Parse(day), read?.Day);
     }
 
+    [Fact]
+    public void A_day_in_the_period_is_selected()
+    {
+        var day = new DateOnly(2026, 9, 3);
+        Assert.Equal(day, new TimesheetLink(Period.For(day), day).Selected(Today));
+    }
+
+    [Fact]
+    public void Without_a_day_in_the_period_today_is_selected_when_it_is_in_the_period()
+    {
+        var period = Period.For(Today);
+        Assert.Equal(Today, new TimesheetLink(period, null).Selected(Today));
+        Assert.Equal(Today, new TimesheetLink(period, new DateOnly(2026, 9, 3)).Selected(Today));
+    }
+
+    [Fact]
+    public void Otherwise_the_first_day_of_the_period_is_selected()
+    {
+        var period = Period.For(new DateOnly(2026, 9, 20));
+        Assert.Equal(period.Start, new TimesheetLink(period, null).Selected(Today));
+        Assert.Equal(period.Start, new TimesheetLink(period, new DateOnly(2026, 9, 3)).Selected(Today));
+    }
+
     [Theory]
     [InlineData("settings")]
     [InlineData("setup/connect")]

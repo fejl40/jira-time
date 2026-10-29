@@ -76,8 +76,9 @@ else
 }
 
 @code {
+    // The period start and the selected day are kept in the URL, so reload and back/forward keep them.
+    // They are read from the whole link with Links.Read; these parameters make a change re-render the page.
     [Parameter] public string? StartText { get; set; }
-    /// <summary>The selected day, kept in the URL so reload and back/forward keep it.</summary>
     [SupplyParameterFromQuery(Name = "day")] public string? DayText { get; set; }
 
     /// <summary>Read on each use, so a tab left open overnight moves on to the new day.</summary>
@@ -110,9 +111,9 @@ else
 
     protected override async Task OnParametersSetAsync()
     {
-        var day = Format.ParseIso(DayText);
-        var period = Period.For(Format.ParseIso(StartText) ?? day ?? Today);
-        var selected = day is { } d && period.Contains(d) ? d : period.Contains(Today) ? Today : period.Start;
+        var link = Links.Read(Nav.ToBaseRelativePath(Nav.Uri), Today) ?? new TimesheetLink(Period.For(Today), null);
+        var period = link.Period;
+        var selected = link.Selected(Today);
 
         // Same period, other day (a day picked in the grid, Today, back/forward): keep everything.
         if (_sheet?.Period == period)

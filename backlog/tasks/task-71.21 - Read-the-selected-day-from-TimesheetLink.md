@@ -1,9 +1,10 @@
 ---
 id: TASK-71.21
 title: Read the selected day from TimesheetLink
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 07:52'
+updated_date: '2026-10-29 08:00'
 labels:
   - refactor
 dependencies: []
@@ -20,7 +21,13 @@ Timesheet parses the route and ?day= again instead of using Links.Read; the day 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 TimesheetLink.Selected(today) holds the fallback rule
-- [ ] #2 Timesheet no longer calls Format.ParseIso
-- [ ] #3 LinksTests cover the three fallback cases
+- [x] #1 TimesheetLink.Selected(today) holds the fallback rule
+- [x] #2 Timesheet no longer calls Format.ParseIso
+- [x] #3 LinksTests cover the three fallback cases
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+TimesheetLink.Selected(today) holds the day fallback rule and Timesheet reads its period and day with Links.Read instead of parsing the route itself; LinksTests cover the three cases.
+<!-- SECTION:FINAL_SUMMARY:END -->
