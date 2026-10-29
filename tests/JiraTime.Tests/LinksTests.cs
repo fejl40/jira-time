@@ -36,4 +36,17 @@ public class LinksTests
     [InlineData("setup/connect")]
     [InlineData("periods")]
     public void Other_pages_are_not_timesheet_links(string link) => Assert.Null(Links.Read(link, Today));
+
+    [Fact]
+    public void Export_links_name_the_month() =>
+        Assert.Equal("export?month=2026-02", ExportLinks.To(new DateOnly(2026, 2, 16)));
+
+    [Theory]
+    [InlineData("2026-02", "2026-02-01")]
+    [InlineData(" 2026-12 ", "2026-12-01")]
+    [InlineData("2026-13", null)]
+    [InlineData("feb", null)]
+    [InlineData(null, null)]
+    public void Export_links_are_read_back(string? month, string? first) =>
+        Assert.Equal(first is null ? null : DateOnly.Parse(first), ExportLinks.Read(month));
 }

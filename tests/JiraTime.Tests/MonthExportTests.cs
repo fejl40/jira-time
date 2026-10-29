@@ -98,6 +98,12 @@ public class MonthExportTests
         Assert.Equal("2026-02-02\t8\ta b c\t\t\t\thttps://jira.uim.dk/browse/BAC-500\tBAC-577", lines[2]);
         Assert.Equal(28 + 2, lines.Length); // header, 28 days, and the trailing line break
     }
+
+    [Theory]
+    [InlineData("https://jira.uim.dk")]
+    [InlineData("https://jira.uim.dk/")]
+    public void Issue_links_point_at_the_issue_page_in_Jira(string baseUrl) =>
+        Assert.Equal("https://jira.uim.dk/browse/BAC-500", JiraIssue.Url(baseUrl, "BAC-500"));
 }
 
 public class EpicExportStoreTests : IDisposable
@@ -150,26 +156,4 @@ public class EpicExportStoreTests : IDisposable
         _store.Dispose();
         _dir.Dispose();
     }
-}
-
-public class ExportLinksTests
-{
-    [Fact]
-    public void Links_name_the_month() =>
-        Assert.Equal("export?month=2026-02", JiraTime.Components.ExportLinks.To(new DateOnly(2026, 2, 16)));
-
-    [Theory]
-    [InlineData("2026-02", "2026-02-01")]
-    [InlineData(" 2026-12 ", "2026-12-01")]
-    [InlineData("2026-13", null)]
-    [InlineData("feb", null)]
-    [InlineData(null, null)]
-    public void Links_are_read_back(string? month, string? first) =>
-        Assert.Equal(first is null ? null : DateOnly.Parse(first), JiraTime.Components.ExportLinks.Read(month));
-
-    [Theory]
-    [InlineData("https://jira.uim.dk")]
-    [InlineData("https://jira.uim.dk/")]
-    public void Issue_links_point_at_the_issue_page_in_Jira(string baseUrl) =>
-        Assert.Equal("https://jira.uim.dk/browse/BAC-500", JiraIssue.Url(baseUrl, "BAC-500"));
 }

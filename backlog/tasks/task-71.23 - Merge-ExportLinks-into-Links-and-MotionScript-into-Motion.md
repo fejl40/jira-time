@@ -1,9 +1,10 @@
 ---
 id: TASK-71.23
 title: Merge ExportLinks into Links and MotionScript into Motion
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-29 07:52'
+updated_date: '2026-10-29 07:57'
 labels:
   - refactor
 dependencies: []
@@ -20,7 +21,13 @@ Each concept is split over two tiny files. (Found in the TASK-71 review.)
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ExportLinks.cs and MotionScript.cs are gone
-- [ ] #2 Export link tests live in LinksTests.cs
-- [ ] #3 Build and tests pass
+- [x] #1 ExportLinks.cs and MotionScript.cs are gone
+- [x] #2 Export link tests live in LinksTests.cs
+- [x] #3 Build and tests pass
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ExportLinks now lives in Links.cs and MotionScript in Motion.cs (type names kept); the export link tests moved into LinksTests.cs.
+<!-- SECTION:FINAL_SUMMARY:END -->
