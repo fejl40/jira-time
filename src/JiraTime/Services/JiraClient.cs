@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using JiraTime.Domain;
 using static JiraTime.Services.JiraHttp;
 
@@ -82,6 +83,88 @@ public class JiraClient(HttpClient http)
         {
             return [];
         }
+    }
+
+    /// <summary>
+    /// The epic of each issue, by key; null for issues with no epic (and for epics themselves). The epic is
+    /// the parent when that is an epic, else the Epic Link field (Server/DC); a sub-task has its parent's epic.
+    /// Keys Jira doesn't know are left out.
+    /// </summary>
+    /// <param name="epicLink">The Epic Link field's id from <see cref="GetEpicLinkFieldAsync"/>, if the Jira has one.</param>
+    public async Task<IReadOnlyDictionary<string, string?>> GetEpicsAsync(JiraConnection c, IReadOnlyCollection<string> keys, string? epicLink, CancellationToken ct = default)
+    {
+        var found = await ReadEpicsAsync(c, keys, epicLink, ct);
+        // A sub-task's epic is its parent's.
+        var parents = found.Values.Where(f => f.Epic is null && f.SubtaskOf is not null).Select(f => f.SubtaskOf!).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var parentEpics = parents.Count == 0 ? new Dictionary<string, IssueEpic>() : await ReadEpicsAsync(c, parents, epicLink, ct);
+        return found.ToDictionary(f => f.Key,
+            f => f.Value.Epic ?? (f.Value.SubtaskOf is { } parent ? parentEpics.GetValueOrDefault(parent)?.Epic : null),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>What one issue says about its epic.</summary>
+    /// <param name="Epic">Its epic's key, when the issue names one.</param>
+    /// <param name="SubtaskOf">The parent's key, when the issue is a sub-task (whose epic is the parent's).</param>
+    public sealed record IssueEpic(string? Epic, string? SubtaskOf);
+
+    /// <summary>Reads <see cref="IssueEpic"/> from an issue's fields as Jira returns them.</summary>
+    public static IssueEpic EpicOf(JsonElement fields, string? epicLinkField)
+    {
+        var parent = fields.TryGetProperty("parent", out var p) && p.ValueKind == JsonValueKind.Object ? p : (JsonElement?)null;
+        var parentKey = parent is { } pk && pk.TryGetProperty("key", out var k) ? k.GetString() : null;
+        if (parent is { } pe && IsEpic(pe.TryGetProperty("fields", out var pf) ? pf : default)) return new(parentKey, null);
+        if (epicLinkField is not null && fields.TryGetProperty(epicLinkField, out var link) && link.ValueKind == JsonValueKind.String)
+            return new(link.GetString(), null);
+        var subtask = fields.TryGetProperty("issuetype", out var t) && t.ValueKind == JsonValueKind.Object
+                      && t.TryGetProperty("subtask", out var st) && st.ValueKind == JsonValueKind.True;
+        return new(null, subtask ? parentKey : null);
+    }
+
+    private static bool IsEpic(JsonElement fields) =>
+        fields.ValueKind == JsonValueKind.Object && fields.TryGetProperty("issuetype", out var t) && t.ValueKind == JsonValueKind.Object
+        && ((t.TryGetProperty("hierarchyLevel", out var level) && level.ValueKind == JsonValueKind.Number && level.GetInt32() == 1)
+            || (t.TryGetProperty("name", out var name) && string.Equals(name.GetString(), "Epic", StringComparison.OrdinalIgnoreCase)));
+
+    private async Task<Dictionary<string, IssueEpic>> ReadEpicsAsync(JiraConnection c, IReadOnlyCollection<string> keys, string? epicLink, CancellationToken ct)
+    {
+        if (keys.Count == 0) return new(StringComparer.OrdinalIgnoreCase);
+        var fields = "issuetype,parent" + (epicLink is null ? "" : "," + epicLink);
+        try
+        {
+            var result = await _jira.GetAsync<JsonElement>(c,
+                $"{SearchPath(c)}?jql={Uri.EscapeDataString($"key in {Jql.List(keys)}")}&fields={fields}&maxResults=100", ct);
+            var found = new Dictionary<string, IssueEpic>(StringComparer.OrdinalIgnoreCase);
+            if (result.TryGetProperty("issues", out var issues) && issues.ValueKind == JsonValueKind.Array)
+                foreach (var issue in issues.EnumerateArray())
+                    if (issue.TryGetProperty("key", out var key) && key.GetString() is { } k)
+                        found[k] = issue.TryGetProperty("fields", out var f) ? EpicOf(f, epicLink) : new(null, null);
+            return found;
+        }
+        catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest && keys.Count > 1)
+        {
+            // One unknown key fails the whole query: ask one by one.
+            var found = new Dictionary<string, IssueEpic>(StringComparer.OrdinalIgnoreCase);
+            foreach (var key in keys)
+                foreach (var (k, v) in await ReadEpicsAsync(c, [key], epicLink, ct)) found[k] = v;
+            return found;
+        }
+        catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest)
+        {
+            return new(StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    /// <summary>The id of the Epic Link field (e.g. customfield_10008) on Jiras that have one (Server/DC); null otherwise.</summary>
+    public async Task<string?> GetEpicLinkFieldAsync(JiraConnection c, CancellationToken ct = default)
+    {
+        var all = await _jira.GetAsync<JsonElement>(c, $"{Api(c)}/field", ct);
+        if (all.ValueKind != JsonValueKind.Array) return null;
+        return all.EnumerateArray()
+            .Where(f => (f.TryGetProperty("schema", out var schema) && schema.ValueKind == JsonValueKind.Object
+                         && schema.TryGetProperty("custom", out var custom) && custom.GetString() == "com.pyxis.greenhopper.jira:gh-epic-link")
+                        || (f.TryGetProperty("name", out var name) && name.GetString() == "Epic Link"))
+            .Select(f => f.TryGetProperty("id", out var id) ? id.GetString() : null)
+            .FirstOrDefault(id => id is not null);
     }
 
     private async Task<IReadOnlyList<IssueWithStatus>> SearchAsync(JiraConnection c, string jql, CancellationToken ct)
