@@ -156,4 +156,15 @@ public class PeriodSheetTests
         sheet.FillPeriod();
         Assert.Empty(sheet.UnsavedDays);
     }
+
+    [Fact]
+    public void A_grid_row_gives_its_entries_on_one_day()
+    {
+        var monday = new TimeEntry { IssueKey = "ABC-1", Date = Monday, Duration = TimeSpan.FromHours(2) };
+        var tuesday = new TimeEntry { IssueKey = "ABC-1", Date = Monday.AddDays(1), Duration = TimeSpan.FromHours(3) };
+        var row = new PeriodRow("ABC-1", "", [monday, tuesday]);
+
+        Assert.Equal([monday], row.On(Monday));
+        Assert.Empty(row.On(Monday.AddDays(2)));
+    }
 }

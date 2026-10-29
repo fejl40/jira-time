@@ -1,0 +1,57 @@
+@* One cell of the period grid: an issue's hours on a day, saved or not yet, and whether Jira has them. *@
+
+<td class="@Class relative cursor-pointer p-2 text-center tabular-nums" @onclick="OnClick" title="@Title">
+    @if (TimeEntry.HasSyncProblem(_entries))
+    {
+        <span class="absolute right-1 top-1 size-1.5 rounded-full bg-amber-500" data-not-in-jira></span>
+    }
+    @if (Sheet.UnsavedFor(Day, Row.Key) is { } unsaved)
+    {
+        @if (_saved > TimeSpan.Zero)
+        {
+            <span class="text-slate-400 line-through dark:text-slate-500">@Format.Hours(_saved)</span>
+        }
+        <span class="motion-drop ml-0.5 inline-block rounded border border-dashed border-blue-400 px-1 text-xs text-blue-700 dark:border-blue-600 dark:text-blue-300" title="Not saved yet"
+              style="@(Cascade ? Motion.Order(Index) : null)" data-draft-cell>@(unsaved > TimeSpan.Zero ? Format.Hours(unsaved) : "0")</span>
+    }
+    else if (_saved > TimeSpan.Zero)
+    {
+        <span class="inline-block rounded px-1 @(JustSaved ? "motion-settle" : "")" data-sent="@(JustSaved && SentToJira ? "" : null)">@Format.Hours(_saved)</span>
+    }
+</td>
+
+@code {
+    [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
+    [Parameter, EditorRequired] public PeriodRow Row { get; set; } = default!;
+    [Parameter, EditorRequired] public DateOnly Day { get; set; }
+    /// <summary>The day's place in the period, to stagger the drop-in after Fill period.</summary>
+    [Parameter] public int Index { get; set; }
+    /// <summary>The day column's classes (week boundary, weekend, day off).</summary>
+    [Parameter] public string? Class { get; set; }
+    [Parameter] public bool Cascade { get; set; }
+    /// <summary>The day was just saved: the hours settle from draft to saved.</summary>
+    [Parameter] public bool JustSaved { get; set; }
+    /// <summary>The day just saved went to Jira completely: a tick flies from the cell.</summary>
+    [Parameter] public bool SentToJira { get; set; }
+    [Parameter] public EventCallback OnClick { get; set; }
+
+    private IReadOnlyList<TimeEntry> _entries = [];
+    private TimeSpan _saved;
+
+    protected override void OnParametersSet()
+    {
+        _entries = Row.On(Day);
+        _saved = TimeEntry.Total(_entries);
+    }
+
+    private string Title
+    {
+        get
+        {
+            if (Row.Key == "") return "";
+            var title = $"{Row.Key} on {Format.ShortDay(Day)}";
+            var problems = TimeEntry.SyncProblems(_entries);
+            return problems.Count == 0 ? title : $"{title}\nNot in Jira: {string.Join("; ", problems)}";
+        }
+    }
+}

@@ -39,6 +39,21 @@ public class TimeEntryTests
     }
 
     [Fact]
+    public void Sync_problems_name_each_reason_once()
+    {
+        var synced = Entry("ABC-1", 1);
+        synced.JiraWorklogId = "10";
+        synced.SyncPending = false;
+        var failed = Entry("ABC-2", 1);
+        failed.SyncError = "Jira said no";
+        var failedToo = Entry("ABC-3", 1);
+        failedToo.SyncError = "Jira said no";
+
+        Assert.Empty(TimeEntry.SyncProblems([synced]));
+        Assert.Equal(["Jira said no", TimeEntry.NotSentYet], TimeEntry.SyncProblems([synced, failed, failedToo, Entry("ABC-4", 1)]));
+    }
+
+    [Fact]
     public void Hours_must_be_whole_minutes() =>
         Assert.NotNull(TimeEntry.Validate(new TimeEntry { IssueKey = "ABC-1", Date = Day, Duration = TimeSpan.FromSeconds(90) }));
 

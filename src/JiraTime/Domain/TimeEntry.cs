@@ -99,6 +99,13 @@ public class TimeEntry : IOwnedDocument
 
     /// <summary>True when any of the entries is not (fully) in Jira.</summary>
     public static bool HasSyncProblem(IEnumerable<TimeEntry> entries) => entries.Any(e => !e.IsSynced);
+
+    /// <summary>Why the entries are not in Jira, each reason once; empty when they all are.</summary>
+    public static IReadOnlyList<string> SyncProblems(IEnumerable<TimeEntry> entries) =>
+        entries.Where(e => !e.IsSynced).Select(e => e.SyncError ?? NotSentYet).Distinct().ToList();
+
+    /// <summary>The reason shown for an entry not in Jira that has no error (yet).</summary>
+    public const string NotSentYet = "Not sent to Jira yet";
 }
 
 /// <summary>Adding up spans of time.</summary>

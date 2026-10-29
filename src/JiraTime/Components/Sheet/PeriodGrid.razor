@@ -50,28 +50,8 @@
                     </td>
                     @foreach (var (day, i) in Days)
                     {
-                        var cellEntries = row.Entries.Where(e => e.Date == day).ToList();
-                        var saved = TimeEntry.Total(cellEntries);
-                        <td class="@DayCellClass(day, i) relative cursor-pointer p-2 text-center tabular-nums" @onclick="() => OnCellClicked.InvokeAsync((day, row))" title="@CellTitle(day, row, cellEntries)">
-                            @if (TimeEntry.HasSyncProblem(cellEntries))
-                            {
-                                <span class="absolute right-1 top-1 size-1.5 rounded-full bg-amber-500" data-not-in-jira></span>
-                            }
-                            @if (Sheet.UnsavedFor(day, row.Key) is { } unsaved)
-                            {
-                                @if (saved > TimeSpan.Zero)
-                                {
-                                    <span class="text-slate-400 line-through dark:text-slate-500">@Format.Hours(saved)</span>
-                                }
-                                <span class="motion-drop ml-0.5 inline-block rounded border border-dashed border-blue-400 px-1 text-xs text-blue-700 dark:border-blue-600 dark:text-blue-300" title="Not saved yet"
-                                      style="@(Cascade ? Motion.Order(i) : null)" data-draft-cell>@(unsaved > TimeSpan.Zero ? Format.Hours(unsaved) : "0")</span>
-                            }
-                            else if (saved > TimeSpan.Zero)
-                            {
-                                var justSaved = JustSaved.Contains(day);
-                                <span class="inline-block rounded px-1 @(justSaved ? "motion-settle" : "")" data-sent="@(justSaved && SentToJira.Contains(day) ? "" : null)">@Format.Hours(saved)</span>
-                            }
-                        </td>
+                        <PeriodCell Sheet="Sheet" Row="row" Day="day" Index="i" Class="@DayCellClass(day, i)" Cascade="Cascade"
+                                    JustSaved="JustSaved.Contains(day)" SentToJira="SentToJira.Contains(day)" OnClick="() => OnCellClicked.InvokeAsync((day, row))" />
                     }
                     <td class="px-3 py-2 text-right font-medium tabular-nums"><Count Value="TimeEntry.Total(row.Entries)" /></td>
                 </tr>
@@ -88,9 +68,9 @@
                 <td class="@FooterLabel text-slate-500 dark:text-slate-400">Day total</td>
                 @foreach (var (day, i) in Days)
                 {
-                    <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums"><Count Value="TimeEntry.Total(Sheet.SavedOn(day))" /></td>
+                    <td class="@DayCellClass(day, i, footer: true) @FooterDayCell"><Count Value="TimeEntry.Total(Sheet.SavedOn(day))" /></td>
                 }
-                <td class="px-3 py-2 text-right tabular-nums"><Count Value="TimeEntry.Total(Sheet.Entries)" /></td>
+                <td class="@FooterTotalCell"><Count Value="TimeEntry.Total(Sheet.Entries)" /></td>
             </tr>
             <tr class="bg-slate-50 dark:bg-slate-800/60 text-xs" data-week-totals>
                 <td class="@FooterLabel font-semibold text-slate-500 dark:text-slate-400">Week</td>
@@ -112,9 +92,9 @@
                     <td class="@FooterLabel" title="Day totals once the unsaved changes are saved">Unsaved</td>
                     @foreach (var (day, i) in Days)
                     {
-                        <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums">@if (Sheet.IsUnsaved(day)) { <Count Value="Sheet.UnsavedDayTotal(day)" Zero="0" /> }</td>
+                        <td class="@DayCellClass(day, i, footer: true) @FooterDayCell">@if (Sheet.IsUnsaved(day)) { <Count Value="Sheet.UnsavedDayTotal(day)" Zero="0" /> }</td>
                     }
-                    <td class="px-3 py-2 text-right tabular-nums"><Count Value="Sheet.UnsavedTotal" /></td>
+                    <td class="@FooterTotalCell"><Count Value="Sheet.UnsavedTotal" /></td>
                 </tr>
             }
             @if (Sheet.HoursKnown && Sheet.Summary.Missing > TimeSpan.Zero)
@@ -123,9 +103,9 @@
                     <td class="@FooterLabel">Missing</td>
                     @foreach (var (day, i) in Days)
                     {
-                        <td class="@DayCellClass(day, i, footer: true) p-2 text-center tabular-nums"><Count Value="Sheet.Missing(day)" /></td>
+                        <td class="@DayCellClass(day, i, footer: true) @FooterDayCell"><Count Value="Sheet.Missing(day)" /></td>
                     }
-                    <td class="px-3 py-2 text-right tabular-nums"><Count Value="Sheet.Summary.Missing" /></td>
+                    <td class="@FooterTotalCell"><Count Value="Sheet.Summary.Missing" /></td>
                 </tr>
             }
         </tfoot>
@@ -149,6 +129,8 @@
     [Parameter] public EventCallback<(DateOnly Day, PeriodRow Row)> OnCellClicked { get; set; }
 
     private const string FooterLabel = "sticky left-0 z-10 bg-slate-50 dark:bg-slate-800 px-4 py-2";
+    private const string FooterDayCell = "p-2 text-center tabular-nums";
+    private const string FooterTotalCell = "px-3 py-2 text-right tabular-nums";
 
     private IReadOnlyList<PeriodRow> Rows = [];
 
@@ -168,7 +150,6 @@
     /// <summary>Moves the selected day's highlight after every render, as columns can change width.</summary>
     protected override Task OnAfterRenderAsync(bool firstRender) => Animations.GlideAsync(_grid);
 
-
     private IEnumerable<(DateOnly Day, int Index)> Days => Sheet.Period.Days.Select((d, i) => (d, i));
 
     private string? DayTitle(DateOnly day) => Sheet.Day(day) switch
@@ -178,14 +159,6 @@
         { HasPartialDayOff: true } d => $"{d.Name}: {Format.Hours(d.Off)} h off",
         _ => null,
     };
-
-    private static string CellTitle(DateOnly day, PeriodRow row, IReadOnlyList<TimeEntry> entries)
-    {
-        if (row.Key == "") return "";
-        var title = $"{row.Key} on {Format.ShortDay(day)}";
-        var problems = entries.Where(e => !e.IsSynced).Select(e => e.SyncError ?? "Not sent to Jira yet").Distinct().ToList();
-        return problems.Count == 0 ? title : $"{title}\nNot in Jira: {string.Join("; ", problems)}";
-    }
 
     private string DayCellClass(DateOnly day, int index, bool footer = false)
     {

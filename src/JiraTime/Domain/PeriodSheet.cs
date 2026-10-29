@@ -1,7 +1,11 @@
 namespace JiraTime.Domain;
 
 /// <summary>One issue's row in the period grid: its saved entries in the period.</summary>
-public sealed record PeriodRow(string Key, string Summary, IReadOnlyList<TimeEntry> Entries);
+public sealed record PeriodRow(string Key, string Summary, IReadOnlyList<TimeEntry> Entries)
+{
+    /// <summary>The row's saved entries on one day.</summary>
+    public IReadOnlyList<TimeEntry> On(DateOnly day) => Entries.Where(e => e.Date == day).ToList();
+}
 
 /// <summary>
 /// One timesheet period as the user works on it: the saved entries and days, plus unsaved changes per
