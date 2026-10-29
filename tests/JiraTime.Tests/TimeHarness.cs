@@ -1,6 +1,6 @@
 using JiraTime.Domain;
 using JiraTime.Services;
-using JiraTime.Storage.FileSystem;
+using JiraTime.Storage;
 
 namespace JiraTime.Tests;
 
@@ -29,7 +29,7 @@ public sealed class TimeHarness : IDisposable
     public TimeHarness(JiraConnection? connection = null)
     {
         Connection = connection ?? Server;
-        Store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
+        Store = new FileDocumentStore(_dir.Path);
         var user = User = CurrentUser.SignedIn(TestUsers.Carl, connection: Connection);
         Issues = new JiraIssueLookup(new JiraClient(Jira.Client()), Clock);
         Calendar = new WorkCalendarService(Store, user);

@@ -10,7 +10,7 @@ var dataDir = Path.GetFullPath(builder.Configuration["DataDirectory"] ?? "data",
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
 // Storage: JSON files on disk for now. Swap this line for a document database later.
-builder.Services.AddFileDocumentStore(Path.Combine(dataDir, "documents"));
+builder.Services.AddSingleton<IDocumentStore>(_ => new FileDocumentStore(Path.Combine(dataDir, "documents")));
 
 // Encrypts the Jira connection (incl. token) before it is put in the browser's localStorage.
 // The keys stay on the server, next to the data, so they survive restarts.

@@ -1,6 +1,6 @@
 using JiraTime.Domain;
 using JiraTime.Services;
-using JiraTime.Storage.FileSystem;
+using JiraTime.Storage;
 
 namespace JiraTime.Tests;
 
@@ -41,7 +41,7 @@ public class RetryQueueStoreTests : IDisposable
     private readonly TempDir _dir = new();
     private readonly FileDocumentStore _store;
 
-    public RetryQueueStoreTests() => _store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
+    public RetryQueueStoreTests() => _store = new FileDocumentStore(_dir.Path);
 
     public void Dispose()
     {
@@ -87,7 +87,7 @@ public class RetryQueueStoreTests : IDisposable
               "start": "09:00:00", "end": "11:30:00", "syncPending": true }
             """);
 
-        using var store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
+        using var store = new FileDocumentStore(_dir.Path);
         var queue = new RetryQueue(store, TestUsers.SignedIn());
         var old = Assert.Single(await queue.GetPendingAsync(Day, Day));
         Assert.Equal(TimeSpan.FromHours(2.5), old.Duration);

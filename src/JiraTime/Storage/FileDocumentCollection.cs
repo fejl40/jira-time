@@ -2,7 +2,7 @@ using System.Linq.Expressions;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace JiraTime.Storage.FileSystem;
+namespace JiraTime.Storage;
 
 internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>, IDisposable
     where T : class, IDocument

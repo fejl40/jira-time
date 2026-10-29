@@ -1,6 +1,6 @@
 using JiraTime.Domain;
 using JiraTime.Services;
-using JiraTime.Storage.FileSystem;
+using JiraTime.Storage;
 
 namespace JiraTime.Tests;
 
@@ -67,7 +67,7 @@ public class WorkCalendarTests
     public async Task Days_off_can_be_marked_and_unmarked()
     {
         using var dir = new TempDir();
-        using var store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = dir.Path });
+        using var store = new FileDocumentStore(dir.Path);
         var calendar = new WorkCalendarService(store, TestUsers.SignedIn());
         var day = D("2026-10-20");
 
@@ -84,7 +84,7 @@ public class WorkCalendarTests
     private static (TempDir, FileDocumentStore, WorkCalendarService) Calendar()
     {
         var dir = new TempDir();
-        var store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = dir.Path });
+        var store = new FileDocumentStore(dir.Path);
         return (dir, store, new WorkCalendarService(store, TestUsers.SignedIn()));
     }
 

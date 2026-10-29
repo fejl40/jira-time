@@ -1,7 +1,7 @@
 using System.Net;
 using JiraTime.Domain;
 using JiraTime.Services;
-using JiraTime.Storage.FileSystem;
+using JiraTime.Storage;
 
 namespace JiraTime.Tests;
 
@@ -39,7 +39,7 @@ public class JiraIdentityTests : IDisposable
 
     public JiraIdentityTests()
     {
-        _store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
+        _store = new FileDocumentStore(_dir.Path);
         _identity = new JiraIdentity(new JiraClient(_jira.Client()), _store, _user, new LegacyDataMigration(_store));
         Me("JIRAUSER1", "carl", "Carl Lilholm");
     }
@@ -165,7 +165,7 @@ public class DataSeparationTests : IDisposable
     private readonly TempDir _dir = new();
     private readonly FileDocumentStore _store;
 
-    public DataSeparationTests() => _store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
+    public DataSeparationTests() => _store = new FileDocumentStore(_dir.Path);
 
     public void Dispose()
     {
@@ -241,7 +241,7 @@ public class LegacyDataMigrationTests : IDisposable
 
     public void Dispose() => _dir.Dispose();
 
-    private FileDocumentStore Store() => new(new FileDocumentStoreOptions { RootPath = _dir.Path });
+    private FileDocumentStore Store() => new(_dir.Path);
 
     /// <summary>Writes data the way the app stored it before multi-user support.</summary>
     private async Task WriteOldDataAsync(string? profileId = "JIRAUSER1")

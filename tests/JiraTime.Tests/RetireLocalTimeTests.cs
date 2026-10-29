@@ -1,6 +1,6 @@
 using JiraTime.Domain;
 using JiraTime.Services;
-using JiraTime.Storage.FileSystem;
+using JiraTime.Storage;
 
 namespace JiraTime.Tests;
 
@@ -12,7 +12,7 @@ public class RetireLocalTimeTests : IDisposable
     private readonly TempDir _dir = new();
     private readonly FileDocumentStore _store;
 
-    public RetireLocalTimeTests() => _store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
+    public RetireLocalTimeTests() => _store = new FileDocumentStore(_dir.Path);
 
     public void Dispose()
     {

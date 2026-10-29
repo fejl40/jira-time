@@ -64,7 +64,9 @@ Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work ho
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount
 Domain/MonthExport.cs              the month export: rows per day and issue, tab-separated text
 Domain/LegacyData.cs               data from older versions and their backups
-Storage/                           document store interfaces + file-system implementation
+Storage/IDocumentStore.cs          the document store interfaces
+Storage/FileDocumentStore.cs       the file store: one JSON file per document
+Storage/FileDocumentCollection.cs  one collection of the file store, cached in memory
 Services/SignInSession.cs          restores, connects and signs out a tab (uses the two below)
 Services/ConnectionState.cs        encrypted connection in browser localStorage (per tab/circuit)
 Services/JiraIdentity.cs           signs a tab in as the user Jira says the token belongs to
@@ -265,10 +267,10 @@ The app only uses `IDocumentStore` / `IDocumentCollection<T>` (`Storage/IDocumen
 `GetAsync`, `QueryAsync(Expression<...>)`, `UpsertAsync`, `DeleteAsync`. Filters are
 expressions so a database implementation can translate them into server-side queries.
 
-The current implementation, `Storage/FileSystem/FileDocumentStore`, writes one JSON file per
+The current implementation, `Storage/FileDocumentStore`, writes one JSON file per
 document (atomic temp-file + move), caches each collection in memory, and reloads if files change
 on disk. To move to a document database (MongoDB, Cosmos DB, RavenDB, ...), implement the two
-interfaces and replace `AddFileDocumentStore(...)` in `Program.cs`.
+interfaces and replace the `IDocumentStore` registration in `Program.cs`.
 
 ### Tests
 

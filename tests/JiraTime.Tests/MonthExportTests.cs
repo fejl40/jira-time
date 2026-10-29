@@ -1,6 +1,6 @@
 using JiraTime.Domain;
 using JiraTime.Services;
-using JiraTime.Storage.FileSystem;
+using JiraTime.Storage;
 
 namespace JiraTime.Tests;
 
@@ -105,7 +105,7 @@ public class EpicExportStoreTests : IDisposable
     private readonly TempDir _dir = new();
     private readonly FileDocumentStore _store;
 
-    public EpicExportStoreTests() => _store = new FileDocumentStore(new FileDocumentStoreOptions { RootPath = _dir.Path });
+    public EpicExportStoreTests() => _store = new FileDocumentStore(_dir.Path);
 
     private EpicExportStore For(UserKey user) => new(_store, CurrentUser.SignedIn(user));
 

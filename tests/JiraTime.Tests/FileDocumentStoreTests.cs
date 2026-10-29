@@ -1,6 +1,5 @@
 using JiraTime.Domain;
 using JiraTime.Storage;
-using JiraTime.Storage.FileSystem;
 
 namespace JiraTime.Tests;
 
@@ -10,7 +9,7 @@ public class FileDocumentStoreTests : IDisposable
 
     public void Dispose() => _dir.Dispose();
 
-    private FileDocumentStore NewStore() => new(new FileDocumentStoreOptions { RootPath = _dir.Path });
+    private FileDocumentStore NewStore() => new(_dir.Path);
 
     private static TimeEntry Entry(string key, DateOnly date) =>
         new() { IssueKey = key, Date = date, Duration = TimeSpan.FromHours(1) };

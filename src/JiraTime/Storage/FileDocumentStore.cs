@@ -3,18 +3,12 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace JiraTime.Storage.FileSystem;
-
-public class FileDocumentStoreOptions
-{
-    /// <summary>Root folder. Each collection is a sub-folder, each document a JSON file.</summary>
-    public string RootPath { get; set; } = "data/documents";
-}
+namespace JiraTime.Storage;
 
 /// <summary>
-/// Stores documents as <c>{RootPath}/{collection}/{id}.json</c>. Meant for a single
-/// local user: collections are read into memory on first use and written through
-/// on every change. Editing files by hand while the app runs is picked up too.
+/// Stores documents as <c>{rootPath}/{collection}/{id}.json</c>, for one server:
+/// collections are read into memory on first use and written through on every change.
+/// Editing files by hand while the app runs is picked up too.
 /// </summary>
 public sealed class FileDocumentStore : IDocumentStore, IDisposable
 {
@@ -27,9 +21,10 @@ public sealed class FileDocumentStore : IDocumentStore, IDisposable
     private readonly string _root;
     private readonly ConcurrentDictionary<Type, IDisposable> _collections = new();
 
-    public FileDocumentStore(FileDocumentStoreOptions options)
+    /// <param name="rootPath">Root folder. Each collection is a sub-folder, each document a JSON file.</param>
+    public FileDocumentStore(string rootPath)
     {
-        _root = Path.GetFullPath(options.RootPath);
+        _root = Path.GetFullPath(rootPath);
         Directory.CreateDirectory(_root);
     }
 
