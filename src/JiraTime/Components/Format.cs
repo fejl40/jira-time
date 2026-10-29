@@ -14,8 +14,17 @@ public static class Format
     /// <summary>Hours with a unit, "0 h" for none: 7.5 h.</summary>
     public static string HoursText(TimeSpan t) => $"{(Hours(t) is { Length: > 0 } h ? h : "0")} h";
 
+    /// <summary>A number and a word, plural when it isn't one: "1 row", "3 rows", "2 entries".</summary>
+    public static string Count(int n, string word)
+    {
+        if (n == 1) return $"1 {word}";
+        // "entry" becomes "entries", but "day" stays "days".
+        var consonantY = word.Length > 1 && word[^1] == 'y' && !"aeiou".Contains(word[^2]);
+        return consonantY ? $"{n} {word[..^1]}ies" : $"{n} {word}s";
+    }
+
     /// <summary>"1 day", "3 days".</summary>
-    public static string Days(int n) => n == 1 ? "1 day" : $"{n} days";
+    public static string Days(int n) => Count(n, "day");
 
     public static string Range(DateOnly a, DateOnly b) =>
         a.Year == b.Year

@@ -44,4 +44,13 @@ public class FormatTests
         Assert.Equal("1 day", Format.Days(1));
         Assert.Equal("3 days", Format.Days(3));
     }
+
+    [Theory]
+    [InlineData(1, "row", "1 row")]
+    [InlineData(0, "row", "0 rows")]
+    [InlineData(3, "row", "3 rows")]
+    [InlineData(1, "entry", "1 entry")]
+    [InlineData(2, "entry", "2 entries")]
+    [InlineData(2, "day", "2 days")]
+    public void Counts_are_plural_unless_one(int n, string word, string expected) => Assert.Equal(expected, Format.Count(n, word));
 }
