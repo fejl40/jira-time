@@ -55,19 +55,20 @@ public static class MonthExport
     public static IReadOnlyList<ExportRow> Rows(DateOnly month, IEnumerable<TimeEntry> entries, IReadOnlyDictionary<string, string?> epics)
     {
         var (from, to) = MonthOf(month);
-        var byDay = entries
-            .Where(e => !e.DeletePending && e.Date >= from && e.Date <= to && e.Duration > TimeSpan.Zero)
-            .GroupBy(e => e.Date)
-            .ToDictionary(g => g.Key, g => g
-                .GroupBy(e => e.IssueKey.ToUpperInvariant())
-                .OrderBy(i => i.Key, StringComparer.Ordinal)
-                .Select(i => new ExportRow(g.Key, TimeEntry.Total(i), i.Key, epics.GetValueOrDefault(i.Key)))
-                .ToList());
+        var logged = entries.Where(e => !e.DeletePending && e.Date >= from && e.Date <= to && e.Duration > TimeSpan.Zero);
+        var byDay = logged.GroupBy(e => e.Date).ToDictionary(g => g.Key, g => DayRows(g.Key, g, epics));
 
         var rows = new List<ExportRow>();
         for (var d = from; d <= to; d = d.AddDays(1))
             rows.AddRange(byDay.TryGetValue(d, out var day) ? day : [new ExportRow(d)]);
         return rows;
+    }
+
+    /// <summary>One row per issue on a day, by key, with its hours added up.</summary>
+    private static List<ExportRow> DayRows(DateOnly date, IEnumerable<TimeEntry> entries, IReadOnlyDictionary<string, string?> epics)
+    {
+        var byIssue = entries.GroupBy(e => e.IssueKey.ToUpperInvariant()).OrderBy(i => i.Key, StringComparer.Ordinal);
+        return byIssue.Select(i => new ExportRow(date, TimeEntry.Total(i), i.Key, epics.GetValueOrDefault(i.Key))).ToList();
     }
 
     /// <summary>The row's eight cells, in <see cref="Header"/> order.</summary>

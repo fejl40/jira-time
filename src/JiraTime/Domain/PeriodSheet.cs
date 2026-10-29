@@ -102,16 +102,19 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
     {
         get
         {
-            var unsaved = _work.Values.SelectMany(w => w.RowsToSave(SavedOn(w.Date)));
-            return Entries.Select(e => (Entry: e, Saved: true))
-                .Concat(unsaved.Select(e => (Entry: e, Saved: false)))
-                .GroupBy(x => x.Entry.IssueKey)
-                .Select(g => new PeriodRow(g.Key,
-                    g.OrderByDescending(x => x.Saved).ThenByDescending(x => x.Entry.UpdatedUtc).First().Entry.IssueSummary,
-                    g.Where(x => x.Saved).Select(x => x.Entry).ToList()))
-                .OrderBy(r => r.Key == "").ThenBy(r => r.Key, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            var unsaved = _work.Values.SelectMany(w => w.RowsToSave(SavedOn(w.Date))).ToList();
+            var keys = Entries.Concat(unsaved).Select(e => e.IssueKey).Distinct();
+            var rows = keys.Select(key => RowOf(key, unsaved));
+            return rows.OrderBy(r => r.Key == "").ThenBy(r => r.Key, StringComparer.OrdinalIgnoreCase).ToList();
         }
+    }
+
+    /// <summary>An issue's grid row: its saved entries, named after the latest saved entry (or the latest unsaved one).</summary>
+    private PeriodRow RowOf(string key, IReadOnlyList<TimeEntry> unsaved)
+    {
+        var saved = Entries.Where(e => e.IssueKey == key).ToList();
+        var named = saved.MaxBy(e => e.UpdatedUtc) ?? unsaved.Where(e => e.IssueKey == key).MaxBy(e => e.UpdatedUtc)!;
+        return new PeriodRow(key, named.IssueSummary, saved);
     }
 
     /// <summary>
