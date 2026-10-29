@@ -1,0 +1,64 @@
+@* Keyboard shortcuts for the selected day (wwwroot/keys.js), passed on as events, and focus once the
+   page has rendered. No markup of its own. *@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+@code {
+    /// <summary>Ctrl/Cmd+S: save the day.</summary>
+    [Parameter] public EventCallback OnSave { get; set; }
+    /// <summary>← or →: -1 for the previous day, 1 for the next.</summary>
+    [Parameter] public EventCallback<int> OnMove { get; set; }
+    /// <summary>N: add a row.</summary>
+    [Parameter] public EventCallback OnAddRow { get; set; }
+
+    private DotNetObjectReference<DayKeys>? _self;
+    /// <summary>Element id to focus after the page's next render; empty for the day's first hours field.</summary>
+    private string? _focus;
+
+    /// <summary>Focuses the element with this id once the page has rendered.</summary>
+    public void Focus(string id) => _focus = id;
+
+    /// <summary>Focuses the selected day's first hours field once the page has rendered.</summary>
+    public void FocusFirstHours() => _focus = "";
+
+    /// <summary>
+    /// Called by the page after each render. Its re-render doesn't always re-render this component, so
+    /// the page says when to focus.
+    /// </summary>
+    public async Task PageRenderedAsync()
+    {
+        if (_focus is not { } id) return;
+        _focus = null;
+        await JS.InvokeVoidAsync("jiraKeys.focus", id);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _self = DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("jiraKeys.attach", _self);
+    }
+
+    [JSInvokable]
+    public Task SaveDayFromKeyboard() => InvokeAsync(() => OnSave.InvokeAsync());
+
+    [JSInvokable]
+    public Task MoveDay(int delta) => InvokeAsync(() => OnMove.InvokeAsync(delta));
+
+    [JSInvokable]
+    public Task AddRowFromKeyboard() => InvokeAsync(() => OnAddRow.InvokeAsync());
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_self is null) return;
+        try
+        {
+            await JS.InvokeVoidAsync("jiraKeys.detach");
+        }
+        catch (JSDisconnectedException)
+        {
+            // The tab is gone; nothing to detach.
+        }
+        _self.Dispose();
+    }
+}

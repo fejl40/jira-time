@@ -1,0 +1,84 @@
+@* The selected day: its header with time off, news about it, the rows to edit and the keyboard hint.
+   Jira not readable means hours are unknown, so the day can't be edited then. *@
+@inject CurrentUser User
+@inject WorkCalendarService Calendar
+
+<section class="card p-6">
+    <DayHeader Date="Day" Info="Sheet.Day(Day)" Logged="TimeEntry.Total(Saved)" Missing="Sheet.Missing(Day)"
+               OnMarkOff="MarkDayOffAsync" OnUnmarkOff="UnmarkDayOffAsync" />
+
+    @if (Notice is not null)
+    {
+        <div class="mt-3 text-sm text-amber-700 dark:text-amber-400" role="status">@Notice</div>
+    }
+    @if (User.Connection is { } connection && Sheet.HoursKnown)
+    {
+        <div class="mt-4">
+            <DayEditor @ref="_editor" Date="Day" Saved="Saved" Work="Sheet.WorkFor(Day)"
+                       Recent="Extras.Recent" Comments="Extras.Comments" Sprint="Sheet.Sprint" Earlier="Extras.Earlier" Statuses="Statuses.Known"
+                       OnIssuePicked="key => Statuses.LookUpAsync([key])" Connection="connection" Expected="@(Sheet.Day(Day)?.Expected ?? TimeSpan.Zero)"
+                       Previous="Sheet.PreviousWorkedDay(Day)"
+                       OnChanged="OnChanged" OnSaved="OnSaved" OnChangedInJira="OnReload" OnDiscard="DiscardAsync" />
+        </div>
+        <p class="hint mt-4 hidden sm:block" data-shortcuts>
+            Keys: <kbd>←</kbd> <kbd>→</kbd> previous / next day · <kbd>N</kbd> add a row ·
+            <kbd>Enter</kbd> next row · <kbd>Esc</kbd> leave a field · <kbd>Ctrl</kbd>+<kbd>S</kbd> save the day
+        </p>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
+    [Parameter, EditorRequired] public DateOnly Day { get; set; }
+    /// <summary>News about the day, such as days Save all couldn't save.</summary>
+    [Parameter] public string? Notice { get; set; }
+    /// <summary>What the issue picker offers besides the sprint.</summary>
+    [Parameter, EditorRequired] public PeriodExtras Extras { get; set; } = default!;
+    /// <summary>The page's issue statuses; rows on Done issues get a note.</summary>
+    [Parameter, EditorRequired] public IssueStatuses Statuses { get; set; } = default!;
+    /// <summary>Raised after the day's unsaved changes changed, so the page shows them.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback<WorklogSync.DayResult> OnSaved { get; set; }
+    /// <summary>Raised when the period has to be read again (time off changed, or Jira changed meanwhile).</summary>
+    [Parameter] public EventCallback OnReload { get; set; }
+
+    private DayEditor? _editor;
+
+    private IReadOnlyList<TimeEntry> Saved => Sheet.SavedOn(Day);
+
+    /// <summary>Saves the day, for the Ctrl+S shortcut.</summary>
+    public Task SaveAsync() => _editor?.SaveAsync() ?? Task.CompletedTask;
+
+    /// <summary>Adds an empty row, for the N shortcut; null when the day can't be edited.</summary>
+    public async Task<TimeEntry?> AddRowAsync() => _editor is null ? null : await _editor.AddRowAsync();
+
+    private Task DiscardAsync()
+    {
+        Sheet.Finish(Day);
+        return OnChanged.InvokeAsync();
+    }
+
+    /// <summary>
+    /// Marks the day, or part of it, off. A suggestion made for the old hours no longer fits and is made
+    /// again; changes the user made are kept.
+    /// </summary>
+    private async Task MarkDayOffAsync(DayHeader.TimeOff off)
+    {
+        var day = Day;
+        var onlySuggested = Sheet.HasOnlySuggestions(day);
+        if (off.Hours is null || onlySuggested) Sheet.Finish(day);
+        await Calendar.MarkDayOffAsync(day, off.Reason, off.Hours);
+        await OnReload.InvokeAsync();
+        if (off.Hours is not null && onlySuggested) Sheet.Restart(day);
+        await OnChanged.InvokeAsync();
+    }
+
+    private async Task UnmarkDayOffAsync()
+    {
+        var day = Day;
+        await Calendar.UnmarkDayOffAsync(day);
+        await OnReload.InvokeAsync();
+        Sheet.Restart(day);
+        await OnChanged.InvokeAsync();
+    }
+}

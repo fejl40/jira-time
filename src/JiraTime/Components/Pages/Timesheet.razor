@@ -5,12 +5,10 @@
 @inject IssueStatuses Statuses
 @inject TimeProvider Clock
 @inject WorklogSync Sync
-@inject WorkCalendarService Calendar
 @inject CurrentUser User
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject MotionScript Animations
-@implements IAsyncDisposable
 
 @* Loads a period into a PeriodSheet and wires its parts to the services. The rules live in
    PeriodSheet; the markup in Components/Sheet. *@
@@ -21,16 +19,17 @@
 
 @if (_sheet is { } sheet)
 {
+<DayKeys @ref="_keys" OnSave="SaveDayFromKeyboardAsync" OnMove="d => SelectDay(_selectedDay.AddDays(d))" OnAddRow="AddRowFromKeyboardAsync" />
 <div class="mx-auto max-w-7xl space-y-6 overflow-x-clip">
     <PeriodHeader Sheet="sheet" Unsynced="_unsynced" Syncing="_syncing" Saving="_savingAll"
                   OnSync="SyncPeriodAsync" OnFillPeriod="FillPeriod" OnSaveAll="SaveAllAsync" OnDiscardAll="DiscardAll" />
 
-    <PeriodReminders Sheet="sheet" Unsynced="_unsynced" Previous="_previousOpen" />
+    <PeriodReminders Sheet="sheet" Unsynced="_unsynced" Previous="_extras.Previous" />
 
-    @if (_jiraError is not null)
+    @if (_extras.JiraError is { } jiraError)
     {
         <div class="card flex flex-wrap items-center gap-3 border-amber-300 p-4 text-sm text-amber-800 dark:border-amber-700 dark:text-amber-300" role="alert" data-jira-error>
-            <span class="flex-1">Couldn't read your time from Jira: @_jiraError. Only work waiting to be sent is shown, and days can't be edited until Jira can be read.</span>
+            <span class="flex-1">Couldn't read your time from Jira: @jiraError. Only work waiting to be sent is shown, and days can't be edited until Jira can be read.</span>
             <button type="button" class="btn-secondary" disabled="@_loading" @onclick="RetryJiraAsync">@(_loading ? "Trying…" : "Try again")</button>
         </div>
     }
@@ -40,34 +39,12 @@
         <DayList Sheet="sheet" Selected="_selectedDay" OnSelect="d => SelectDay(d)" />
 
         <PeriodGrid Sheet="sheet" Selected="_selectedDay" JiraBaseUrl="@User.Connection?.BaseUrl"
-                    Cascade="_cascade" JustSaved="_justSaved" SentToJira="_sentToJira"
+                    Cascade="_cascade" JustSaved="_saveMotion.JustSaved" SentToJira="_saveMotion.SentToJira"
                     OnSelectDay="d => SelectDay(d, focus: true)" OnCellClicked="CellClicked" />
     </div>
 
-    @* Selected day *@
-    <section class="card p-6">
-        <DayHeader Date="_selectedDay" Info="sheet.Day(_selectedDay)" Logged="TimeEntry.Total(DayEntries)" Missing="sheet.Missing(_selectedDay)"
-                   OnMarkOff="MarkDayOffAsync" OnUnmarkOff="UnmarkDayOffAsync" />
-
-        @if (_notice is not null)
-        {
-            <div class="mt-3 text-sm text-amber-700 dark:text-amber-400" role="status">@_notice</div>
-        }
-        @if (User.Connection is { } connection && sheet.HoursKnown)
-        {
-            <div class="mt-4">
-                <DayEditor @ref="_editor" Date="_selectedDay" Saved="DayEntries" Work="sheet.WorkFor(_selectedDay)"
-                           Recent="_recent" Comments="_comments" Sprint="sheet.Sprint" Earlier="_earlier" Statuses="Statuses.Known"
-                           OnIssuePicked="key => Statuses.LookUpAsync([key])" Connection="connection" Expected="@(sheet.Day(_selectedDay)?.Expected ?? TimeSpan.Zero)"
-                           Previous="sheet.PreviousWorkedDay(_selectedDay)"
-                           OnChanged="StateHasChanged" OnSaved="DaySavedAsync" OnChangedInJira="ReloadAsync" OnDiscard="() => sheet.Finish(_selectedDay)" />
-            </div>
-            <p class="hint mt-4 hidden sm:block" data-shortcuts>
-                Keys: <kbd>←</kbd> <kbd>→</kbd> previous / next day · <kbd>N</kbd> add a row ·
-                <kbd>Enter</kbd> next row · <kbd>Esc</kbd> leave a field · <kbd>Ctrl</kbd>+<kbd>S</kbd> save the day
-            </p>
-        }
-    </section>
+    <DayPanel @ref="_panel" Sheet="sheet" Day="_selectedDay" Notice="@_notice" Extras="_extras" Statuses="Statuses"
+              OnChanged="StateHasChanged" OnSaved="DaySavedAsync" OnReload="ReloadAsync" />
 </div>
 }
 else
@@ -76,8 +53,7 @@ else
 }
 
 @code {
-    // The period start and the selected day are kept in the URL, so reload and back/forward keep them.
-    // They are read from the whole link with Links.Read; these parameters make a change re-render the page.
+    // Period and day are kept in the URL (read with Links.Read); a change to these re-renders the page.
     [Parameter] public string? StartText { get; set; }
     [SupplyParameterFromQuery(Name = "day")] public string? DayText { get; set; }
 
@@ -88,25 +64,21 @@ else
     private PeriodSheet? _sheet;
     private DateOnly _selectedDay;
     private int _unsynced;
-    private OpenPeriod? _previousOpen;
     private bool _syncing, _savingAll, _loading;
     /// <summary>News about the selected day, such as days Save all couldn't save.</summary>
     private string? _notice;
-    /// <summary>Why Jira couldn't be read; the period then shows only work waiting for Jira and can't be edited.</summary>
-    private string? _jiraError;
-    private DayEditor? _editor;
+    private DayPanel? _panel;
 
-    // What the issue picker offers besides the sprint.
-    private IReadOnlyList<JiraIssue> _recent = [];
-    private IReadOnlyDictionary<string, IReadOnlyList<string>> _comments = new Dictionary<string, IReadOnlyList<string>>();
-    /// <summary>Issues assigned to the user that were to do earlier in this period (maybe Done now).</summary>
-    private IReadOnlyList<IssueWithStatus> _earlier = [];
+    /// <summary>
+    /// What goes around the period: why Jira couldn't be read (the period then shows only work waiting for
+    /// Jira and can't be edited), the previous period's state, and what the issue picker offers.
+    /// </summary>
+    private PeriodExtras _extras = new(null, null, [], new Dictionary<string, IReadOnlyList<string>>(), []);
 
     /// <summary>Which way the last period change went: 1 to a later period, -1 to an earlier one, 0 on first show.</summary>
     private int _slide;
 
     private PeriodSheet Sheet => _sheet!;
-    private IReadOnlyList<TimeEntry> DayEntries => Sheet.SavedOn(_selectedDay);
     private bool HasUnsaved => _sheet?.OwnChangeDays.Count > 0;
 
     protected override async Task OnParametersSetAsync()
@@ -139,7 +111,7 @@ else
         _loading = true;
         var loaded = await Loader.LoadAsync(sheet, Statuses);
         _loading = false;
-        (_jiraError, _previousOpen, _recent, _comments, _earlier) = (loaded.JiraError, loaded.Previous, loaded.Recent, loaded.Comments, loaded.Earlier);
+        _extras = loaded;
         _unsynced = sheet.Entries.Count(e => !e.IsSynced);
     }
 
@@ -152,32 +124,20 @@ else
 
     // ---- Saving and syncing ----
 
-    // The last save, for its animation: days saved, and those Jira got completely.
-    private readonly HashSet<DateOnly> _justSaved = [], _sentToJira = [];
-    private bool _flyTicks;
+    private readonly SaveMotion _saveMotion = new();
 
     private void Saved(DateOnly day, WorklogSync.DayResult result)
     {
         Sheet.Finish(day);
-        _justSaved.Add(day);
-        if (result.SyncFailures == 0) _sentToJira.Add(day);
-    }
-
-    /// <summary>After the saved work has reloaded, so the ticks start from the saved cells.</summary>
-    private void FinishSave() => _flyTicks = _sentToJira.Count > 0;
-
-    private void StartSave()
-    {
-        _justSaved.Clear();
-        _sentToJira.Clear();
+        _saveMotion.Saved(day, sentToJira: result.SyncFailures == 0);
     }
 
     private async Task DaySavedAsync(WorklogSync.DayResult result)
     {
-        StartSave();
+        _saveMotion.Start();
         Saved(_selectedDay, result);
         await ReloadAsync();
-        FinishSave();
+        _saveMotion.Finish();
     }
 
     /// <summary>True for the render right after Fill period, so its suggestions drop in day by day.</summary>
@@ -201,13 +161,13 @@ else
         if (User.Connection is not { } c) return;
         _savingAll = true;
         _notice = null;
-        StartSave();
+        _saveMotion.Start();
         var result = await Sync.SaveDaysAsync(c, Sheet);
         foreach (var (savedDay, dayResult) in result.Saved) Saved(savedDay, dayResult);
         _savingAll = false;
-        if (_justSaved.Contains(_selectedDay)) await Animations.CollapseAsync(MotionScript.RemovedRows);
+        if (_saveMotion.JustSaved.Contains(_selectedDay)) await Animations.CollapseAsync(MotionScript.RemovedRows);
         await ReloadAsync();
-        FinishSave();
+        _saveMotion.Finish();
         if (result.FirstToFix is { } day)
         {
             SelectDay(day);
@@ -225,36 +185,13 @@ else
         _syncing = false;
     }
 
-    // ---- Time off ----
-
-    /// <summary>
-    /// Marks the selected day, or part of it, off. A suggestion made for the old hours no longer fits and
-    /// is made again; changes the user made are kept.
-    /// </summary>
-    private async Task MarkDayOffAsync(DayHeader.TimeOff off)
-    {
-        var day = _selectedDay;
-        var onlySuggested = Sheet.HasOnlySuggestions(day);
-        if (off.Hours is null || onlySuggested) Sheet.Finish(day);
-        await Calendar.MarkDayOffAsync(day, off.Reason, off.Hours);
-        await ReloadAsync();
-        if (off.Hours is not null && onlySuggested) Sheet.Restart(day);
-    }
-
-    private async Task UnmarkDayOffAsync()
-    {
-        await Calendar.UnmarkDayOffAsync(_selectedDay);
-        await ReloadAsync();
-        Sheet.Restart(_selectedDay);
-    }
-
     // ---- Days and navigation ----
 
     /// <summary>Selects a day by putting it in the URL; <see cref="OnParametersSetAsync"/> shows it.</summary>
     /// <param name="focus">Focus the day's first hours field once shown (picked with the mouse).</param>
     private void SelectDay(DateOnly day, bool focus = false)
     {
-        if (focus) _focus = FirstHours;
+        if (focus) _keys?.FocusFirstHours();
         if (day == _selectedDay) return;
         Nav.NavigateTo(Links.To(day), replace: true);
     }
@@ -276,7 +213,7 @@ else
             SelectDay(day, focus: true);
             return;
         }
-        _focus = $"hours-{Sheet.RowFor(day, row.Key, row.Summary).Id}";
+        _keys?.Focus($"hours-{Sheet.RowFor(day, row.Key, row.Summary).Id}");
         SelectDay(day);
     }
 
@@ -291,86 +228,23 @@ else
             context.PreventNavigation();
     }
 
-    // ---- Focus and keyboard shortcuts ----
+    // ---- Animations and keyboard shortcuts ----
 
-    private const string FirstHours = "";
-    /// <summary>Element id to focus after the next render; <see cref="FirstHours"/> for the day's first hours field.</summary>
-    private string? _focus;
-    private DotNetObjectReference<Timesheet>? _self;
+    private DayKeys? _keys;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_sheet is null) return;
         _cascade = false;
-        if (_self is null)
-        {
-            _self = DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("jiraKeys.attach", _self);
-        }
-        if (_focus is { } id)
-        {
-            _focus = null;
-            await JS.InvokeVoidAsync("jiraKeys.focus", id);
-        }
-        await CelebrateAsync();
-        if (_flyTicks)
-        {
-            _flyTicks = false;
-            await Animations.FlyTicksAsync();
-        }
+        if (_keys is not null) await _keys.PageRenderedAsync();
+        if (_saveMotion.TakeFlyTicks()) await Animations.FlyTicksAsync();
     }
 
-    /// <summary>Notices the period becoming complete while it is shown (not one that already was).</summary>
-    private Milestones<Period> _completed = new();
-    private PeriodSheet? _completedSheet;
+    // Keyboard events re-render the page, which shows the editor's errors when the day wasn't saved.
+    private Task SaveDayFromKeyboardAsync() => _panel?.SaveAsync() ?? Task.CompletedTask;
 
-    /// <summary>Confetti when the period becomes complete; the script makes sure each period celebrates once per browser.</summary>
-    private async Task CelebrateAsync()
+    private async Task AddRowFromKeyboardAsync()
     {
-        if (_sheet is not { } sheet || User.Key is not { } user) return;
-        if (_completedSheet != sheet) (_completedSheet, _completed) = (sheet, new());
-        var complete = sheet.Summary.IsComplete(_unsynced, sheet.UnsavedDays.Count > 0);
-        if (_completed.Update(complete ? [sheet.Period] : []).Count > 0)
-            await Animations.CelebrateAsync(user, sheet.Period);
-    }
-
-    [JSInvokable]
-    public async Task SaveDayFromKeyboard()
-    {
-        if (_editor is null) return;
-        await InvokeAsync(async () =>
-        {
-            await _editor.SaveAsync();
-            StateHasChanged(); // shows the editor's errors when the day wasn't saved
-        });
-    }
-
-    [JSInvokable]
-    public Task MoveDay(int delta) => InvokeAsync(() => SelectDay(_selectedDay.AddDays(delta)));
-
-    [JSInvokable]
-    public async Task AddRowFromKeyboard()
-    {
-        if (_editor is null) return;
-        await InvokeAsync(async () =>
-        {
-            var row = await _editor.AddRowAsync();
-            _focus = $"issue-{row.Id}";
-            StateHasChanged();
-        });
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_self is null) return;
-        try
-        {
-            await JS.InvokeVoidAsync("jiraKeys.detach");
-        }
-        catch (JSDisconnectedException)
-        {
-            // The tab is gone; nothing to detach.
-        }
-        _self.Dispose();
+        if (_panel is not null && await _panel.AddRowAsync() is { } row) _keys?.Focus($"issue-{row.Id}");
     }
 }
