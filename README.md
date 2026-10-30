@@ -4,18 +4,24 @@ A timesheet for logging your hours on Jira issues.
 
 Your hours are saved as Jira worklogs, so they show up in Jira and WorklogPRO.
 
-## Start it
+## Install
 
-You need the [.NET 10 SDK](https://dotnet.microsoft.com/download) and [Node.js](https://nodejs.org).
+You need the [.NET 10 SDK](https://dotnet.microsoft.com/download) and git.
 
-```sh
-dotnet run --project src/JiraTime
-```
+1. Get the code:
+   ```sh
+   git clone https://github.com/fejl40/jira-time.git
+   cd jira-time
+   ```
+2. Start it:
+   ```sh
+   dotnet run --project src/JiraTime
+   ```
+3. Open http://localhost:5115 and connect to Jira:
+   - **Jira Server / Data Center:** your Jira URL and a Personal Access Token (in Jira: your profile → Personal Access Tokens → Create token).
+   - **Jira Cloud:** your Jira URL, your email and an API token.
 
-Open http://localhost:5115 and connect to Jira:
-
-- **Jira Server / Data Center:** your Jira URL and a Personal Access Token.
-- **Jira Cloud:** your Jira URL, your email and an API token.
+To update later, run `git pull` in the `jira-time` folder and start it again.
 
 ## Use it
 
