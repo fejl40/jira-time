@@ -1,9 +1,10 @@
 ---
 id: TASK-99
 title: Put the tests into folders that mirror the app
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 13:30'
+updated_date: '2026-10-30 13:31'
 labels:
   - refactor
 dependencies: []
@@ -30,10 +31,16 @@ Move with git mv so history follows. Namespaces stay JiraTime.Tests, so no test 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every test file sits in the folder of the code it tests, mirroring src/JiraTime (Domain, Storage, Services and its subfolders, Components)
-- [ ] #2 Shared test helpers are in one Support folder
-- [ ] #3 Files are moved with git mv; namespaces and test names don't change
-- [ ] #4 dotnet test finds and passes the same number of tests as before
-- [ ] #5 AGENTS.md (Tests) and doc-1 (Tests follow the same concepts) say where tests and helpers live
-- [ ] #6 dotnet build has 0 warnings
+- [x] #1 Every test file sits in the folder of the code it tests, mirroring src/JiraTime (Domain, Storage, Services and its subfolders, Components)
+- [x] #2 Shared test helpers are in one Support folder
+- [x] #3 Files are moved with git mv; namespaces and test names don't change
+- [x] #4 dotnet test finds and passes the same number of tests as before
+- [x] #5 AGENTS.md (Tests) and doc-1 (Tests follow the same concepts) say where tests and helpers live
+- [x] #6 dotnet build has 0 warnings
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Moved the 66 test files with git mv into Domain (and Domain/JiraLog), Storage, Services (SignIn, Worklogs, Jira, JiraLog) and Components, mirroring src/JiraTime; helpers (TimeHarness, TestClock, TempStore, FakeJira*, Entries) into Support. Namespaces unchanged; the same 602 tests pass, build 0 warnings. AGENTS.md Tests and doc-1 say where tests and helpers live.
+<!-- SECTION:FINAL_SUMMARY:END -->

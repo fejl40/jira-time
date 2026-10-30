@@ -25,7 +25,7 @@ The app has four layers, each in its own folder under `src/JiraTime/`:
 - **Keep the number of files low.** A file holds one concept, not one type. Small types that belong to a concept (a result record, an enum, an options class) live in the same file as the class that uses them.
 - Make a new folder only when at least three files belong together.
 - Small browser helpers go in `wwwroot/` as one script per feature. Styles go in `Styles/`.
-- Tests follow the same concepts: `tests/JiraTime.Tests/<Thing>Tests.cs`.
+- Tests follow the same concepts and folders: the tests of `src/JiraTime/<Folder>/<Thing>.cs` are in `tests/JiraTime.Tests/<Folder>/<Thing>Tests.cs`. Shared test helpers are in `tests/JiraTime.Tests/Support/`.
 
 ## Size
 

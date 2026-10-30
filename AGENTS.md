@@ -418,7 +418,8 @@ interfaces and replace the `IDocumentStore` registration in `AddJiraTime` (`Serv
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet and its days (SheetDay, days off), the day
+xUnit tests in `tests/JiraTime.Tests` sit in folders that mirror `src/JiraTime` (Domain, Storage, Services and its
+subfolders, Components), with the shared helpers in `Support/`. They cover periods, the period sheet and its days (SheetDay, days off), the day
 save plan (DaySave), the file document store, owned collections (others' documents are never read or written), time
 entry rules and their sync transitions, workdays, reading hours as typed, reading and writing worklogs in Jira's
 format (embedded worklogs, pages, the worklog body), loading a period, saving days to Jira and the retry queue, the
@@ -431,5 +432,5 @@ time), and searches by key (batches, pages, POST, unknown keys).
 `TimeHarness` builds the app's own services from `AddJiraTime` with a `TestClock` (timers fire at once), a temp
 store and `FakeJira` (a fake Jira answering by URL; `Myself`, `Writes`, `WorklogReads`, `Searches` and
 `WorklogSearches` count what was sent, faults are in `FakeJiraFaults.cs`). Entries and sheets are built with
-`TestEntries` and `TestSheets`, signed-in users with `TestUsers` (all in `Entries.cs`).
+`TestEntries` and `TestSheets`, signed-in users with `TestUsers` (all in `Support/Entries.cs`).
 
