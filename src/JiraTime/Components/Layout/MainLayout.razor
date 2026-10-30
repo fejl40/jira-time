@@ -3,6 +3,7 @@
 @inject CurrentUser User
 @inject SignInSession Session
 @inject NavigationManager Nav
+@using JiraTime.Components.Logs
 
 <div class="flex min-h-full flex-col">
     <header class="flex h-14 flex-none items-center gap-6 bg-slate-800 dark:bg-slate-950 px-5 text-white">
@@ -13,6 +14,7 @@
             <nav class="flex gap-1 text-sm">
                 <a href="" class="rounded-md px-3 py-1.5 hover:bg-white/10 hover:text-white @(OnTimesheet ? "bg-white/15 text-white" : "text-slate-300")">Timesheet</a>
                 <NavLink href="export" class="rounded-md px-3 py-1.5 text-slate-300 hover:bg-white/10 hover:text-white" ActiveClass="!bg-white/15 !text-white">Export</NavLink>
+                <NavLink href="logs" class="rounded-md px-3 py-1.5 text-slate-300 hover:bg-white/10 hover:text-white" ActiveClass="!bg-white/15 !text-white" data-nav-logs>Logs</NavLink>
                 <NavLink href="settings" class="rounded-md px-3 py-1.5 text-slate-300 hover:bg-white/10 hover:text-white" ActiveClass="!bg-white/15 !text-white">Settings</NavLink>
             </nav>
         }
@@ -32,7 +34,8 @@
         </div>
     </header>
 
-    <main class="flex-1 px-4 py-8 sm:px-6">
+    @* On phones the extra room at the bottom lets the day editor scroll clear of the request toasts. *@
+    <main class="flex-1 px-4 pb-28 pt-8 sm:px-6 sm:pb-8">
         @if (_verifyError is not null && !OnSetup)
         {
             <ErrorCard Class="mx-auto max-w-lg" Title="Can't check who you are" Error="@_verifyError">
@@ -53,6 +56,11 @@
         }
     </main>
 </div>
+
+@if (User.IsSignedIn)
+{
+    <JiraToasts />
+}
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.

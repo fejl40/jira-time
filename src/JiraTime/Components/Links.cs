@@ -51,3 +51,13 @@ public static class ExportLinks
     public static DateOnly? Read(string? month) =>
         DateOnly.TryParseExact(month?.Trim() + "-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
 }
+
+/// <summary>Links to the Jira request log: <c>logs?day=2026-10-30&amp;request=…</c> opens a day with one request expanded.</summary>
+public static class LogLinks
+{
+    public static string To(DateOnly day, string? request = null) =>
+        request is null ? $"logs?day={Format.Iso(day)}" : $"logs?day={Format.Iso(day)}&request={Uri.EscapeDataString(request)}";
+
+    /// <summary>The logged request's day (its date where the server logged it) with it expanded.</summary>
+    public static string To(JiraLogEntry entry) => To(DateOnly.FromDateTime(entry.Time.DateTime), entry.Id);
+}

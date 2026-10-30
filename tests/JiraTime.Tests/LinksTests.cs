@@ -72,4 +72,13 @@ public class LinksTests
     [InlineData(null, null)]
     public void Export_links_are_read_back(string? month, string? first) =>
         Assert.Equal(first is null ? null : DateOnly.Parse(first), ExportLinks.Read(month));
+
+    [Fact]
+    public void A_log_link_opens_the_requests_day_with_it_expanded()
+    {
+        var entry = new JiraLogEntry { Id = "abc123", Time = new DateTimeOffset(2026, 10, 30, 23, 30, 0, TimeSpan.FromHours(1)) };
+
+        Assert.Equal("logs?day=2026-10-30&request=abc123", LogLinks.To(entry));
+        Assert.Equal("logs?day=2026-10-30", LogLinks.To(new DateOnly(2026, 10, 30)));
+    }
 }
