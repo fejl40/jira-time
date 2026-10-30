@@ -46,9 +46,7 @@ public static class WorklogMatching
 
     /// <summary>
     /// True when <paramref name="saved"/> is synced and <paramref name="edited"/> has the same issue, hours and
-    /// comment, so Jira needs nothing. The comment is compared exactly: a missing comment and an empty one differ,
-    /// so such a change is still sent.
+    /// comment (<see cref="TimeEntry.SameWork"/>), so Jira needs nothing.
     /// </summary>
-    public static bool SameAsSynced(this TimeEntry edited, TimeEntry saved) =>
-        saved.IsSynced && saved.SameWork(edited) && saved.Comment == edited.Comment;
+    public static bool SameAsSynced(this TimeEntry edited, TimeEntry saved) => saved.IsSynced && saved.SameWork(edited);
 }

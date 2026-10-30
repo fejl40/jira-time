@@ -82,14 +82,14 @@ public class WorklogMatchingTests
     }
 
     [Fact]
-    public void Being_the_same_as_in_Jira_compares_comments_exactly_so_no_comment_differs_from_an_empty_one()
+    public void Being_the_same_as_in_Jira_counts_no_comment_as_an_empty_one_like_every_other_comparison()
     {
         var saved = Entry();
         saved.Comment = null;
         var edited = Entry();
         edited.Comment = "";
 
-        Assert.False(edited.SameAsSynced(saved));
-        Assert.False(saved.SameAsSynced(edited));
+        Assert.True(edited.SameAsSynced(saved));
+        Assert.True(saved.SameAsSynced(edited));
     }
 }

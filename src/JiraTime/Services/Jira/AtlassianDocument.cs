@@ -1,4 +1,5 @@
 using System.Text.Json;
+using JiraTime.Domain;
 
 namespace JiraTime.Services;
 
@@ -7,7 +8,8 @@ public static class AtlassianDocument
 {
     /// <summary>
     /// Plain text of a comment: a string on Server/DC, an ADF document on Cloud.
-    /// Paragraphs become lines. Null when there is no text.
+    /// Paragraphs become lines. Cleaned as a typed comment is (<see cref="TimeEntry.CleanComment"/>), so comments
+    /// compare one way wherever they came from: trimmed, and null when there is no text.
     /// </summary>
     public static string? ToPlainText(JsonElement? comment)
     {
@@ -18,7 +20,7 @@ public static class AtlassianDocument
             JsonValueKind.Object => string.Join("\n", Paragraphs(c)),
             _ => null,
         };
-        return string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+        return TimeEntry.CleanComment(text);
 
         static IEnumerable<string> Paragraphs(JsonElement doc) =>
             doc.TryGetProperty("content", out var blocks) && blocks.ValueKind == JsonValueKind.Array

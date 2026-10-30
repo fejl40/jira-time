@@ -86,6 +86,36 @@ public class SaveAllTests : IDisposable
     }
 
     [Fact]
+    public async Task A_Jira_comment_with_spaces_around_it_is_read_cleaned_and_not_sent_again()
+    {
+        _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 8 * 3600, "  Pairing  ");
+        var sheet = await SheetAsync();
+        var row = Assert.Single(sheet.SavedOn(Monday));
+        Assert.Equal("Pairing", row.Comment);
+        sheet.Day(Monday).SetComment(row, "Pairing "); // typed again as it was
+        _h.Jira.Requests.Clear();
+
+        await _h.Sync.SaveDaysAsync(sheet.PlanSaveAll());
+
+        Assert.False(sheet.IsUnsaved(Monday));
+        Assert.Empty(_h.Jira.Writes);
+    }
+
+    [Fact]
+    public async Task Changing_the_hours_of_a_worklog_with_spaces_around_its_comment_sends_the_cleaned_comment()
+    {
+        _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 8 * 3600, "  Pairing  ");
+        var sheet = await SheetAsync();
+        sheet.Day(Monday).SetHours(sheet.SavedOn(Monday)[0], "6");
+
+        var result = await _h.Sync.SaveDaysAsync(sheet.PlanSaveAll());
+
+        Assert.Equal([Monday], result.Saved.Keys);
+        Assert.Equal("Pairing", (string?)_h.Jira.Worklogs["ABC-1"].Values.Single()["comment"]);
+        Assert.Equal(6 * 3600, _h.JiraSeconds("ABC-1"));
+    }
+
+    [Fact]
     public async Task A_day_taken_off_deletes_its_worklogs_in_Jira_on_save()
     {
         await _h.SaveDayAsync(Monday, [Row("ABC-1", 6), Row("ABC-2", 2)]);
