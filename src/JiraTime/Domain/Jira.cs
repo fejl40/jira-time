@@ -10,6 +10,7 @@ public enum JiraAuthType
     Cloud,
 }
 
+/// <summary>How to reach Jira: its URL, the kind of token and the token itself.</summary>
 public record JiraConnection(string BaseUrl, JiraAuthType AuthType, string Token, string? Email)
 {
     [JsonIgnore]
@@ -23,6 +24,15 @@ public record JiraConnection(string BaseUrl, JiraAuthType AuthType, string Token
     /// </summary>
     [JsonIgnore]
     public string? Owner { get; init; }
+
+    /// <summary>The Jira URL as typed, trimmed, without a trailing slash and with https:// when no scheme is given; null when it isn't a URL.</summary>
+    public static string? NormalizeUrl(string typed)
+    {
+        var url = typed.Trim().TrimEnd('/');
+        if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            url = "https://" + url;
+        return Uri.TryCreate(url, UriKind.Absolute, out _) ? url : null;
+    }
 }
 
 /// <param name="Id">accountId on Cloud, user key on Server/DC.</param>

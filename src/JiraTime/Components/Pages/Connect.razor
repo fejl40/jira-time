@@ -81,10 +81,7 @@
     {
         if (!CanSubmit) return;
 
-        var url = _baseUrl.Trim().TrimEnd('/');
-        if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            url = "https://" + url;
-        if (!Uri.TryCreate(url, UriKind.Absolute, out _))
+        if (JiraConnection.NormalizeUrl(_baseUrl) is not { } url)
         {
             _error = "That doesn't look like a valid URL.";
             return;

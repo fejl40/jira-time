@@ -61,126 +61,45 @@ public class WorkCalendarTests
         Assert.Equal(TimeSpan.FromHours(missing), day.MissingWith(TimeSpan.FromHours(logged)));
     }
 
-    [Fact]
-    public async Task Days_off_can_be_marked_and_unmarked()
-    {
-        using var h = new TimeHarness();
-        var calendar = h.Calendar;
-        var day = D("2026-10-20");
-
-        await calendar.MarkDayOffAsync(day, DayOffReason.Vacation);
-        var marked = await calendar.GetDayAsync(day);
-        Assert.Equal(DayKind.DayOff, marked.Kind);
-        Assert.Equal("Vacation", marked.Name);
-        Assert.Equal(DayOffReason.Vacation, marked.Reason);
-        Assert.Equal(TimeSpan.Zero, marked.Expected);
-
-        await calendar.UnmarkDayOffAsync(day);
-        Assert.Equal(DayKind.Workday, (await calendar.GetDayAsync(day)).Kind);
-        Assert.Null((await calendar.GetDayAsync(day)).Reason);
-    }
-
-    [Fact]
-    public async Task A_partial_day_off_lowers_the_expected_hours()
-    {
-        using var h = new TimeHarness();
-        var calendar = h.Calendar;
-        var day = D("2026-10-20");
-
-        await calendar.MarkDayOffAsync(day, DayOffReason.Other, TimeSpan.FromHours(3));
-        var partial = await calendar.GetDayAsync(day);
-        Assert.Equal(DayKind.Workday, partial.Kind);
-        Assert.True(partial.HasPartialDayOff);
-        Assert.Equal("Other", partial.Name);
-        Assert.Equal(DayOffReason.Other, partial.Reason);
-        Assert.Equal(TimeSpan.FromHours(5), partial.Expected);
-        Assert.Equal(TimeSpan.FromHours(1), partial.MissingWith(TimeSpan.FromHours(4)));
-        Assert.Equal(TimeSpan.FromHours(5), DayFiller.Propose(partial, [], []).Single().Duration);
-
-        await calendar.UnmarkDayOffAsync(day);
-        Assert.Equal(TimeSpan.FromHours(8), (await calendar.GetDayAsync(day)).Expected);
-    }
-
     [Theory]
-    [InlineData(8)]
-    [InlineData(10)]
-    public async Task Time_off_of_the_whole_day_or_more_is_a_day_off(double hours)
+    [InlineData("7:30", 7.5)]
+    [InlineData("7,5", 7.5)]
+    [InlineData("0", 0)]
+    [InlineData("", 0)]
+    public void Typed_work_hours_are_read(string monday, double hours)
     {
-        using var h = new TimeHarness();
-        var calendar = h.Calendar;
-        var day = D("2026-10-20");
+        var week = WorkWeekInput.Parse(Typed(monday));
 
-        await calendar.MarkDayOffAsync(day, DayOffReason.Sick, TimeSpan.FromHours(hours));
-
-        var info = await calendar.GetDayAsync(day);
-        Assert.Equal(DayKind.DayOff, info.Kind);
-        Assert.Equal(DayOffReason.Sick, info.Reason);
-        Assert.Equal(TimeSpan.Zero, info.Expected);
+        Assert.Null(week.Error);
+        Assert.Equal(TimeSpan.FromHours(hours), week.Hours![DayOfWeek.Monday]);
     }
 
     [Fact]
-    public async Task Work_hours_per_weekday_are_saved_per_user_and_used_for_every_day()
+    public void The_week_total_adds_up_every_day()
     {
-        using var h = new TimeHarness();
-        var calendar = h.Calendar;
-        var week = UserSettings.StandardWeek();
-        week[DayOfWeek.Friday] = TimeSpan.FromHours(5);
-        week[DayOfWeek.Monday] = TimeSpan.FromHours(7.5);
-        week[DayOfWeek.Saturday] = TimeSpan.FromHours(2);
-        week[DayOfWeek.Wednesday] = TimeSpan.Zero;
+        var typed = Typed("7:30");
+        typed[DayOfWeek.Saturday] = "2";
 
-        Assert.Null(await calendar.SaveWorkHoursAsync(week));
-        var days = await calendar.GetDaysAsync(D("2026-10-19"), D("2026-10-25"));
-
-        Assert.Equal(TimeSpan.FromHours(7.5), days[D("2026-10-19")].Expected); // Monday
-        Assert.Equal(DayKind.Weekend, days[D("2026-10-21")].Kind);             // Wednesday, no hours
-        Assert.Equal(TimeSpan.FromHours(5), days[D("2026-10-23")].Expected);   // Friday
-        Assert.Equal(DayKind.Workday, days[D("2026-10-24")].Kind);             // Saturday with hours
-        Assert.Equal(TimeSpan.FromHours(2), days[D("2026-10-24")].Expected);
-        Assert.Equal(TimeSpan.Zero, days[D("2026-10-25")].Expected);           // Sunday
-
-        var anna = h.For(TestUsers.Anna).Calendar;
-        Assert.Equal(TimeSpan.FromHours(8), (await anna.GetDayAsync(D("2026-10-23"))).Expected);
+        Assert.Equal(TimeSpan.FromHours(41.5), WorkWeekInput.Parse(typed).Total);
     }
 
     [Fact]
-    public async Task Partial_time_off_is_taken_from_the_users_hours_for_that_day()
+    public void Hours_that_cant_be_read_name_the_first_such_day_and_leave_no_total()
     {
-        using var h = new TimeHarness();
-        var calendar = h.Calendar;
-        var week = UserSettings.StandardWeek();
-        week[DayOfWeek.Friday] = TimeSpan.FromHours(6);
-        await calendar.SaveWorkHoursAsync(week);
+        var typed = Typed("8");
+        typed[DayOfWeek.Thursday] = "lots";
+        typed[DayOfWeek.Friday] = "x";
 
-        await calendar.MarkDayOffAsync(D("2026-10-23"), DayOffReason.Other, TimeSpan.FromHours(2));
+        var week = WorkWeekInput.Parse(typed);
 
-        Assert.Equal(TimeSpan.FromHours(4), (await calendar.GetDayAsync(D("2026-10-23"))).Expected);
+        Assert.Null(week.Hours);
+        Assert.Null(week.Total);
+        Assert.Equal("Thursday: enter hours like 7.5 or 7:30.", week.Error);
     }
 
-    [Fact]
-    public async Task Holidays_need_no_hours_whatever_the_work_hours()
+    private static Dictionary<DayOfWeek, string> Typed(string monday) => new()
     {
-        using var h = new TimeHarness();
-        var calendar = h.Calendar;
-
-        var goodFriday = await calendar.GetDayAsync(D("2026-04-03"));
-
-        Assert.Equal(DayKind.Holiday, goodFriday.Kind);
-        Assert.Equal(TimeSpan.Zero, goodFriday.Expected);
-    }
-
-    [Theory]
-    [InlineData(-1)]
-    [InlineData(25)]
-    [InlineData(7.501)]
-    public async Task Invalid_work_hours_are_not_saved(double hours)
-    {
-        using var h = new TimeHarness();
-        var calendar = h.Calendar;
-        var week = UserSettings.StandardWeek();
-        week[DayOfWeek.Monday] = TimeSpan.FromHours(hours);
-
-        Assert.NotNull(await calendar.SaveWorkHoursAsync(week));
-        Assert.Equal(TimeSpan.FromHours(8), (await calendar.GetDayAsync(D("2026-10-19"))).Expected);
-    }
+        [DayOfWeek.Monday] = monday, [DayOfWeek.Tuesday] = "8", [DayOfWeek.Wednesday] = "8", [DayOfWeek.Thursday] = "8",
+        [DayOfWeek.Friday] = "8", [DayOfWeek.Saturday] = "0", [DayOfWeek.Sunday] = "",
+    };
 }

@@ -1,9 +1,10 @@
 ---
 id: TASK-90.4
 title: Move Settings and Connect form rules into Domain
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 11:32'
+updated_date: '2026-10-30 11:36'
 labels:
   - refactor
 dependencies: []
@@ -31,12 +32,18 @@ Rules for this subtask: edit only the files listed. Do not edit AGENTS.md, READM
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The pages contain no parsing or URL logic
-- [ ] #2 Tests cover 7:30 and 0 accepted, the error naming the right weekday, and URLs without scheme, with a trailing slash and invalid
-- [ ] #3 The Setup folder is gone
-- [ ] #4 WorkCalendarTests holds only Domain tests; service tests are in WorkCalendarServiceTests
-- [ ] #5 User-facing messages are unchanged
-- [ ] #6 Only the files listed under Files are created, edited, moved or deleted
-- [ ] #7 Behaviour and what the user sees stay the same
-- [ ] #8 dotnet build has 0 warnings and dotnet test passes
+- [x] #1 The pages contain no parsing or URL logic
+- [x] #2 Tests cover 7:30 and 0 accepted, the error naming the right weekday, and URLs without scheme, with a trailing slash and invalid
+- [x] #3 The Setup folder is gone
+- [x] #4 WorkCalendarTests holds only Domain tests; service tests are in WorkCalendarServiceTests
+- [x] #5 User-facing messages are unchanged
+- [x] #6 Only the files listed under Files are created, edited, moved or deleted
+- [x] #7 Behaviour and what the user sees stay the same
+- [x] #8 dotnet build has 0 warnings and dotnet test passes
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added WorkWeekInput (Days, Parse, Total) in Domain/WorkCalendar.cs and JiraConnection.NormalizeUrl in Domain/Jira.cs; SettingsPage and Connect now call them, with the same messages. Connect.razor moved from Pages/Setup/ to Pages/ (route /setup/connect unchanged), so the Setup folder is gone. WorkCalendarTests now holds only Domain tests (plus WorkWeekInput parsing); the WorkCalendarService tests moved to WorkCalendarServiceTests, sharing one TimeHarness per test class instance. New JiraConnectionTests cover URLs without scheme, with trailing slashes and invalid. Doc changes for cleanup: AGENTS.md Layout - replace 'Components/Pages/Setup/            Connect' with 'Components/Pages/Connect.razor     connecting to Jira (route /setup/connect)'; Domain/WorkCalendar.cs line could add 'work hours as typed on Settings (WorkWeekInput)'; Domain/Jira.cs line could add 'the typed Jira URL (NormalizeUrl)'. Tests section: mention the Settings work hours and the Jira URL from Connect.
+<!-- SECTION:FINAL_SUMMARY:END -->

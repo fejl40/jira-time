@@ -43,7 +43,7 @@
         <h2 class="font-semibold">Work hours</h2>
         <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Hours each weekday needs. Danish public holidays and time you mark off are left out. A day with 0 hours is not a workday.</p>
         <div class="mt-4 grid grid-cols-4 gap-3 sm:grid-cols-7">
-            @foreach (var day in Week)
+            @foreach (var day in WorkWeekInput.Days)
             {
                 <label class="text-xs text-muted">
                     @day.ToString()[..3]
@@ -53,7 +53,7 @@
             }
         </div>
         <div class="mt-4 flex flex-wrap items-center gap-2">
-            <span class="text-sm text-slate-600 dark:text-slate-300">@(WeekTotal is { } t ? $"{Format.Hours(t)} h a week" : "")</span>
+            <span class="text-sm text-slate-600 dark:text-slate-300">@(WorkWeekInput.Parse(_hours).Total is { } t ? $"{Format.Hours(t)} h a week" : "")</span>
             @if (_hoursMessage is not null)
             {
                 <span class="text-sm @(_hoursSaved ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400")" role="status">@_hoursMessage</span>
@@ -71,9 +71,6 @@
 </div>
 
 @code {
-    private static readonly DayOfWeek[] Week =
-        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
-
     private Dictionary<DayOfWeek, string> _hours = [];
     private string? _hoursMessage;
     private bool _hoursSaved, _savingHours;
@@ -85,11 +82,7 @@
     }
 
     private void Show(IReadOnlyDictionary<DayOfWeek, TimeSpan> hours) =>
-        _hours = Week.ToDictionary(d => d, d => hours.GetValueOrDefault(d) is var h && h > TimeSpan.Zero ? Format.Hours(h) : "0");
-
-    private static TimeSpan? Read(string text) => text.Trim() is "" or "0" ? TimeSpan.Zero : TypedHours.Parse(text);
-
-    private TimeSpan? WeekTotal => _hours.Values.Select(Read).Aggregate((TimeSpan?)TimeSpan.Zero, (t, h) => t + h);
+        _hours = WorkWeekInput.Days.ToDictionary(d => d, d => hours.GetValueOrDefault(d) is var h && h > TimeSpan.Zero ? Format.Hours(h) : "0");
 
     private void SetHours(DayOfWeek day, ChangeEventArgs e)
     {
@@ -105,15 +98,11 @@
 
     private async Task SaveHoursAsync()
     {
-        var parsed = new Dictionary<DayOfWeek, TimeSpan>();
-        foreach (var day in Week)
+        var week = WorkWeekInput.Parse(_hours);
+        if (week.Hours is not { } parsed)
         {
-            if (Read(_hours[day]) is not { } h)
-            {
-                (_hoursMessage, _hoursSaved) = ($"{day}: enter hours like 7.5 or 7:30.", false);
-                return;
-            }
-            parsed[day] = h;
+            (_hoursMessage, _hoursSaved) = (week.Error, false);
+            return;
         }
         _savingHours = true;
         var error = await Calendar.SaveWorkHoursAsync(parsed);

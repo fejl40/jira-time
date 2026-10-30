@@ -92,6 +92,32 @@ public class UserSettings : IOwnedDocument
     }
 }
 
+/// <summary>Work hours per weekday as the user typed them on Settings: the hours, or the first day that can't be read.</summary>
+public record WorkWeekInput(Dictionary<DayOfWeek, TimeSpan>? Hours, string? Error)
+{
+    /// <summary>The weekdays in the order Settings shows them, Monday first.</summary>
+    public static readonly DayOfWeek[] Days =
+        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+
+    /// <summary>Hours of the whole week; null while a day can't be read.</summary>
+    public TimeSpan? Total => Hours?.Values.Aggregate(TimeSpan.Zero, (total, day) => total + day);
+
+    /// <summary>Reads each day's text; empty or 0 is no hours.</summary>
+    public static WorkWeekInput Parse(IReadOnlyDictionary<DayOfWeek, string> typed)
+    {
+        var hours = new Dictionary<DayOfWeek, TimeSpan>();
+        foreach (var day in Days)
+        {
+            if (ReadDay(typed.GetValueOrDefault(day, "")) is not { } h)
+                return new WorkWeekInput(null, $"{day}: enter hours like 7.5 or 7:30.");
+            hours[day] = h;
+        }
+        return new WorkWeekInput(hours, null);
+    }
+
+    private static TimeSpan? ReadDay(string text) => text.Trim() is "" or "0" ? TimeSpan.Zero : TypedHours.Parse(text);
+}
+
 /// <summary>Official Danish public holidays (helligdage).</summary>
 public static class DanishHolidays
 {
