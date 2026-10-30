@@ -1,7 +1,8 @@
 using JiraTime.Domain;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 /// <summary>A period being worked on: missing hours, suggestions, unsaved days and totals, grid rows. Days off are in PeriodSheetTests.DaysOff.cs.</summary>
 public partial class PeriodSheetTests

@@ -1,6 +1,6 @@
 using JiraTime.Components;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Components;
 
 public class MotionTests
 {

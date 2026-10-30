@@ -1,6 +1,6 @@
 using JiraTime.Domain;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 /// <summary>The Jira URL as typed on Connect.</summary>
 public class JiraConnectionTests

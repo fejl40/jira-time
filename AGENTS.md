@@ -18,6 +18,8 @@ dotnet run --project src/JiraTime   # http://localhost:5115
 
 - App: `src/JiraTime`. Tests: `tests/JiraTime.Tests` (xUnit). Solution: `JiraTime.slnx`.
 - New features come with tests. Build and tests must pass before every push.
+- The build has 0 warnings. `.editorconfig` and `Directory.Build.props` make it report a namespace that doesn't
+  match its folder (IDE0130) and unused usings (IDE0005).
 - Never commit `data/` (encryption keys and time entries).
 - Colleagues restore packages from a company NuGet mirror that lags behind nuget.org. Don't move a package to
   its newest version: pick one that has been out a few months (Microsoft.Extensions.Http.Resilience 10.6.0 and
@@ -105,7 +107,7 @@ Components/Motion.cs               animation classes (Styles/motion.css), Motion
 Components/Sheet/ShownPeriod.cs    the period on screen and its work with Jira: open, reload, Try again, Sync now, Save all, time off; SaveMotion
 Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, IssueColors (an issue's dot colour), DayKeys (keyboard shortcuts), JiraWaits (running Jira requests: what shows pending, which buttons wait, the status text), TimeOffModal, SaveAllModal
 Components/Export/                 ExportPage (a month in the agency's format: Copy, Download .tsv), EpicValuesForm (values per epic), ExportTable
-Components/Modals/                 the modal system: Modals (service), ModalQueue and ModalContext, ModalHost (in MainLayout), the Modal frame, ConfirmModal (wwwroot/modal.js)
+Components/Modals/                 the modal system: ModalService (injected as Modals), ModalQueue and ModalContext, ModalHost (in MainLayout), the Modal frame, ConfirmModal (wwwroot/modal.js)
 Components/Logs/                   request toasts (in MainLayout), the log's action groups, a request's details and its status dot, the JSON tree
 Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow, Waiting (the waiting-for-Jira spinner)
 Styles/app.css, motion.css         Tailwind input and animations (compiled to wwwroot/app.css)
@@ -362,7 +364,8 @@ Clear logs; a row expands into its details with the bodies as JSON trees. Clicki
 
 ### Modals
 
-All modals go through `Components/Modals` (namespace `JiraTime.Components`). `Modals` (scoped, one per tab)
+All modals go through `Components/Modals` (namespace `JiraTime.Components.Modals`). `ModalService` (scoped, one per tab,
+injected as `Modals`)
 shows a modal component and waits for its result: `ShowAsync<TModal, TResult>(parameters, onTop)` returns what
 the modal closed with, or null (the default) when it was cancelled, once its dialog has finished closing (so
 what comes next, such as a new period sliding in, isn't hidden behind the fading backdrop); `ConfirmAsync(title, text, confirmLabel,

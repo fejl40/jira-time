@@ -1,7 +1,8 @@
 using JiraTime.Domain;
-using JiraTime.Services;
+using JiraTime.Services.Jira;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.Jira;
 
 public class JqlTests
 {

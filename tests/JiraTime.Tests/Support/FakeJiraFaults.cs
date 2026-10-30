@@ -1,6 +1,6 @@
 using System.Net;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Support;
 
 /// <summary>The knobs of <see cref="FakeJira"/> that make Jira fail, refuse with 429, go offline or hold requests back.</summary>
 public sealed partial class FakeJira

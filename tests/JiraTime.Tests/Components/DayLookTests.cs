@@ -1,7 +1,7 @@
 using JiraTime.Components;
 using JiraTime.Domain;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Components;
 
 public class DayLookTests
 {

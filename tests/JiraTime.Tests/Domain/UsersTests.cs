@@ -1,6 +1,7 @@
 using JiraTime.Domain;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 /// <summary>Who a user is: a Jira host plus the user id it returns, and the tokens Jira confirmed for them.</summary>
 public class UsersTests

@@ -1,6 +1,6 @@
 using JiraTime.Domain;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 /// <summary>Reading hours as the user types them.</summary>
 public class TypedHoursTests

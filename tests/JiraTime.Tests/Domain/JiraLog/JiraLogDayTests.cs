@@ -1,7 +1,9 @@
 using JiraTime.Domain;
-using JiraTime.Services;
+using JiraTime.Domain.JiraLog;
+using JiraTime.Services.JiraLog;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain.JiraLog;
 
 /// <summary>A day of the Jira log as the Logs page shows it: grouped by action, filtered, updated live.</summary>
 public class JiraLogDayTests

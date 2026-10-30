@@ -1,6 +1,6 @@
 using JiraTime.Components;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Components;
 
 /// <summary>How hours, days and counts are written for the user.</summary>
 public class FormatTests

@@ -1,7 +1,7 @@
 using JiraTime.Domain;
-using JiraTime.Services;
+using JiraTime.Services.SignIn;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Support;
 
 /// <summary>Time entries as the tests build them. Without a date they are on <see cref="Monday"/>, 19 October 2026.</summary>
 public static class TestEntries

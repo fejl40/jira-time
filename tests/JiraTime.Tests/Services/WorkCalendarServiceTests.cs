@@ -1,6 +1,7 @@
 using JiraTime.Domain;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services;
 
 /// <summary>Days off and work hours saved and read through <see cref="JiraTime.Services.WorkCalendarService"/>.</summary>
 public sealed class WorkCalendarServiceTests : IDisposable

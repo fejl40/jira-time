@@ -1,8 +1,9 @@
 using System.Net;
 using JiraTime.Domain;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services;
 
 public class PeriodLoaderTests : IDisposable
 {

@@ -1,4 +1,4 @@
-namespace JiraTime.Domain;
+namespace JiraTime.Domain.JiraLog;
 
 /// <summary>One Jira request shown as a toast. <see cref="Leaving"/> is set while it fades out.</summary>
 public sealed class RequestToast(JiraLogEntry entry)

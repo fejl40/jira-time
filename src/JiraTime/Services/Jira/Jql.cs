@@ -1,7 +1,7 @@
 using System.Globalization;
 using JiraTime.Domain;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Jira;
 
 /// <summary>Builds pieces of JQL so values are always quoted the same, safe way.</summary>
 public static class Jql

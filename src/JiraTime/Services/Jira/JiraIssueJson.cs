@@ -1,7 +1,7 @@
 using System.Text.Json;
 using JiraTime.Domain;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Jira;
 
 /// <summary>Jira's issue, user and field JSON and the app's issues, profile and epics.</summary>
 internal static class JiraIssueJson

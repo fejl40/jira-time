@@ -1,7 +1,8 @@
 using System.Net;
 using JiraTime.Domain;
+using JiraTime.Services.Jira;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Worklogs;
 
 /// <summary>
 /// Writes one entry's worklog to Jira, or deletes it. What Jira can't take waits in the retry queue

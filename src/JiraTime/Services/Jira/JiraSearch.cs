@@ -1,8 +1,8 @@
 using System.Net;
 using JiraTime.Domain;
-using static JiraTime.Services.JiraHttp;
+using static JiraTime.Services.Jira.JiraHttp;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Jira;
 
 /// <summary>
 /// Jira's issue search, the one way the app asks for several issues at once: it reads every page of the answer,

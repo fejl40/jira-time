@@ -1,0 +1,9 @@
+<Project>
+  <!-- Code style rules from .editorconfig run in the build. IDE0005 (unused usings) needs the XML documentation file. -->
+  <PropertyGroup>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- CS1591: not every member needs a summary. CS1573: param tags are written only for the parameters that need one. -->
+    <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
+  </PropertyGroup>
+</Project>

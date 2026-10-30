@@ -1,11 +1,10 @@
 @page "/logs"
 @implements IDisposable
 @using System.Text
-@using JiraTime.Components.Logs
 @inject MyJiraLog Log
 @inject IJSRuntime JS
 @inject NavigationManager Nav
-@inject Modals Modals
+@inject ModalService Modals
 
 @* The signed-in user's Jira requests for a day, grouped by the action that made them, updated live.
    The rules (grouping, filters, live updates) are in Domain/JiraLog.cs. *@

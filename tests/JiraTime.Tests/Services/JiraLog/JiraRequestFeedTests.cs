@@ -1,6 +1,7 @@
-using JiraTime.Services;
+using JiraTime.Services.JiraLog;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.JiraLog;
 
 /// <summary>The live feed of Jira requests: per user, and never held up by its subscribers.</summary>
 public class JiraRequestFeedTests : IDisposable

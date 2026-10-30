@@ -1,4 +1,7 @@
 using JiraTime.Domain;
+using JiraTime.Services.Jira;
+using JiraTime.Services.JiraLog;
+using JiraTime.Services.SignIn;
 
 namespace JiraTime.Services;
 

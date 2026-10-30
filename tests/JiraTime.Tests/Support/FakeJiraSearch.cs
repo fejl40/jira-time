@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Web;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Support;
 
 /// <summary>The issue searches of <see cref="FakeJira"/>: worklog, sprint, period, status and key-in searches, GET or POST.</summary>
 public sealed partial class FakeJira

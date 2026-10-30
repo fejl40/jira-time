@@ -24,6 +24,7 @@ The app has four layers, each in its own folder under `src/JiraTime/`:
 - Dependencies point one way: Components → Services → Domain. Domain never knows about Jira, files or the UI.
 - **Keep the number of files low.** A file holds one concept, not one type. Small types that belong to a concept (a result record, an enum, an options class) live in the same file as the class that uses them.
 - Make a new folder only when at least three files belong together.
+- A file's namespace is its folder (`JiraTime.Services.Worklogs`, `JiraTime.Tests.Domain`); Razor components take it from their folder, so no `@namespace`. Leave no unused using. The build checks both (IDE0130 and IDE0005 in `.editorconfig`), so the 0-warnings rule keeps them right. A type can't share its folder's name (the modal service is `ModalService` in `Modals/`).
 - Small browser helpers go in `wwwroot/` as one script per feature. Styles go in `Styles/`.
 - Tests follow the same concepts and folders: the tests of `src/JiraTime/<Folder>/<Thing>.cs` are in `tests/JiraTime.Tests/<Folder>/<Thing>Tests.cs`. Shared test helpers are in `tests/JiraTime.Tests/Support/`.
 

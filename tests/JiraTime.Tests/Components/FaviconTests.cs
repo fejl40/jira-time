@@ -1,4 +1,4 @@
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Components;
 
 public class FaviconTests
 {

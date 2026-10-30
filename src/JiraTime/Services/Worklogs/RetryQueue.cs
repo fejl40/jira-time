@@ -1,7 +1,8 @@
 using JiraTime.Domain;
 using JiraTime.Storage;
+using JiraTime.Services.SignIn;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Worklogs;
 
 /// <summary>
 /// The signed-in user's changes Jira couldn't take yet: new or changed work, and removals still to send.

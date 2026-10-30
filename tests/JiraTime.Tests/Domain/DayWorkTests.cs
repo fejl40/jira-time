@@ -1,7 +1,8 @@
 using JiraTime.Domain;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 /// <summary>
 /// One day's unsaved changes on their own: edited copies, removals, new rows, suggestions and unreadable hours.

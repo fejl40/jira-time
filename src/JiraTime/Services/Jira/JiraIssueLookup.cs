@@ -1,6 +1,6 @@
 using JiraTime.Domain;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Jira;
 
 /// <summary>
 /// The user's issues from Jira (active sprint, earlier in a period) and the current status and epic of given

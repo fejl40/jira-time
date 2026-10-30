@@ -1,8 +1,8 @@
 using System.Net;
 using JiraTime.Domain;
-using static JiraTime.Services.JiraHttp;
+using static JiraTime.Services.Jira.JiraHttp;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Jira;
 
 /// <summary>Jira REST calls about issues and the user. Runs on the server, so there are no CORS issues.</summary>
 public class JiraClient(JiraHttp jira)

@@ -1,6 +1,8 @@
 using JiraTime.Domain;
+using JiraTime.Services.Jira;
+using JiraTime.Services.SignIn;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Worklogs;
 
 /// <summary>Logged time for a range of days: Jira's worklogs with the work Jira doesn't have yet laid over them.</summary>
 /// <param name="JiraError">Why Jira couldn't be read; then <see cref="Entries"/> holds only the work waiting for Jira.</param>

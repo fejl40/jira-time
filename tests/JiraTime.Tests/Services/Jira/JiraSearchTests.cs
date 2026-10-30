@@ -1,8 +1,9 @@
 using System.Net;
 using System.Text.Json.Nodes;
-using JiraTime.Services;
+using JiraTime.Services.Jira;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.Jira;
 
 /// <summary>Searches by key: unknown keys are skipped, long key lists go in batches and long answers in pages.</summary>
 public class JiraSearchTests : IDisposable

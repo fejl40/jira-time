@@ -1,7 +1,9 @@
 using JiraTime.Domain;
-using JiraTime.Services;
+using JiraTime.Services.Jira;
+using JiraTime.Services.JiraLog;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.Worklogs;
 
 /// <summary>
 /// Reads that don't depend on each other go to Jira together, at most four at once; writes go one at a time.

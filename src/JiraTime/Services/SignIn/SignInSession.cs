@@ -2,8 +2,9 @@ using System.Security.Cryptography;
 using JiraTime.Domain;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.JSInterop;
+using JiraTime.Services.JiraLog;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.SignIn;
 
 /// <summary>
 /// Signing this browser tab in and out: the connection remembered in the browser together with the

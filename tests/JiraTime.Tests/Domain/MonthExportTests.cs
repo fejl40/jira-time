@@ -1,7 +1,7 @@
 using JiraTime.Domain;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 public class MonthExportTests
 {

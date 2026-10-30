@@ -1,6 +1,6 @@
 using JiraTime.Storage;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Support;
 
 /// <summary>A file document store in its own temp folder, deleted after the test.</summary>
 public sealed class TempStore : IDisposable

@@ -3,8 +3,9 @@ using System.Threading.RateLimiting;
 using Microsoft.Extensions.Http.Resilience;
 using Polly;
 using Polly.CircuitBreaker;
+using JiraTime.Services.JiraLog;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Jira;
 
 /// <summary>
 /// How every Jira request copes with Jira's rate limits, set up once on the <see cref="JiraHttp"/> client with

@@ -1,9 +1,10 @@
 using JiraTime.Domain;
-using JiraTime.Services;
 using JiraTime.Storage;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
+using JiraTime.Services.SignIn;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.SignIn;
 
 /// <summary>
 /// Data saved before multi-user support goes to its old user, and entries from when the app kept logged time itself are

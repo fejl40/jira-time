@@ -1,7 +1,7 @@
 using JiraTime.Domain;
 using JiraTime.Storage;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.SignIn;
 
 /// <summary>
 /// Moves data saved by older versions of the app. Data saved before multi-user support has no owner. The first time its user signs in, it is given

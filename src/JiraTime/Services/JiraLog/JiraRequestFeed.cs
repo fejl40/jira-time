@@ -1,7 +1,7 @@
 using System.Threading.Channels;
-using JiraTime.Domain;
+using JiraTime.Domain.JiraLog;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.JiraLog;
 
 public enum JiraRequestStage { Started, Finished }
 

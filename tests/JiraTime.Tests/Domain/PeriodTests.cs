@@ -1,6 +1,6 @@
 using JiraTime.Domain;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 public class PeriodTests
 {

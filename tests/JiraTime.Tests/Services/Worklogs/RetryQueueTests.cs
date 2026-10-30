@@ -1,8 +1,9 @@
 using System.Net;
 using JiraTime.Domain;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.Worklogs;
 
 /// <summary>Changes Jira couldn't take wait in a local queue, show as not in Jira and are sent by Sync now; old formats stay readable.</summary>
 public class RetryQueueTests : IDisposable
@@ -52,7 +53,7 @@ public class RetryQueueTests : IDisposable
         _h.Jira.Offline = true;
         await _h.SaveDayAsync(Day, [Row("ABC-1", 6)]);
 
-        var again = new JiraTime.Services.RetryQueue(_h.Files.Reopen(), TestUsers.SignedIn());
+        var again = new JiraTime.Services.Worklogs.RetryQueue(_h.Files.Reopen(), TestUsers.SignedIn());
 
         Assert.Single(await again.GetPendingAsync(From, To));
     }

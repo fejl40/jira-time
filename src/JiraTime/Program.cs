@@ -1,5 +1,7 @@
 using System.Globalization;
 using JiraTime.Components;
+using JiraTime.Components.Modals;
+using JiraTime.Components.Sheet;
 using JiraTime.Services;
 
 // Numbers are written with a decimal point whatever the machine's language settings are (7.5, never 7,5).
@@ -15,7 +17,7 @@ builder.Services.AddJiraTime(dataDir);
 
 // The UI's own services, per browser tab.
 builder.Services.AddScoped<MotionScript>();
-builder.Services.AddScoped<Modals>();
+builder.Services.AddScoped<ModalService>();
 builder.Services.AddTransient<ShownPeriod>(); // one per timesheet page
 
 var app = builder.Build();

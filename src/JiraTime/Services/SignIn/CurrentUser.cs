@@ -1,6 +1,8 @@
 using JiraTime.Domain;
+using JiraTime.Services.Jira;
+using JiraTime.Services.JiraLog;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.SignIn;
 
 /// <summary>The signed-in user's way into Jira: the verified connection and the profile Jira returned for its token.</summary>
 public sealed record SignedInJira(JiraConnection Connection, JiraProfile Profile);

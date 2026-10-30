@@ -1,8 +1,10 @@
 using System.Net.Http.Headers;
 using System.Text;
 using JiraTime.Domain;
+using JiraTime.Domain.JiraLog;
+using JiraTime.Services.Jira;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.JiraLog;
 
 /// <summary>
 /// Records every Jira request for the request log and the live feed. <see cref="JiraHttp"/> starts a

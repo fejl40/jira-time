@@ -1,6 +1,7 @@
-using JiraTime.Domain;
+using JiraTime.Domain.JiraLog;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain.JiraLog;
 
 /// <summary>The toasts for live Jira requests: order, how long they stay, pausing and bursts.</summary>
 public class RequestToastsTests

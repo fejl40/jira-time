@@ -1,6 +1,7 @@
 using JiraTime.Services;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services;
 
 public class ExpiringCacheTests
 {

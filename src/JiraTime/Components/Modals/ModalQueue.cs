@@ -1,4 +1,4 @@
-namespace JiraTime.Components;
+namespace JiraTime.Components.Modals;
 
 /// <summary>
 /// One modal asked for: the component to show with its parameters, how it may be closed, and the result
@@ -41,7 +41,7 @@ public sealed class ModalContext(int id, Type component, IDictionary<string, obj
     public Task<object?> Result => _result.Task;
 
     /// <summary>The service that shows it; null for a modal that isn't shown (in tests).</summary>
-    internal Modals? Owner { get; set; }
+    internal ModalService? Owner { get; set; }
 
     /// <summary>Closes the modal with a result for its caller.</summary>
     public void Close(object? result) => Owner?.Close(this, result);

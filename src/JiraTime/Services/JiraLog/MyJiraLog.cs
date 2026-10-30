@@ -1,6 +1,7 @@
-using JiraTime.Domain;
+using JiraTime.Domain.JiraLog;
+using JiraTime.Services.SignIn;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.JiraLog;
 
 /// <summary>
 /// The signed-in user's Jira request log, for the Logs page. Everything goes through

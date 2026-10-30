@@ -1,8 +1,10 @@
 using System.Net;
 using JiraTime.Domain;
-using JiraTime.Services;
+using JiraTime.Domain.JiraLog;
+using JiraTime.Services.Jira;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.Jira;
 
 /// <summary>Jira's rate limits: a 429 pauses every request to that host, requests are retried after it, and a queue caps how many are out.</summary>
 public class JiraResilienceTests : IDisposable

@@ -1,7 +1,8 @@
 using System.Net;
 using JiraTime.Domain;
+using JiraTime.Services.Jira;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.JiraLog;
 
 /// <summary>
 /// What the handlers below <see cref="JiraHttp"/> need to know about a request: whose connection it is, the JSON

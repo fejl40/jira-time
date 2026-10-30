@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace JiraTime.Domain;
+namespace JiraTime.Domain.JiraLog;
 
 /// <summary>
 /// A logged request or response body as the log shows it: a JSON tree to fold and unfold, or the raw text

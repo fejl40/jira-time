@@ -1,8 +1,9 @@
 using JiraTime.Components;
 using JiraTime.Domain;
-using JiraTime.Services;
+using JiraTime.Components.Sheet;
+using JiraTime.Services.Jira;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Components;
 
 public class JiraWaitsTests
 {

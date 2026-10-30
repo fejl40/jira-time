@@ -1,7 +1,7 @@
 using System.Globalization;
 using JiraTime.Domain;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Jira;
 
 /// <summary>Jira's worklog JSON and the app's worklogs: reading worklogs, writing the worklog body.</summary>
 internal static class JiraWorklogJson

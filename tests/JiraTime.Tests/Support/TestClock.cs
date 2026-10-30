@@ -1,4 +1,4 @@
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Support;
 
 /// <summary>
 /// A clock tests can set and move. Without a time it is noon UTC on Tuesday 27 October 2026, in UTC. Timers fire at

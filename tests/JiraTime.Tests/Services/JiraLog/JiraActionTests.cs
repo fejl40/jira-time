@@ -1,8 +1,12 @@
 using System.Net;
 using JiraTime.Domain;
-using JiraTime.Services;
+using JiraTime.Domain.JiraLog;
+using JiraTime.Services.Jira;
+using JiraTime.Services.JiraLog;
+using JiraTime.Services.SignIn;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.JiraLog;
 
 /// <summary>Each logged Jira request names the user action it was made for, and never another one.</summary>
 public class JiraActionTests : IDisposable

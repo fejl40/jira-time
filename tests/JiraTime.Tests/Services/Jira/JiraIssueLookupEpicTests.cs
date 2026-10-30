@@ -1,9 +1,10 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using JiraTime.Domain;
-using JiraTime.Services;
+using JiraTime.Services.Jira;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.Jira;
 
 /// <summary>
 /// <see cref="JiraIssueLookup"/>: the epic of each issue, for the export.

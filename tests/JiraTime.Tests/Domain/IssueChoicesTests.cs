@@ -1,6 +1,6 @@
 using JiraTime.Domain;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 /// <summary>What the issue picker offers, in which group, and filtering it as the user types (<see cref="IssueFilter"/>).</summary>
 public class IssueChoicesTests

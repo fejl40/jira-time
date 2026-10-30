@@ -1,9 +1,10 @@
 using System.Net;
 using JiraTime.Domain;
-using JiraTime.Services;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
+using JiraTime.Services.Worklogs;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.Worklogs;
 
 /// <summary>
 /// Save all (<see cref="WorklogSync.SaveDaysAsync"/>): every unsaved day of a period at once, each checked against Jira

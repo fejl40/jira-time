@@ -1,8 +1,9 @@
 using JiraTime.Components;
 using JiraTime.Components.Sheet;
 using JiraTime.Domain;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Components;
 
 /// <summary>The timesheet's period and its work with Jira, without the page around it.</summary>
 public class ShownPeriodTests : IDisposable

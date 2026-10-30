@@ -1,6 +1,5 @@
-@namespace JiraTime.Components
 @implements IAsyncDisposable
-@inject Modals Modals
+@inject ModalService Modals
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 
@@ -19,7 +18,7 @@
 }
 
 @code {
-    /// <summary>Modals drawn last time; one that is gone from <see cref="Modals.Open"/> has been closed.</summary>
+    /// <summary>Modals drawn last time; one that is gone from <see cref="ModalService.Open"/> has been closed.</summary>
     private List<ModalContext> _drawn = [];
     /// <summary>Closed modals whose dialog still plays its closing animation.</summary>
     private readonly List<ModalContext> _leaving = [];

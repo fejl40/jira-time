@@ -2,10 +2,12 @@ using System.Net;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using JiraTime.Domain;
-using JiraTime.Services;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
+using JiraTime.Services.Jira;
+using JiraTime.Services.Worklogs;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.Worklogs;
 
 /// <summary>Reading logged time: Jira's worklogs, with work waiting for Jira laid over them.</summary>
 public class TimeLogTests : IDisposable

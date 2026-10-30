@@ -1,7 +1,7 @@
 using System.Text.Json;
-using JiraTime.Services;
+using JiraTime.Services.Jira;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.Jira;
 
 public class AtlassianDocumentTests
 {

@@ -1,9 +1,9 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
-using JiraTime.Domain;
+using JiraTime.Domain.JiraLog;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.JiraLog;
 
 /// <summary>
 /// The Jira request log on disk: one JSON line per request in <c>&lt;folder&gt;/&lt;owner&gt;/yyyy-MM-dd.jsonl</c>,

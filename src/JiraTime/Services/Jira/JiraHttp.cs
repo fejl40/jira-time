@@ -5,8 +5,9 @@ using System.Text.Json;
 using JiraTime.Domain;
 using Polly.CircuitBreaker;
 using Polly.RateLimiting;
+using JiraTime.Services.JiraLog;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Jira;
 
 /// <summary>A Jira request that failed, with a message the user can act on and Jira's status when it answered.</summary>
 public class JiraException(string message, HttpStatusCode? status = null) : Exception(message)

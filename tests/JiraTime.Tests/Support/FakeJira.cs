@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Support;
 
 /// <summary>
 /// In-memory stand-in for Jira's myself, worklog and issue search endpoints, plugged into HttpClient.

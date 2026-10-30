@@ -1,0 +1,7 @@
+root = true
+
+[*.cs]
+# Namespaces match folders, and no using is left that nothing needs. The build reports both (0 warnings).
+dotnet_style_namespace_match_folder = true
+dotnet_diagnostic.IDE0130.severity = warning
+dotnet_diagnostic.IDE0005.severity = warning

@@ -2,13 +2,13 @@ using System.Globalization;
 using System.Reflection;
 using Microsoft.AspNetCore.Components;
 
-namespace JiraTime.Components;
+namespace JiraTime.Components.Modals;
 
 /// <summary>
 /// Shows modals in this tab and hands back their results. <see cref="ModalHost"/> (in MainLayout) draws
 /// the open ones; <see cref="ModalQueue"/> decides which are open.
 /// </summary>
-public sealed class Modals
+public sealed class ModalService
 {
     private readonly ModalQueue _queue = new();
     private int _lastId;

@@ -1,13 +1,13 @@
-using JiraTime.Components;
 using JiraTime.Domain;
 using Microsoft.AspNetCore.Components;
+using JiraTime.Components.Modals;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Components;
 
 /// <summary>Modals: results, cancel, the queue, modals on top and closing them all.</summary>
 public class ModalsTests
 {
-    private readonly Modals _modals = new();
+    private readonly ModalService _modals = new();
 
     private Task<string?> Show(bool onTop = false) => _modals.ShowAsync<Modal, string>(onTop: onTop);
 

@@ -1,6 +1,6 @@
 using JiraTime.Domain;
 
-namespace JiraTime.Components;
+namespace JiraTime.Components.Sheet;
 
 /// <summary>What the timesheet waits on Jira for.</summary>
 public enum JiraWait

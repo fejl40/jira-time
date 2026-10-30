@@ -1,6 +1,8 @@
 using JiraTime.Domain;
+using JiraTime.Services.Jira;
+using JiraTime.Services.SignIn;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Worklogs;
 
 /// <summary>
 /// Writes work to Jira. Jira is where logged time lives: saving a day creates, updates and deletes its

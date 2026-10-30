@@ -1,7 +1,8 @@
 using JiraTime.Domain;
 using JiraTime.Services;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services;
 
 /// <summary>Fase, Forordning and Hovedleverance per epic, kept per user.</summary>
 public class EpicExportStoreTests : IDisposable

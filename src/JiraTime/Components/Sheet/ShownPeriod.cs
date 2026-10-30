@@ -1,8 +1,10 @@
-using JiraTime.Components.Sheet;
 using JiraTime.Domain;
 using JiraTime.Services;
+using JiraTime.Services.JiraLog;
+using JiraTime.Services.SignIn;
+using JiraTime.Services.Worklogs;
 
-namespace JiraTime.Components;
+namespace JiraTime.Components.Sheet;
 
 /// <summary>
 /// The period the timesheet shows and its work with Jira: opening it, reading it again, Try again, Sync now,

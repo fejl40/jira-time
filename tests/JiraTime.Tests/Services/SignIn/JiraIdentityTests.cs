@@ -1,8 +1,9 @@
 using System.Net;
 using JiraTime.Domain;
-using JiraTime.Services;
+using JiraTime.Services.SignIn;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.SignIn;
 
 /// <summary>Signing in as the user Jira says the token belongs to, and offline with a token Jira confirmed before.</summary>
 public class JiraIdentityTests : IDisposable

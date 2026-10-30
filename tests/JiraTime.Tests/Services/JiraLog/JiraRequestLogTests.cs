@@ -1,10 +1,12 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using JiraTime.Domain;
-using JiraTime.Services;
+using JiraTime.Domain.JiraLog;
+using JiraTime.Services.Jira;
+using JiraTime.Services.JiraLog;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.JiraLog;
 
 /// <summary>Every Jira request written to the user's JSONL log for the day, without credentials.</summary>
 public class JiraRequestLogTests : IDisposable

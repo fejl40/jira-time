@@ -1,8 +1,9 @@
 using System.Net;
 using JiraTime.Domain;
-using JiraTime.Services;
+using JiraTime.Services.Jira;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.Jira;
 
 /// <summary>
 /// <see cref="JiraIssueLookup"/>: the issues assigned to the user in an open sprint.

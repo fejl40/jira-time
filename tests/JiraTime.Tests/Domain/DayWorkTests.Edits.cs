@@ -1,7 +1,7 @@
 using JiraTime.Domain;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 /// <summary>Editing a row of a day: its issue, hours and comment, and adding rows (the rest of <see cref="DayWork"/> is in DayWorkTests.cs).</summary>
 public partial class DayWorkTests

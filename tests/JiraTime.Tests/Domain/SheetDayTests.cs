@@ -1,7 +1,8 @@
 using JiraTime.Domain;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 /// <summary>A day of the sheet: its rows and totals, what counts as a change, filling, copying and why it can't be saved.</summary>
 public class SheetDayTests

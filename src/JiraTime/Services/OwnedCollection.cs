@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using JiraTime.Domain;
 using JiraTime.Storage;
+using JiraTime.Services.SignIn;
 
 namespace JiraTime.Services;
 

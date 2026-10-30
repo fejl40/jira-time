@@ -1,4 +1,4 @@
-namespace JiraTime.Services;
+namespace JiraTime.Services.JiraLog;
 
 /// <summary>
 /// The user action Jira requests are made for, such as "Time off Tue 27 Oct". The UI starts one around

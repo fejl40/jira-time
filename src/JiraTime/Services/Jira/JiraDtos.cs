@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Jira;
 
 // Raw JSON shapes of Jira's REST answers, only the fields the app reads.
 

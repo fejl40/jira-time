@@ -1,7 +1,7 @@
 using System.Text.Json;
 using JiraTime.Domain;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Jira;
 
 /// <summary>Converts between plain text and Atlassian Document Format (ADF), which Cloud uses for comments.</summary>
 public static class AtlassianDocument

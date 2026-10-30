@@ -1,5 +1,9 @@
 using JiraTime.Storage;
 using Microsoft.AspNetCore.DataProtection;
+using JiraTime.Services.Jira;
+using JiraTime.Services.JiraLog;
+using JiraTime.Services.SignIn;
+using JiraTime.Services.Worklogs;
 
 namespace JiraTime.Services;
 

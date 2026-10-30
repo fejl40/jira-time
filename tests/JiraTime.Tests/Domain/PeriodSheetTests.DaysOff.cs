@@ -1,7 +1,7 @@
 using JiraTime.Domain;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 /// <summary>Days off on a period being worked on. Part of <see cref="PeriodSheetTests"/>, split out to keep each file under 250 lines.</summary>
 public partial class PeriodSheetTests

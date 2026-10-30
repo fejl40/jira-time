@@ -1,10 +1,11 @@
 using System.Text.Json.Nodes;
 using System.Web;
 using JiraTime.Domain;
-using JiraTime.Services;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
+using JiraTime.Services.Jira;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.Jira;
 
 /// <summary>Reading and writing worklogs in Jira's format: embedded worklogs, pages, the worklog body.</summary>
 public class JiraWorklogClientTests : IDisposable

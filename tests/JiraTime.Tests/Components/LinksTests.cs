@@ -1,7 +1,8 @@
 using JiraTime.Components;
 using JiraTime.Domain;
+using JiraTime.Domain.JiraLog;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Components;
 
 public class LinksTests
 {

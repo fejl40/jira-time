@@ -1,8 +1,8 @@
-using JiraTime.Components;
 using JiraTime.Components.Sheet;
 using JiraTime.Domain;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services;
 
 /// <summary>A user whose browser is in another time zone than the server: today and worklog start times are on the user's clock.</summary>
 public class UserTimeZoneTests

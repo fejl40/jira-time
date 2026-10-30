@@ -1,11 +1,12 @@
 using System.Net;
 using JiraTime.Domain;
-using JiraTime.Services;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.JSInterop;
+using JiraTime.Services.SignIn;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Services.SignIn;
 
 /// <summary>Signing a tab in and out: what is remembered in the browser follows what Jira says.</summary>
 public class SignInSessionTests : IDisposable

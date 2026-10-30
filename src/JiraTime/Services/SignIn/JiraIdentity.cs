@@ -1,8 +1,9 @@
 using System.Net;
 using JiraTime.Domain;
 using JiraTime.Storage;
+using JiraTime.Services.Jira;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.SignIn;
 
 /// <summary>
 /// Signs a browser tab in as the Jira user its token belongs to. The identity is whatever the chosen

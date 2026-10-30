@@ -1,6 +1,7 @@
 using System.Text.Json.Serialization;
+using JiraTime.Domain;
 
-namespace JiraTime.Domain;
+namespace JiraTime.Domain.JiraLog;
 
 /// <summary>
 /// One Jira request as the request log keeps it: what was sent, what came back, how long it took and the

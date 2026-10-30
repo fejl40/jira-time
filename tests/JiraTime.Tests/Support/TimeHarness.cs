@@ -2,8 +2,12 @@ using JiraTime.Domain;
 using JiraTime.Services;
 using JiraTime.Storage;
 using Microsoft.Extensions.DependencyInjection;
+using JiraTime.Services.Jira;
+using JiraTime.Services.JiraLog;
+using JiraTime.Services.SignIn;
+using JiraTime.Services.Worklogs;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Support;
 
 /// <summary>
 /// The app's services as Program.cs registers them (<see cref="AppServices.AddJiraTime"/>), signed in as Carl, over a

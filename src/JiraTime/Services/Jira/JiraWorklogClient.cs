@@ -1,8 +1,8 @@
 using System.Net;
 using JiraTime.Domain;
-using static JiraTime.Services.JiraHttp;
+using static JiraTime.Services.Jira.JiraHttp;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Jira;
 
 /// <summary>Jira REST calls that read and write worklogs. Runs on the server, so there are no CORS issues.</summary>
 /// <param name="clock">Its time zone is where worklogs start when the connection has no browser time zone: Jira gets the start time with that zone's offset.</param>

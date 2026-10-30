@@ -1,7 +1,8 @@
 using JiraTime.Domain;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
+using JiraTime.Tests.Support;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 /// <summary>The change list Save all shows: added, changed and removed rows per day, and the totals.</summary>
 public class UnsavedChangesTests

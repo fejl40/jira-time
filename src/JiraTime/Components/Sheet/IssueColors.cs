@@ -1,4 +1,4 @@
-namespace JiraTime.Components;
+namespace JiraTime.Components.Sheet;
 
 /// <summary>The colour of an issue's dot in the grid, the day's rows and the issue picker.</summary>
 public static class IssueColors

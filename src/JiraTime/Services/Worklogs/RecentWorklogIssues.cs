@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using JiraTime.Domain;
 
-namespace JiraTime.Services;
+namespace JiraTime.Services.Worklogs;
 
 /// <summary>
 /// Issues each user wrote worklogs on in the last few minutes. Jira's search finds a worklog only once

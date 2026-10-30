@@ -1,7 +1,7 @@
 using JiraTime.Domain;
-using static JiraTime.Tests.TestEntries;
+using static JiraTime.Tests.Support.TestEntries;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain;
 
 /// <summary>Worklogs as entries, waiting work laid over them, and comparing the two.</summary>
 public class WorklogMatchingTests

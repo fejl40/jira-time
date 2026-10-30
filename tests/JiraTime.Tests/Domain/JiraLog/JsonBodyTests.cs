@@ -1,6 +1,6 @@
-using JiraTime.Domain;
+using JiraTime.Domain.JiraLog;
 
-namespace JiraTime.Tests;
+namespace JiraTime.Tests.Domain.JiraLog;
 
 /// <summary>Logged bodies as the log shows them: JSON trees that start partly open, or raw text with a note.</summary>
 public class JsonBodyTests
