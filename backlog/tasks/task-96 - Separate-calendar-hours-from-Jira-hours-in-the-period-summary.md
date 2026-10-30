@@ -1,9 +1,10 @@
 ---
 id: TASK-96
 title: Separate calendar hours from Jira hours in the period summary
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 13:06'
+updated_date: '2026-10-30 13:13'
 labels:
   - refactor
 dependencies: []
@@ -19,9 +20,15 @@ PeriodSummary mixes two kinds of hours: those that depend on Jira (logged, missi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 PeriodSummary groups or names its values as Jira hours (unknown without Jira) and calendar hours (always known), with summaries saying so
-- [ ] #2 Tests: without Jira, logged, missing and complete are unknown or zero while expected and still to log keep their values
-- [ ] #3 The end-of-period reminder still shows the hours for the days left while Jira is down
-- [ ] #4 What the user sees stays the same
-- [ ] #5 dotnet build has 0 warnings and dotnet test passes
+- [x] #1 PeriodSummary groups or names its values as Jira hours (unknown without Jira) and calendar hours (always known), with summaries saying so
+- [x] #2 Tests: without Jira, logged, missing and complete are unknown or zero while expected and still to log keep their values
+- [x] #3 The end-of-period reminder still shows the hours for the days left while Jira is down
+- [x] #4 What the user sees stays the same
+- [x] #5 dotnet build has 0 warnings and dotnet test passes
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PeriodSummary now names its two kinds of hours: Jira hours (JiraHoursKnown, Logged, NotInJira, Missing, MissingOn, IsComplete), unknown or zero when Jira can't be read, and calendar hours (ExpectedOn, StillToLog, the weeks' Expected), always known. HoursKnown is renamed JiraHoursKnown; members are grouped under the two kinds with summaries saying so. Tests pin that without Jira logged is only the waiting work, missing is zero and the period isn't complete, while expected and still to log keep their values, and that the end of a period still knows the hours for the days left. No UI change.
+<!-- SECTION:FINAL_SUMMARY:END -->

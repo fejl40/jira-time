@@ -87,7 +87,7 @@ public class PeriodSummaryTests
 
         var summary = PeriodSummary.For(Second, TestSheets.Days(Second), [waiting], Today, hoursKnown: false);
 
-        Assert.False(summary.HoursKnown);
+        Assert.False(summary.JiraHoursKnown);
         Assert.Equal(TimeSpan.Zero, summary.Missing);
         Assert.Equal(TimeSpan.Zero, summary.MissingOn(new DateOnly(2026, 10, 20)));
         Assert.Equal(1, summary.NotInJira);
@@ -97,6 +97,37 @@ public class PeriodSummaryTests
     [Fact]
     public void Unknown_hours_with_full_days_are_still_not_complete() =>
         Assert.False(PeriodSummary.For(Second, TestSheets.Days(Second), FullDaysUpToToday(), Today, hoursKnown: false).IsComplete(false));
+
+    [Fact]
+    public void Without_Jira_the_Jira_hours_are_unknown_and_the_calendar_hours_keep_their_values()
+    {
+        var waiting = Saved("ABC-1", 2, October(19));
+        waiting.Failed("Jira was down");
+        List<TimeEntry> entries = [Saved("ABC-1", 8, October(16)), waiting];
+        var known = PeriodSummary.For(Second, TestSheets.Days(Second), entries, Today);
+
+        var unknown = PeriodSummary.For(Second, TestSheets.Days(Second), [waiting], Today, hoursKnown: false);
+
+        Assert.Equal(TimeSpan.FromHours(2), unknown.Logged); // only the work waiting for Jira
+        Assert.Equal(TimeSpan.Zero, unknown.Missing);
+        Assert.False(unknown.IsComplete(false));
+        Assert.Equal(known.StillToLog, unknown.StillToLog);
+        Assert.Equal(TimeSpan.FromHours(7 * 8), unknown.StillToLog);
+        Assert.Equal(known.Weeks.Select(w => w.Expected), unknown.Weeks.Select(w => w.Expected));
+        Assert.Equal(TimeSpan.FromHours(8), unknown.ExpectedOn(October(20)));
+    }
+
+    [Fact]
+    public void Without_Jira_the_end_of_the_period_still_knows_the_hours_for_the_days_left()
+    {
+        var thursday = October(29);
+
+        var summary = PeriodSummary.For(Second, TestSheets.Days(Second), [], thursday, hoursKnown: false);
+
+        Assert.True(PeriodSummary.EndsSoon(Second, thursday));
+        Assert.Equal(TimeSpan.Zero, summary.Missing);
+        Assert.Equal(TimeSpan.FromHours(8), summary.StillToLog); // Friday 30; Saturday 31 isn't a workday
+    }
 
     [Theory]
     [InlineData("2026-10-28", false)]
