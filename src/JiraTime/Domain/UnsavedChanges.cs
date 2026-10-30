@@ -36,7 +36,7 @@ public sealed record DayChanges(DateOnly Day, IReadOnlyList<RowChange> Rows, Tim
         }
         var savedIds = day.Saved.Select(e => e.Id).ToHashSet();
         foreach (var added in day.RowsToSave.Where(r => !savedIds.Contains(r.Id)))
-            rows.Add(new RowChange(RowChangeKind.Added, added.IssueKey, added.IssueSummary, added.Duration) { Comment = added.Description });
+            rows.Add(new RowChange(RowChangeKind.Added, added.IssueKey, added.IssueSummary, added.Duration) { Comment = added.Comment });
 
         var problem = day.Errors.Values.FirstOrDefault();
         return new DayChanges(day.Date, rows, day.Logged, day.Total) { Problem = problem };
@@ -45,17 +45,17 @@ public sealed record DayChanges(DateOnly Day, IReadOnlyList<RowChange> Rows, Tim
     private static RowChange Removed(TimeEntry entry) =>
         new(RowChangeKind.Removed, entry.IssueKey, entry.IssueSummary, entry.Duration)
         {
-            Comment = entry.Description,
+            Comment = entry.Comment,
             DeletesWorklog = entry.JiraWorklogId is not null,
         };
 
     private static RowChange Changed(TimeEntry before, TimeEntry now) =>
         new(RowChangeKind.Changed, now.IssueKey, now.IssueSummary, now.Duration)
         {
-            Comment = now.Description,
+            Comment = now.Comment,
             IssueBefore = now.IssueKey != before.IssueKey ? before.IssueKey : null,
             HoursBefore = now.Duration != before.Duration ? before.Duration : null,
-            CommentChanged = (now.Description ?? "") != (before.Description ?? ""),
+            CommentChanged = !TimeEntry.SameComment(now.Comment, before.Comment),
         };
 }
 

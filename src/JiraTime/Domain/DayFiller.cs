@@ -88,12 +88,16 @@ public static class DayFiller
 
     /// <summary>
     /// Best guess for the rest of a day: the issue last worked on that day, then an In Progress
-    /// sprint issue, then any sprint issue.
+    /// sprint issue, then any sprint issue. Rows not saved yet are the latest work, the last one added first.
     /// </summary>
     public static JiraIssue? GuessIssue(IReadOnlyList<TimeEntry> sameDay, IReadOnlyList<IssueWithStatus> sprint)
     {
-        if (sameDay.Where(e => e.IssueKey != "").MaxBy(e => e.UpdatedUtc) is { } last)
+        var named = sameDay.Where(e => e.IssueKey != "").ToList();
+        if ((named.LastOrDefault(IsUnsaved) ?? named.MaxBy(e => e.UpdatedUtc)) is { } last)
             return new JiraIssue(last.IssueKey, last.IssueSummary);
         return (sprint.FirstOrDefault(i => i.IsInProgress) ?? sprint.FirstOrDefault())?.ToIssue();
     }
+
+    /// <summary>A new row the user hasn't saved: it has no worklog and no save time yet.</summary>
+    private static bool IsUnsaved(TimeEntry e) => e.JiraWorklogId is null && e.UpdatedUtc == default;
 }

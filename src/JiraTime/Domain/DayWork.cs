@@ -31,7 +31,7 @@ public sealed class DayWork(DateOnly date)
     public TimeEntry View(TimeEntry saved) => _edits.GetValueOrDefault(saved.Id) ?? saved;
 
     /// <summary>True when the saved entry was edited to other values (removing it doesn't count).</summary>
-    public bool IsChanged(TimeEntry saved) => _edits.TryGetValue(saved.Id, out var copy) && Differs(saved, copy);
+    public bool IsChanged(TimeEntry saved) => _edits.TryGetValue(saved.Id, out var copy) && !copy.SameWork(saved);
 
     public bool IsRemoved(TimeEntry saved) => _removed.Contains(saved.Id);
 
@@ -39,13 +39,10 @@ public sealed class DayWork(DateOnly date)
 
     /// <summary>A new row nobody filled in (no hours, no comment). Saving skips it.</summary>
     public bool IsBlank(TimeEntry draft) =>
-        draft.Duration == TimeSpan.Zero && string.IsNullOrWhiteSpace(draft.Description) && !_badHours.ContainsKey(draft.Id);
+        draft.Duration == TimeSpan.Zero && TimeEntry.CleanComment(draft.Comment) is null && !_badHours.ContainsKey(draft.Id);
 
     /// <summary>True when every new row is an untouched suggestion and no saved row is marked removed.</summary>
     public bool HasOnlySuggestedDrafts => _drafts.All(IsSuggested) && _removed.Count == 0;
-
-    private static bool Differs(TimeEntry a, TimeEntry b) =>
-        a.IssueKey != b.IssueKey || a.Duration != b.Duration || (a.Description ?? "") != (b.Description ?? "");
 
     /// <summary>
     /// The entry to change for a row: a copy of the saved entry, made on first use so the saved entry stays as
@@ -80,11 +77,7 @@ public sealed class DayWork(DateOnly date)
     }
 
     /// <summary>Sets the row's comment, trimmed; an empty comment becomes none.</summary>
-    public void SetDescription(TimeEntry row, TimeEntry? saved, string? text)
-    {
-        text = text?.Trim();
-        Editable(row, saved).Description = string.IsNullOrEmpty(text) ? null : text;
-    }
+    public void SetComment(TimeEntry row, TimeEntry? saved, string? text) => Editable(row, saved).Comment = TimeEntry.CleanComment(text);
 
     /// <summary>A saved row is marked removed (deleted on save); a new row is dropped right away.</summary>
     public void Remove(TimeEntry row, TimeEntry? saved)

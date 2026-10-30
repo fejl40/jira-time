@@ -14,7 +14,7 @@ public class WorklogMatchingTests
         IssueSummary = "Old summary",
         Date = Day,
         Duration = TimeSpan.FromHours(2),
-        Description = "Review",
+        Comment = "Review",
         JiraWorklogId = "10001",
         JiraWorklogIssueKey = "ABC-1",
         SyncPending = false,
@@ -26,7 +26,7 @@ public class WorklogMatchingTests
         var e = Entry();
         Assert.True(e.Matches(Worklog));
 
-        e.Description = null;
+        e.Comment = null;
         Assert.True(e.Matches(Worklog with { Comment = "" }));
     }
 
@@ -47,7 +47,7 @@ public class WorklogMatchingTests
     {
         var e = Worklog.ToEntry();
 
-        Assert.Equal(("ABC-1", "Login page", Day, TimeSpan.FromHours(2), "Review"), (e.IssueKey, e.IssueSummary, e.Date, e.Duration, e.Description));
+        Assert.Equal(("ABC-1", "Login page", Day, TimeSpan.FromHours(2), "Review"), (e.IssueKey, e.IssueSummary, e.Date, e.Duration, e.Comment));
         Assert.Equal("10001", e.JiraWorklogId);
         Assert.Equal("ABC-1", e.JiraWorklogIssueKey);
         Assert.True(e.IsSynced);
@@ -61,7 +61,7 @@ public class WorklogMatchingTests
         var gone = Worklog with { Id = "10003", IssueKey = "ABC-3" };
         var changed = Entry();
         changed.Duration = TimeSpan.FromHours(5);
-        changed.SyncPending = true;
+        changed.Failed("Jira said no");
         var removed = new TimeEntry { IssueKey = "ABC-3", Date = Day, JiraWorklogId = "10003", SyncPending = true, DeletePending = true };
         var added = new TimeEntry { IssueKey = "ABC-4", Date = Day.AddDays(-1), Duration = TimeSpan.FromHours(1), SyncPending = true };
 
@@ -71,20 +71,32 @@ public class WorklogMatchingTests
     }
 
     [Fact]
-    public void SameAsSynced_needs_a_synced_entry_with_the_same_issue_hours_and_description()
+    public void SameAsSynced_needs_a_synced_entry_with_the_same_issue_hours_and_comment()
     {
         Assert.True(Entry().SameAsSynced(Entry()));
 
         var pending = Entry();
-        pending.SyncPending = true;
+        pending.Failed("Jira said no");
         Assert.False(Entry().SameAsSynced(pending));
 
         var edited = Entry();
-        edited.Description = "Changed";
+        edited.Comment = "Changed";
         Assert.False(edited.SameAsSynced(Entry()));
 
         edited = Entry();
         edited.IssueKey = "abc-1"; // exact comparison here
         Assert.False(edited.SameAsSynced(Entry()));
+    }
+
+    [Fact]
+    public void SameAsSynced_compares_comments_exactly_so_no_comment_differs_from_an_empty_one()
+    {
+        var saved = Entry();
+        saved.Comment = null;
+        var edited = Entry();
+        edited.Comment = "";
+
+        Assert.False(edited.SameAsSynced(saved));
+        Assert.False(saved.SameAsSynced(edited));
     }
 }

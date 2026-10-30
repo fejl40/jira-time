@@ -9,7 +9,7 @@ public class DayWorkTests
 
     /// <summary>A row Jira has.</summary>
     internal static TimeEntry Saved(string key, double hours, string? desc = null) =>
-        new() { IssueKey = key, IssueSummary = key + " summary", Date = Day, Duration = TimeSpan.FromHours(hours), Description = desc, JiraWorklogId = "1", SyncPending = false };
+        new() { IssueKey = key, IssueSummary = key + " summary", Date = Day, Duration = TimeSpan.FromHours(hours), Comment = desc, JiraWorklogId = "1", SyncPending = false };
 
     /// <summary>A row the user added.</summary>
     internal static TimeEntry Draft(DayWork work, string key = "ABC-1", double hours = 0)
@@ -35,13 +35,13 @@ public class DayWorkTests
 
         work.SetHours(a, a, "6");
         var copy = work.View(a);
-        work.SetDescription(copy, a, "Pairing");
+        work.SetComment(copy, a, "Pairing");
 
         Assert.Equal(TimeSpan.FromHours(4), a.Duration);
-        Assert.Null(a.Description);
+        Assert.Null(a.Comment);
         Assert.NotSame(a, copy);
         Assert.Same(copy, work.View(a)); // one copy, made on first use
-        Assert.Equal((TimeSpan.FromHours(6), "Pairing"), (copy.Duration, copy.Description));
+        Assert.Equal((TimeSpan.FromHours(6), "Pairing"), (copy.Duration, copy.Comment));
         Assert.True(work.IsChanged(a));
         Assert.Same(a, new DayWork(Day).View(a));
     }
@@ -66,7 +66,7 @@ public class DayWorkTests
         var unreadable = work.AddRow();
         Assert.True(work.IsBlank(commented));
 
-        work.SetDescription(commented, null, "Pairing");
+        work.SetComment(commented, null, "Pairing");
         work.SetHours(unreadable, null, "abc");
 
         Assert.False(work.IsBlank(commented));
@@ -83,7 +83,7 @@ public class DayWorkTests
         Assert.True(work.IsSuggested(suggestion));
         Assert.True(work.HasOnlySuggestedDrafts);
 
-        work.SetDescription(suggestion, null, "Pairing");
+        work.SetComment(suggestion, null, "Pairing");
 
         Assert.False(work.IsSuggested(suggestion));
         Assert.False(work.HasOnlySuggestedDrafts);

@@ -188,21 +188,22 @@ public class RetryQueueTests : IDisposable
     }
 
     [Fact]
-    public async Task Entries_saved_with_start_and_end_times_are_read_as_their_duration()
+    public async Task Waiting_changes_keep_their_comment_in_the_description_field()
     {
         var folder = _h.Files.Folder("time-entries");
-        await File.WriteAllTextAsync(Path.Combine(folder, "old.json"), $$"""
-            { "id": "old", "owner": "{{TestUsers.Carl.Id}}", "issueKey": "ABC-1", "issueSummary": "", "date": "2026-10-19",
-              "start": "09:00:00", "end": "11:30:00", "syncPending": true }
+        await File.WriteAllTextAsync(Path.Combine(folder, "saved.json"), $$"""
+            { "id": "saved", "owner": "{{TestUsers.Carl.Id}}", "issueKey": "ABC-1", "date": "2026-10-19",
+              "duration": "02:00:00", "description": "Review", "syncPending": true }
             """);
 
         var queue = _h.Queue;
-        var old = Assert.Single(await queue.GetPendingAsync(Day, Day));
-        Assert.Equal(TimeSpan.FromHours(2.5), old.Duration);
+        var saved = Assert.Single(await queue.GetPendingAsync(Day, Day));
+        Assert.Equal("Review", saved.Comment);
 
-        await queue.AddAsync(old);
-        var json = await File.ReadAllTextAsync(Path.Combine(folder, "old.json"));
-        Assert.DoesNotContain("\"start\"", json);
-        Assert.Contains("\"duration\"", json);
+        saved.Comment = "Pairing";
+        await queue.AddAsync(saved);
+        var json = await File.ReadAllTextAsync(Path.Combine(folder, "saved.json"));
+        Assert.Contains("\"description\": \"Pairing\"", json);
+        Assert.DoesNotContain("\"comment\"", json);
     }
 }

@@ -141,7 +141,7 @@ public sealed class SheetDay
 
     public TimeEntry PickIssue(TimeEntry row, JiraIssue issue) => Changing.PickIssue(row, SavedOf(row), issue);
     public void SetHours(TimeEntry row, string? text) => Changing.SetHours(row, SavedOf(row), text);
-    public void SetDescription(TimeEntry row, string? text) => Changing.SetDescription(row, SavedOf(row), text);
+    public void SetComment(TimeEntry row, string? text) => Changing.SetComment(row, SavedOf(row), text);
     public void Remove(TimeEntry row) => Changing.Remove(row, SavedOf(row));
 
     /// <summary>Keeps a saved row that was marked removed.</summary>

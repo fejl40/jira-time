@@ -10,7 +10,7 @@ public static class WorklogMatching
     public static bool Matches(this TimeEntry entry, JiraWorklog worklog) =>
         entry.Date == worklog.Date
         && entry.Duration == worklog.Duration
-        && (entry.Description ?? "") == (worklog.Comment ?? "");
+        && TimeEntry.SameComment(entry.Comment, worklog.Comment);
 
     /// <summary>Prefix of the ids of entries read from Jira; the rest is the worklog id.</summary>
     public const string JiraIdPrefix = "jira-";
@@ -23,7 +23,7 @@ public static class WorklogMatching
         IssueSummary = worklog.IssueSummary,
         Date = worklog.Date,
         Duration = worklog.Duration,
-        Description = worklog.Comment,
+        Comment = worklog.Comment,
         JiraWorklogId = worklog.Id,
         JiraWorklogIssueKey = worklog.IssueKey,
         SyncPending = false,
@@ -46,11 +46,9 @@ public static class WorklogMatching
 
     /// <summary>
     /// True when <paramref name="saved"/> is synced and <paramref name="edited"/> has the same issue, hours and
-    /// description (compared exactly), so Jira needs nothing.
+    /// comment, so Jira needs nothing. The comment is compared exactly: a missing comment and an empty one differ,
+    /// so such a change is still sent.
     /// </summary>
     public static bool SameAsSynced(this TimeEntry edited, TimeEntry saved) =>
-        saved.IsSynced
-        && saved.IssueKey == edited.IssueKey
-        && saved.Duration == edited.Duration
-        && saved.Description == edited.Description;
+        saved.IsSynced && saved.SameWork(edited) && saved.Comment == edited.Comment;
 }

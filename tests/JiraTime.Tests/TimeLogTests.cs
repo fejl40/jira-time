@@ -26,7 +26,7 @@ public class TimeLogTests : IDisposable
 
         Assert.True(time.IsComplete);
         var e = Assert.Single(time.Entries);
-        Assert.Equal(("OPS-9", "Summary of OPS-9", Day, TimeSpan.FromHours(2), "Support"), (e.IssueKey, e.IssueSummary, e.Date, e.Duration, e.Description));
+        Assert.Equal(("OPS-9", "Summary of OPS-9", Day, TimeSpan.FromHours(2), "Support"), (e.IssueKey, e.IssueSummary, e.Date, e.Duration, e.Comment));
         Assert.Equal((id, "jira-" + id), (e.JiraWorklogId, e.Id));
         Assert.True(e.IsSynced);
         Assert.Empty(await _h.QueuedAsync()); // nothing is stored locally

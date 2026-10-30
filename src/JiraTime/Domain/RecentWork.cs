@@ -17,11 +17,11 @@ public static class RecentWork
     /// <summary>The latest distinct comments per issue, newest first, at most <paramref name="perIssue"/> each.</summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<string>> Comments(IEnumerable<TimeEntry> entries, int perIssue = 5) =>
         entries
-            .Where(e => !string.IsNullOrWhiteSpace(e.Description))
+            .Where(e => TimeEntry.CleanComment(e.Comment) is not null)
             .GroupBy(e => e.IssueKey, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key,
                 g => (IReadOnlyList<string>)Newest(g)
-                    .Select(e => e.Description!.Trim())
+                    .Select(e => TimeEntry.CleanComment(e.Comment)!)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .Take(perIssue)
                     .ToList(),

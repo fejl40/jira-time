@@ -113,4 +113,36 @@ public class LegacyDataMigrationTests : IDisposable
         Assert.Equal(["ABC-2"], (await StoredAsync(_h.Store, user)).Select(e => e.IssueKey));
         Assert.Equal(2, Assert.Single(await _h.Store.Collection<TimeEntriesBackup>().QueryAsync(_ => true)).Entries.Count);
     }
+
+    [Fact]
+    public async Task Owned_entries_saved_with_start_and_end_times_get_their_hours_on_sign_in()
+    {
+        var folder = _h.Files.Folder("time-entries");
+        await File.WriteAllTextAsync(Path.Combine(folder, "old.json"), $$"""
+            { "id": "old", "owner": "{{TestUsers.Carl.Id}}", "issueKey": "ABC-1", "issueSummary": "", "date": "2026-10-19",
+              "start": "09:00:00", "end": "11:30:00", "description": "Review", "syncPending": true }
+            """);
+
+        Assert.False(await _h.Legacy.ClaimAsync(TestUsers.Carl)); // nothing unowned to claim
+
+        var old = Assert.Single(await StoredAsync(_h.Store, CurrentUser.SignedIn(TestUsers.Carl)));
+        Assert.Equal((TimeSpan.FromHours(2.5), "Review"), (old.Duration, old.Comment));
+        var json = await File.ReadAllTextAsync(Path.Combine(folder, "old.json"));
+        Assert.DoesNotContain("\"start\"", json);
+        Assert.Contains("\"duration\"", json);
+    }
+
+    [Fact]
+    public async Task Start_and_end_times_never_replace_hours_an_entry_already_has()
+    {
+        var folder = _h.Files.Folder("time-entries");
+        await File.WriteAllTextAsync(Path.Combine(folder, "both.json"), $$"""
+            { "id": "both", "owner": "{{TestUsers.Carl.Id}}", "issueKey": "ABC-1", "date": "2026-10-19", "duration": "01:00:00",
+              "start": "09:00:00", "end": "11:30:00", "syncPending": true }
+            """);
+
+        await _h.Legacy.ClaimAsync(TestUsers.Carl);
+
+        Assert.Equal(TimeSpan.FromHours(1), Assert.Single(await StoredAsync(_h.Store, CurrentUser.SignedIn(TestUsers.Carl))).Duration);
+    }
 }

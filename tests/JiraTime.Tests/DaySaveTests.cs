@@ -14,7 +14,7 @@ public class DaySaveTests
         IssueSummary = "Login page",
         Date = Day,
         Duration = TimeSpan.FromHours(2),
-        Description = "Review",
+        Comment = "Review",
         JiraWorklogId = "10001",
         JiraWorklogIssueKey = "ABC-1",
         SyncPending = false,
@@ -80,8 +80,7 @@ public class DaySaveTests
         read.CreatedUtc = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
         var edited = read.Copy();
         edited.Duration = TimeSpan.FromHours(3);
-        edited.JiraWorklogId = "tampered";
-        edited.JiraWorklogIssueKey = "XYZ-1";
+        edited.LeftOldIssue(); // the copy's worklog differs from what was read
         edited.Date = Day.AddDays(1);
         var now = new DateTime(2026, 10, 27, 12, 0, 0, DateTimeKind.Utc);
 
@@ -105,8 +104,8 @@ public class DaySaveTests
 
         var plan = DaySave.Plan(Day, rows, [read, gone]);
         var sent = plan.RowsToSend(DateTime.UnixEpoch);
-        sent[0].JiraWorklogId = "changed by the writer";
-        plan.Removed[0].DeletePending = true;
+        sent[0].Sent("changed by the writer");
+        plan.Removed[0].MarkRemovalPending();
 
         Assert.Equal(before, string.Join(",", rows.Concat([read, gone]).Select(e => $"{e.Id} {e.Date} {e.Duration} {e.JiraWorklogId} {e.UpdatedUtc:O}")));
         Assert.False(gone.DeletePending);

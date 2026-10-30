@@ -11,7 +11,7 @@ public class UnsavedChangesTests
     private static TimeEntry Saved(string key, double hours, DateOnly date, string? worklog = "1", string? comment = null) => new()
     {
         IssueKey = key, IssueSummary = key + " summary", Date = date, Duration = TimeSpan.FromHours(hours),
-        Description = comment, JiraWorklogId = worklog, SyncPending = worklog is null,
+        Comment = comment, JiraWorklogId = worklog, SyncPending = worklog is null,
     };
 
     /// <summary>Adds a row the user filled in.</summary>
@@ -96,7 +96,7 @@ public class UnsavedChangesTests
         var entry = Saved("ABC-1", 4, Friday, comment: "Review");
         var sheet = Sheet(entry);
         var friday = sheet.Day(Friday);
-        friday.SetDescription(entry, "Planning");
+        friday.SetComment(entry, "Planning");
         friday.AddRow();
 
         var change = Assert.Single(UnsavedChanges.Of(sheet).Days.Single().Rows);
@@ -105,5 +105,19 @@ public class UnsavedChangesTests
         Assert.Equal("Planning", change.Comment);
         Assert.Null(change.HoursBefore);
         Assert.Null(change.IssueBefore);
+    }
+
+    [Fact]
+    public void An_empty_comment_that_became_none_is_not_a_changed_comment()
+    {
+        var entry = Saved("ABC-1", 4, Friday, comment: "");
+        var sheet = Sheet(entry);
+        sheet.Day(Friday).SetHours(entry, "5");
+        sheet.Day(Friday).SetComment(entry, " ");
+
+        var change = Assert.Single(UnsavedChanges.Of(sheet).Days.Single().Rows);
+
+        Assert.Equal((RowChangeKind.Changed, null), (change.Kind, change.Comment));
+        Assert.False(change.CommentChanged);
     }
 }

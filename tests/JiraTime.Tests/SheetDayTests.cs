@@ -23,8 +23,7 @@ public class SheetDayTests
         var inJira = Saved("ABC-1", 1);
         var changed = Saved("ABC-2", 1);
         var removed = Saved("ABC-3", 1);
-        var notInJira = Saved("ABC-4", 1);
-        notInJira.SyncPending = true;
+        var notInJira = new TimeEntry { IssueKey = "ABC-4", IssueSummary = "ABC-4 summary", Date = Day, Duration = TimeSpan.FromHours(1), JiraWorklogId = "1" };
         var sheet = Sheet(inJira, changed, removed, notInJira);
         sheet.Suggest(Day);
         var day = sheet.Day(Day);
@@ -46,10 +45,8 @@ public class SheetDayTests
     public void Jira_s_reason_shows_only_on_untouched_rows_Jira_does_not_have()
     {
         var notInJira = Saved("ABC-1", 1);
-        notInJira.SyncPending = true;
-        notInJira.SyncError = "Jira said no";
-        var waiting = Saved("ABC-2", 1);
-        waiting.SyncPending = true;
+        notInJira.Failed("Jira said no");
+        var waiting = new TimeEntry { IssueKey = "ABC-2", IssueSummary = "ABC-2 summary", Date = Day, Duration = TimeSpan.FromHours(1), JiraWorklogId = "1" };
         var day = DayWith(notInJira, waiting);
 
         Assert.Equal([true, false], day.Rows.Select(r => r.ShowsSyncError));
@@ -114,7 +111,7 @@ public class SheetDayTests
         Assert.False(day.HasOwnChanges);
         Assert.True(day.HasOnlySuggestions);
 
-        day.SetDescription(day.Rows[0].Entry, "Pairing");
+        day.SetComment(day.Rows[0].Entry, "Pairing");
         Assert.True(day.HasOwnChanges);
         Assert.False(day.HasOnlySuggestions);
     }

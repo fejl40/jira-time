@@ -58,7 +58,7 @@ internal static class JiraWorklogJson
     {
         var started = FormatStarted(e.Date, TimeEntry.JiraStartTime, zone);
         var seconds = (int)e.Duration.TotalSeconds;
-        var text = e.Description ?? "";
+        var text = e.Comment ?? "";
         // Cloud (API v3) wants comments as Atlassian Document Format.
         object comment = isCloud ? AtlassianDocument.FromPlainText(text) : text;
         return new { started, timeSpentSeconds = seconds, comment };

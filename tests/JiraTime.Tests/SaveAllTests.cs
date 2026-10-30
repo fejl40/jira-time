@@ -58,7 +58,7 @@ public class SaveAllTests : IDisposable
         var sheet = await SheetAsync();
         foreach (var day in new[] { Monday, Tuesday, Wednesday })
             foreach (var row in sheet.SavedOn(day))
-                sheet.Day(day).SetDescription(row, "Edited");
+                sheet.Day(day).SetComment(row, "Edited");
         _h.Jira.Requests.Clear();
 
         var result = await _h.Sync.SaveDaysAsync(_h.Connection, sheet.PlanSaveAll());
@@ -120,7 +120,7 @@ public class SaveAllTests : IDisposable
         var id = _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 3600);
         var saved = await _h.DayAsync(Monday);
         var rows = saved.Select(e => e.Copy()).Append(Row("ABC-2", 1)).ToList();
-        rows[0].Description = "Edited";
+        rows[0].Comment = "Edited";
         _h.Jira.Worklogs["ABC-1"].Remove(id);
 
         var result = await _h.SaveDayAsync(Monday, rows, saved);
@@ -138,7 +138,7 @@ public class SaveAllTests : IDisposable
             _h.Jira.AddWorklog(key, "2026-10-19T09:00:00.000+0200", 1800);
         }
         var rows = await _h.CopiesAsync(Monday);
-        foreach (var row in rows) row.Description = "Edited";
+        foreach (var row in rows) row.Comment = "Edited";
         _h.Jira.Requests.Clear();
 
         Assert.True((await _h.SaveDayAsync(Monday, rows)).Saved);
@@ -157,7 +157,7 @@ public class SaveAllTests : IDisposable
         var later = _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 1800);
         var saved = await _h.DayAsync(Monday);
         var rows = saved.Select(e => e.Copy()).ToList();
-        rows.Single(r => r.JiraWorklogId == later).Description = "Edited";
+        rows.Single(r => r.JiraWorklogId == later).Comment = "Edited";
         _h.Jira.Worklogs["ABC-1"][later]!["timeSpentSeconds"] = 7200; // changed in Jira, beyond what the search sends
         _h.Jira.EmbeddedWorklogLimit = 1;
         _h.Jira.Requests.Clear();
@@ -173,7 +173,7 @@ public class SaveAllTests : IDisposable
         _h.Jira.AddWorklog("ABC-2", "2026-10-19T09:00:00.000+0200", 3600);
         var saved = await _h.DayAsync(Monday);
         var rows = saved.Select(e => e.Copy()).ToList();
-        foreach (var row in rows) row.Description = "Edited";
+        foreach (var row in rows) row.Comment = "Edited";
         _h.Jira.Worklogs.Remove("ABC-2");
         _h.Jira.Requests.Clear();
 
@@ -186,7 +186,7 @@ public class SaveAllTests : IDisposable
     {
         _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 3600);
         var rows = await _h.CopiesAsync(Monday);
-        rows[0].Description = "Edited";
+        rows[0].Comment = "Edited";
         _h.Jira.FailWhen = uri => uri.AbsolutePath.EndsWith("/search") ? HttpStatusCode.ServiceUnavailable : null;
 
         Assert.True((await _h.SaveDayAsync(Monday, rows)).Saved);

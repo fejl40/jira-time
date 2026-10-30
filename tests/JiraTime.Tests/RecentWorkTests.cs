@@ -7,7 +7,7 @@ public class RecentWorkTests
     private static readonly DateOnly Today = new(2026, 10, 27);
 
     private static TimeEntry Logged(string key, int daysAgo, string? comment = null) =>
-        new() { IssueKey = key, IssueSummary = key + " summary", Date = Today.AddDays(-daysAgo), Duration = TimeSpan.FromHours(1), Description = comment };
+        new() { IssueKey = key, IssueSummary = key + " summary", Date = Today.AddDays(-daysAgo), Duration = TimeSpan.FromHours(1), Comment = comment };
 
     [Fact]
     public void Recent_issues_are_newest_first_and_each_once()

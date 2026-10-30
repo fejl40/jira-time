@@ -65,7 +65,7 @@ public class SaveDayTests : IDisposable
         _h.Jira.AddWorklog("OPS-9", "2026-10-19T13:00:00.000+0200", 7200, "Support");
         _h.Jira.AddWorklog("OPS-8", "2026-10-19T13:00:00.000+0200", 3600);
         var rows = await _h.CopiesAsync(Day);
-        rows.Single(r => r.IssueKey == "OPS-9").Description = "Support call";
+        rows.Single(r => r.IssueKey == "OPS-9").Comment = "Support call";
         rows.RemoveAll(r => r.IssueKey == "OPS-8");
 
         Assert.True((await _h.SaveDayAsync(Day, rows)).Saved);
@@ -113,7 +113,7 @@ public class SaveDayTests : IDisposable
         await _h.SaveDayAsync(Day, [Row("ABC-1", 2)]);
         var rows = await _h.CopiesAsync(Day);
         rows[0].Duration = TimeSpan.FromHours(3);
-        rows[0].JiraWorklogId = "99999"; // a stray value on the copy
+        rows[0].Sent("99999"); // a stray worklog id on the copy
 
         Assert.True((await _h.SaveDayAsync(Day, rows)).Saved);
 

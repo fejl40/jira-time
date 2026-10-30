@@ -7,7 +7,8 @@ namespace JiraTime.Services;
 /// Moves data saved by older versions of the app. Data saved before multi-user support has no owner. The first time its user signs in, it is given
 /// to them, after a backup copy is stored. The user is the one recorded in the old profile setting;
 /// if none was recorded, whoever signs in first (there was only one user then). Time entries from
-/// before Jira became the source of truth are dropped once Jira has them (<see cref="RetireSyncedEntriesAsync"/>).
+/// before Jira became the source of truth are dropped once Jira has them (<see cref="RetireSyncedEntriesAsync"/>),
+/// and entries saved with start and end times get them as hours.
 /// </summary>
 public class LegacyDataMigration(IDocumentStore store, TimeProvider clock)
 {
@@ -18,13 +19,16 @@ public class LegacyDataMigration(IDocumentStore store, TimeProvider clock)
     private readonly IDocumentCollection<AppSettings> _settings = store.Collection<AppSettings>();
     private readonly IDocumentCollection<LegacyBackup> _backups = store.Collection<LegacyBackup>();
     private readonly IDocumentCollection<TimeEntriesBackup> _timeBackups = store.Collection<TimeEntriesBackup>();
+    private readonly IDocumentCollection<TimedEntry> _timedEntries = store.Collection<TimedEntry>();
 
+    /// <summary>Gives old data to <paramref name="user"/>; entries saved with start and end times get their hours first.</summary>
     /// <returns>True when old data was given to <paramref name="user"/>.</returns>
     public async Task<bool> ClaimAsync(UserKey user)
     {
         await Gate.WaitAsync();
         try
         {
+            await GiveStartEndTimesHoursAsync();
             var entries = await _entries.QueryAsync(e => e.Owner == null || e.Owner == "");
             var daysOff = await _daysOff.QueryAsync(d => d.Owner == null || d.Owner == "");
             if (entries.Count == 0 && daysOff.Count == 0) return false;
@@ -60,6 +64,21 @@ public class LegacyDataMigration(IDocumentStore store, TimeProvider clock)
         finally
         {
             Gate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Entries saved before TASK-12 had start and end times instead of hours. Each gets the hours between
+    /// them and is written back without the times. Entries that already have hours are left alone.
+    /// </summary>
+    private async Task GiveStartEndTimesHoursAsync()
+    {
+        var timed = await _timedEntries.QueryAsync(e => e.Start != null && e.End != null);
+        foreach (var t in timed)
+        {
+            if (t.End <= t.Start || await _entries.GetAsync(t.Id) is not { } entry || entry.Duration != TimeSpan.Zero) continue;
+            entry.Duration = t.End!.Value - t.Start!.Value;
+            await _entries.UpsertAsync(entry);
         }
     }
 
@@ -132,4 +151,13 @@ public class TimeEntriesBackup : IDocument
     public DateTime CreatedUtc { get; set; }
     public string Owner { get; set; } = "";
     public List<TimeEntry> Entries { get; set; } = [];
+}
+
+/// <summary>A time entry as saved before TASK-12, with start and end times; only read to give the entry its hours.</summary>
+[DocumentCollection("time-entries")]
+public class TimedEntry : IDocument
+{
+    public string Id { get; set; } = "";
+    public TimeOnly? Start { get; set; }
+    public TimeOnly? End { get; set; }
 }

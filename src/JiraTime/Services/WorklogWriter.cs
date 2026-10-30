@@ -20,19 +20,15 @@ internal sealed class WorklogWriter(JiraWorklogClient jira, RetryQueue queue, Ti
         try
         {
             if (entry.MovedToAnotherIssue) await RemoveFromOldIssueAsync(c, entry, ct);
-            await SendAsync(c, entry, ct);
+            entry.Sent(await SendAsync(c, entry, ct));
         }
         catch (JiraException ex)
         {
-            entry.SyncPending = true;
-            entry.SyncError = ex.Message;
+            entry.Failed(ex.Message);
             await QueueAsync(entry);
-            return entry.SyncError;
+            return ex.Message;
         }
 
-        entry.JiraWorklogIssueKey = entry.IssueKey;
-        entry.SyncPending = false;
-        entry.SyncError = null;
         log.Written(new JiraIssue(entry.IssueKey, entry.IssueSummary));
         await queue.RemoveAsync(entry.Id);
         return null;
@@ -50,8 +46,7 @@ internal sealed class WorklogWriter(JiraWorklogClient jira, RetryQueue queue, Ti
             await queue.RemoveAsync(entry.Id); // work that never reached Jira
             return null;
         }
-        entry.DeletePending = true;
-        entry.SyncPending = true;
+        entry.MarkRemovalPending();
         return await FinishDeleteAsync(c, entry, ct);
     }
 
@@ -61,25 +56,23 @@ internal sealed class WorklogWriter(JiraWorklogClient jira, RetryQueue queue, Ti
         var oldIssue = entry.WorklogIssueKey;
         await DeleteIgnoringMissingAsync(c, oldIssue, entry.JiraWorklogId!, ct);
         log.Written(new JiraIssue(oldIssue, ""));
-        entry.JiraWorklogId = null;
-        entry.JiraWorklogIssueKey = null;
+        entry.LeftOldIssue();
     }
 
-    private async Task SendAsync(JiraConnection c, TimeEntry entry, CancellationToken ct)
+    /// <summary>Creates or overwrites the entry's worklog.</summary>
+    /// <returns>The id of the worklog Jira has now.</returns>
+    private async Task<string> SendAsync(JiraConnection c, TimeEntry entry, CancellationToken ct)
     {
-        if (entry.JiraWorklogId is null)
-        {
-            entry.JiraWorklogId = await jira.AddWorklogAsync(c, entry, ct);
-            return;
-        }
+        if (entry.JiraWorklogId is not { } worklogId) return await jira.AddWorklogAsync(c, entry, ct);
         try
         {
-            await jira.UpdateWorklogAsync(c, entry.IssueKey, entry.JiraWorklogId, entry, ct);
+            await jira.UpdateWorklogAsync(c, entry.IssueKey, worklogId, entry, ct);
+            return worklogId;
         }
         catch (JiraException ex) when (ex.Status == HttpStatusCode.NotFound)
         {
             // Someone deleted it in Jira: log it again.
-            entry.JiraWorklogId = await jira.AddWorklogAsync(c, entry, ct);
+            return await jira.AddWorklogAsync(c, entry, ct);
         }
     }
 
@@ -93,7 +86,7 @@ internal sealed class WorklogWriter(JiraWorklogClient jira, RetryQueue queue, Ti
         }
         catch (JiraException ex)
         {
-            entry.SyncError = ex.Message;
+            entry.Failed(ex.Message);
             await QueueAsync(entry);
             return ex.Message;
         }

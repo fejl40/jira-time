@@ -98,12 +98,12 @@ public class DayWorkEditTests
         var work = new DayWork(Day);
         var s = Suggestion(work, "ABC-2", 2);
 
-        work.SetDescription(work.View(a), a, "  Pairing  ");
-        work.SetDescription(s, null, "   ");
+        work.SetComment(work.View(a), a, "  Pairing  ");
+        work.SetComment(s, null, "   ");
 
-        Assert.Equal("Pairing", work.View(a).Description);
-        Assert.Equal("old", a.Description);
-        Assert.Null(s.Description);
+        Assert.Equal("Pairing", work.View(a).Comment);
+        Assert.Equal("old", a.Comment);
+        Assert.Null(s.Comment);
         Assert.False(work.IsSuggested(s));
     }
 
@@ -120,5 +120,17 @@ public class DayWorkEditTests
         Assert.Equal(("ABC-1", "Login", Day), (onIssue.IssueKey, onIssue.IssueSummary, onIssue.Date));
         Assert.True(work.IsBlank(onIssue));
         Assert.False(work.IsSuggested(onIssue));
+    }
+
+    [Fact]
+    public void Clearing_an_empty_comment_is_no_change()
+    {
+        var a = Saved("ABC-1", 4, "");
+        var work = new DayWork(Day);
+
+        work.SetComment(work.View(a), a, "  ");
+
+        Assert.Null(work.View(a).Comment);
+        Assert.False(work.IsChanged(a)); // no comment and an empty one are the same
     }
 }

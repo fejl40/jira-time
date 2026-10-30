@@ -55,20 +55,16 @@ public sealed class DaySave
     }
 
     /// <summary>
-    /// The new and changed rows, in order, as fresh copies stamped with <paramref name="nowUtc"/>. A changed row
-    /// takes its Jira bookkeeping from what was read, not from the edited copy.
+    /// The new and changed rows, in order, as fresh copies stamped with <paramref name="nowUtc"/> (a new row is
+    /// created then too). A changed row takes its Jira bookkeeping from what was read, not from the edited copy.
     /// </summary>
     public IReadOnlyList<TimeEntry> RowsToSend(DateTime nowUtc) => _toSend.Select(p => Stamped(p.Row, p.Read, nowUtc)).ToList();
 
     private static TimeEntry Stamped(TimeEntry row, TimeEntry? read, DateTime nowUtc)
     {
         var copy = row.Copy();
-        if (read is not null)
-        {
-            copy.JiraWorklogId = read.JiraWorklogId;
-            copy.JiraWorklogIssueKey = read.JiraWorklogIssueKey;
-            copy.CreatedUtc = read.CreatedUtc;
-        }
+        if (read is not null) copy.TakeWorklogFrom(read);
+        else copy.CreatedUtc = nowUtc;
         copy.UpdatedUtc = nowUtc;
         return copy;
     }

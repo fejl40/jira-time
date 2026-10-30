@@ -114,7 +114,7 @@ public sealed class TimeHarness : IDisposable
         Jira.Worklogs.TryGetValue(key, out var logs) ? logs.Values.Sum(l => (int)l["timeSpentSeconds"]!) : 0;
 
     public static TimeEntry Row(string key, double hours, string? comment = null) =>
-        new() { IssueKey = key, IssueSummary = $"Summary of {key}", Duration = TimeSpan.FromHours(hours), Description = comment };
+        new() { IssueKey = key, IssueSummary = $"Summary of {key}", Duration = TimeSpan.FromHours(hours), Comment = comment };
 
     public void Dispose()
     {

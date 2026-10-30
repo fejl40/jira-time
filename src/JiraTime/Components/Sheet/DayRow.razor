@@ -11,7 +11,7 @@
             <span class="font-semibold">@E.IssueKey</span> @E.IssueSummary
         </div>
         <span class="w-20 text-right text-sm tabular-nums text-slate-500 line-through dark:text-slate-400">@Format.Hours(E.Duration) h</span>
-        <span class="min-w-40 flex-1 basis-48 truncate text-sm text-slate-500 line-through dark:text-slate-400">@E.Description</span>
+        <span class="min-w-40 flex-1 basis-48 truncate text-sm text-slate-500 line-through dark:text-slate-400">@E.Comment</span>
         <span class="w-48 text-right text-xs font-medium text-red-700 dark:text-red-400">@(E.JiraWorklogId is null ? "Removed" : "Deletes the worklog in Jira")</span>
         <button type="button" class="btn-ghost text-xs" title="Keep this row" @onclick="Restore">Undo</button>
     }
@@ -26,7 +26,7 @@
             <span class="text-sm text-muted">h</span>
         </div>
         <input type="text" class="field min-w-40 flex-1 basis-48 py-1.5" aria-label="Comment" placeholder="Comment (optional)"
-               list="@CommentListId(E.IssueKey)" data-comment value="@E.Description" @onchange="SetDescription" />
+               list="@CommentListId(E.IssueKey)" data-comment value="@E.Comment" @onchange="SetComment" />
         <span class="w-32 text-right text-xs" title="@E.SyncError">
             @switch (Row.State)
             {
@@ -90,9 +90,9 @@
         return OnChanged.InvokeAsync();
     }
 
-    private Task SetDescription(ChangeEventArgs ev)
+    private Task SetComment(ChangeEventArgs ev)
     {
-        Day.SetDescription(E, ev.Value?.ToString());
+        Day.SetComment(E, ev.Value?.ToString());
         return OnChanged.InvokeAsync();
     }
 

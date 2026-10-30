@@ -38,6 +38,16 @@ public class DayFillerTests
     }
 
     [Fact]
+    public void Rows_not_saved_yet_are_the_latest_work_of_the_day()
+    {
+        var unsaved = new[] { new TimeEntry { IssueKey = "NEW-1", Date = Monday, Duration = TimeSpan.FromHours(1) },
+                              new TimeEntry { IssueKey = "NEW-2", Date = Monday, Duration = TimeSpan.FromHours(1) } };
+        var logged = new[] { E("XYZ-7", 1.5, updatedMinute: 30), unsaved[0], unsaved[1], E("XYZ-8", 1, updatedMinute: 10) };
+
+        Assert.Equal("NEW-2", DayFiller.GuessIssue(logged, [Doing])?.Key);
+    }
+
+    [Fact]
     public void Without_in_progress_issues_any_sprint_issue_is_used()
     {
         Assert.Equal("ABC-2 8h", Show(DayFiller.Propose(Workday, [], [Todo])));
@@ -107,12 +117,12 @@ public class DayFillerTests
     public void A_copy_without_target_keeps_the_hours_and_drops_comments_and_empty_rows()
     {
         var source = new[] { E("XYZ-1", 2), E("", 3), E("XYZ-2", 0) };
-        source[0].Description = "Standup";
+        source[0].Comment = "Standup";
 
         var copy = DayFiller.Copy(Monday, source);
 
         Assert.Equal("XYZ-1 2h", Show(copy));
-        Assert.Null(copy[0].Description);
+        Assert.Null(copy[0].Comment);
         Assert.NotEqual(source[0].Id, copy[0].Id);
     }
 

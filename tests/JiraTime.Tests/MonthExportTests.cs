@@ -48,7 +48,7 @@ public class MonthExportTests
     public void Time_outside_the_month_and_removed_time_is_left_out()
     {
         var removed = Entry("BAC-1", 4, 2);
-        removed.DeletePending = true;
+        removed.MarkRemovalPending();
         var march = new TimeEntry { IssueKey = "BAC-1", Date = new DateOnly(2026, 3, 1), Duration = TimeSpan.FromHours(1) };
 
         Assert.All(MonthExport.Rows(Feb, [removed, march], NoEpics), r => Assert.Null(r.IssueKey));
