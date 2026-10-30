@@ -90,6 +90,7 @@ Components/Layout/MainLayout.razor header + redirect to setup when not signed in
 Components/Pages/Setup/            Connect
 Components/Pages/Timesheet.razor   shows a period: wires PeriodLoader, WorklogSync and the parts below
 Components/Format.cs               how hours, days and counts are written for the user
+Components/DayOffLook.cs           how time off looks: icon, tint and label per reason (vacation, sick, other)
 Components/Links.cs                builds and reads timesheet links (period, selected day) and export links
 Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, DayKeys (keyboard shortcuts)
 Components/JiraWaits.cs            the timesheet's running Jira requests: what shows pending, which buttons wait, the status text
@@ -241,6 +242,13 @@ hours** (a day with 0 hours is not a workday). Danish public holidays are skippe
 **Time off…** in the day view marks a whole day or part of it off (vacation, sick, other); part of a
 day lowers the hours that day needs. Marking a whole day off marks the time saved on it as removed, so
 **Save day** deletes those worklogs in Jira; the day stays editable, and **Undo** brings the rows back before saving. The grid shows the hours still missing on each workday up to today.
+
+Time off stands out without opening the day (`DayOffLook`, styles `.day-off-*` in `Styles/app.css`): each reason has
+an icon and a tint (☀️ amber for vacation, 🤒 rose for sick, 🗓️ violet for other time off). A whole day off stripes
+its column in the grid and its entry in the phone list, with the icon under the date; part of a day off tints them and
+puts the icon next to the weekday. The phone list says "Vacation" or "Time off 3 h", the day header's badge "Vacation ·
+whole day" or "Sick · 4 h off", and the grid header's tooltip the same. A whole day off keeps its saved hours readable,
+struck through next to the 0 they become, until Save day removes them from Jira.
 
 ### Month export
 

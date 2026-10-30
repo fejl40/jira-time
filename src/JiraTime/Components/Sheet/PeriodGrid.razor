@@ -8,13 +8,17 @@
                 <th class="sticky left-0 z-10 min-w-64 bg-white dark:bg-slate-900 px-4 py-2 text-left font-medium">Issue</th>
                 @foreach (var (day, i) in Days)
                 {
-                    <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium" title="@DayTitle(day)" data-selected-day="@(day == Selected ? "" : null)">
+                    <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium" title="@DayTitle(day)" data-selected-day="@(day == Selected ? "" : null)" data-day-off="@DayOffLook.Data(Sheet.Day(day))">
                         <button type="button" class="relative w-full px-1 py-2" @onclick="() => OnSelectDay.InvokeAsync(day)">
-                            <div class="uppercase">@Format.TwoLetterWeekday(day)</div>
+                            <div class="uppercase">@if (Sheet.Day(day) is { HasPartialDayOff: true, Reason: { } partOff }) { <span class="mr-0.5 text-[10px]" aria-hidden="true">@DayOffLook.Icon(partOff)</span> }@Format.TwoLetterWeekday(day)</div>
                             <div class="text-sm @(day == Sheet.Today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700 dark:text-slate-200")">@day.Day</div>
                             @if (Sheet.IsUnsaved(day))
                             {
                                 <span class="dot-unsaved absolute right-1 top-1 size-1.5" title="Unsaved changes" data-unsaved-day></span>
+                            }
+                            @if (Sheet.Day(day) is { Kind: DayKind.DayOff, Reason: { } reason })
+                            {
+                                <span class="mt-0.5 block text-xs leading-none" aria-hidden="true">@DayOffLook.Icon(reason)</span>
                             }
                             @if (Sheet.Day(day) is { Expected.Ticks: > 0 })
                             {
@@ -157,9 +161,7 @@
     private string? DayTitle(DateOnly day) => Sheet.Day(day) switch
     {
         { Kind: DayKind.Holiday, Name: var n } => n,
-        { Kind: DayKind.DayOff, Name: var n } => $"Day off ({n})",
-        { HasPartialDayOff: true } d => $"{d.Name}: {Format.Hours(d.Off)} h off",
-        _ => null,
+        var info => DayOffLook.Label(info),
     };
 
     private string DayCellClass(DateOnly day, int index, bool footer = false)
@@ -167,8 +169,9 @@
         var info = Sheet.Day(day);
         var classes = new List<string> { "motion-colors" }; // a day marked off fades to grey
         if (index > 0 && day.DayOfWeek == DayOfWeek.Monday) classes.Add("border-l-2 border-slate-300 dark:border-slate-600"); // week boundary
-        if (!footer && info is { IsWorkday: false }) classes.Add("bg-slate-50 dark:bg-slate-800/60");
-        if (!footer && info is { Kind: DayKind.Holiday or DayKind.DayOff }) classes.Add("text-slate-400 dark:text-slate-500");
+        if (!footer && info is { Kind: DayKind.Weekend or DayKind.Holiday }) classes.Add("bg-slate-50 dark:bg-slate-800/60");
+        if (!footer && info is { Kind: DayKind.Holiday }) classes.Add("text-slate-400 dark:text-slate-500");
+        classes.Add(DayOffLook.Classes(info)); // the reason's tint down the whole column, striped for a whole day
         if (day == PendingDay) classes.Add("waiting-pending");
         return string.Join(' ', classes);
     }

@@ -44,6 +44,16 @@
   .dot-not-in-jira { @apply rounded-full bg-amber-500; }
   .alert-error { @apply mt-4 rounded-md bg-red-50 px-3 py-2.5 text-sm text-red-700 ring-1 ring-red-200 dark:bg-red-950/60 dark:text-red-300 dark:ring-red-900; }
   kbd { @apply rounded border border-slate-300 bg-white px-1 font-sans text-[11px] text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300; }
+  /* Time off (Components/DayOffLook.cs): a tint per reason; a whole day off is striped, part of a day only tinted. */
+  .day-off-vacation { --day-off: var(--color-amber-400); }
+  .day-off-sick { --day-off: var(--color-rose-400); }
+  .day-off-other { --day-off: var(--color-violet-400); }
+  .day-off-partial { background-color: color-mix(in oklab, var(--day-off) 14%, transparent); }
+  .day-off-whole {
+    background-color: color-mix(in oklab, var(--day-off) 12%, transparent);
+    background-image: repeating-linear-gradient(135deg, color-mix(in oklab, var(--day-off) 30%, transparent) 0 3px, transparent 3px 9px);
+  }
+  .day-off-badge { @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium text-slate-800 dark:text-slate-100; background-color: color-mix(in oklab, var(--day-off) 30%, transparent); }
   .avatar { @apply grid size-8 flex-none place-items-center rounded-full bg-blue-100 text-xs font-semibold text-blue-800 dark:bg-blue-900 dark:text-blue-100; }
 }
 

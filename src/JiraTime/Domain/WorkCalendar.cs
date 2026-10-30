@@ -35,6 +35,9 @@ public record DayInfo(DateOnly Date, DayKind Kind, string? Name)
     /// <summary>Part of a workday taken off (a partial day off). Zero otherwise.</summary>
     public TimeSpan Off { get; init; }
 
+    /// <summary>Why the day, or part of it, is off; null when no time is off.</summary>
+    public DayOffReason? Reason { get; init; }
+
     public bool IsWorkday => Kind == DayKind.Workday;
     public bool HasPartialDayOff => IsWorkday && Off > TimeSpan.Zero;
 
@@ -54,8 +57,8 @@ public record DayInfo(DateOnly Date, DayKind Kind, string? Name)
         if (daysOff.TryGetValue(date, out var off))
         {
             if (off.Hours is not { } partial || partial >= hours)
-                return new DayInfo(date, DayKind.DayOff, off.Reason.ToString()) { Hours = hours, Off = hours };
-            return new DayInfo(date, DayKind.Workday, off.Reason.ToString()) { Hours = hours, Off = partial };
+                return new DayInfo(date, DayKind.DayOff, off.Reason.ToString()) { Hours = hours, Off = hours, Reason = off.Reason };
+            return new DayInfo(date, DayKind.Workday, off.Reason.ToString()) { Hours = hours, Off = partial, Reason = off.Reason };
         }
         return new DayInfo(date, DayKind.Workday, null) { Hours = hours };
     }

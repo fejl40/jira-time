@@ -72,10 +72,12 @@ public class WorkCalendarTests
         var marked = await calendar.GetDayAsync(day);
         Assert.Equal(DayKind.DayOff, marked.Kind);
         Assert.Equal("Vacation", marked.Name);
+        Assert.Equal(DayOffReason.Vacation, marked.Reason);
         Assert.Equal(TimeSpan.Zero, marked.Expected);
 
         await calendar.UnmarkDayOffAsync(day);
         Assert.Equal(DayKind.Workday, (await calendar.GetDayAsync(day)).Kind);
+        Assert.Null((await calendar.GetDayAsync(day)).Reason);
     }
 
     [Fact]
@@ -90,6 +92,7 @@ public class WorkCalendarTests
         Assert.Equal(DayKind.Workday, partial.Kind);
         Assert.True(partial.HasPartialDayOff);
         Assert.Equal("Other", partial.Name);
+        Assert.Equal(DayOffReason.Other, partial.Reason);
         Assert.Equal(TimeSpan.FromHours(5), partial.Expected);
         Assert.Equal(TimeSpan.FromHours(1), partial.MissingWith(TimeSpan.FromHours(4)));
         Assert.Equal(TimeSpan.FromHours(5), DayFiller.Propose(partial, [], []).Single().Duration);
@@ -111,6 +114,7 @@ public class WorkCalendarTests
 
         var info = await calendar.GetDayAsync(day);
         Assert.Equal(DayKind.DayOff, info.Kind);
+        Assert.Equal(DayOffReason.Sick, info.Reason);
         Assert.Equal(TimeSpan.Zero, info.Expected);
     }
 

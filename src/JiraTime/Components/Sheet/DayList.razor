@@ -7,10 +7,17 @@
         var saved = Sheet.SavedOn(day);
         var logged = TimeEntry.Total(saved);
         <li>
-            <button type="button" class="motion-colors flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm @(day == PendingDay ? "waiting-pending" : "") @(day == Selected ? "bg-blue-50 dark:bg-blue-950/60" : info is { IsWorkday: false } ? "bg-slate-50 dark:bg-slate-800/60" : "")"
-                    @onclick="() => OnSelect.InvokeAsync(day)">
-                <span class="w-20 flex-none @(day == Sheet.Today ? "font-semibold text-blue-700 dark:text-blue-400" : "")">@Format.WeekdayAndNumber(day)</span>
-                <span class="flex-1 truncate text-xs text-muted">@Note(info)</span>
+            <button type="button" class="motion-colors flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm @RowClass(day, info)"
+                    @onclick="() => OnSelect.InvokeAsync(day)" data-day-off="@DayOffLook.Data(info)">
+                <span class="w-16 flex-none @(day == Sheet.Today ? "font-semibold text-blue-700 dark:text-blue-400" : "")">@Format.WeekdayAndNumber(day)</span>
+                @if (info?.Reason is { } reason)
+                {
+                    <span class="flex-1 truncate text-xs font-medium text-slate-700 dark:text-slate-200" title="@DayOffLook.Label(info)"><span aria-hidden="true">@DayOffLook.Icon(reason)</span> @DayOffLook.ShortLabel(info)</span>
+                }
+                else
+                {
+                    <span class="flex-1 truncate text-xs text-muted">@(info is { IsWorkday: false } ? info.Name ?? "Weekend" : "")</span>
+                }
                 @if (TimeEntry.HasSyncProblem(saved))
                 {
                     <span class="dot-not-in-jira size-2" title="Not in Jira"></span>
@@ -19,13 +26,13 @@
                 {
                     <span class="dot-unsaved size-2" title="Unsaved changes"></span>
                 }
-                <span class="w-24 text-right tabular-nums">
+                <span class="w-20 flex-none text-right tabular-nums">
                     @if (logged > TimeSpan.Zero || info is { Expected.Ticks: > 0 }) { <Count Value="logged" Zero="0" Unit=" h" /> }@if (info?.Expected is { } exp && exp > TimeSpan.Zero)
                     {
                         <span class="text-slate-400 dark:text-slate-500"> / @Format.Hours(exp)</span>
                     }
                 </span>
-                <span class="w-14 text-right text-xs tabular-nums text-warning">@(Sheet.Missing(day) is var m && m > TimeSpan.Zero ? $"−{Format.Hours(m)}" : "")</span>
+                <span class="w-10 flex-none text-right text-xs tabular-nums text-warning">@(Sheet.Missing(day) is var m && m > TimeSpan.Zero ? $"−{Format.Hours(m)}" : "")</span>
             </button>
         </li>
     }
@@ -38,10 +45,13 @@
     [Parameter] public DateOnly? PendingDay { get; set; }
     [Parameter] public EventCallback<DateOnly> OnSelect { get; set; }
 
-    private static string Note(DayInfo? info) => info switch
+    /// <summary>Selected in blue, weekends and holidays grey, time off in its reason's tint; pending while Save day saves it.</summary>
+    private string RowClass(DateOnly day, DayInfo? info)
     {
-        { IsWorkday: false } => info.Name ?? "Weekend",
-        { HasPartialDayOff: true } => $"{info.Name} · {Format.Hours(info.Off)} h off",
-        _ => "",
-    };
+        var pending = day == PendingDay ? "waiting-pending" : "";
+        var background = day == Selected ? "bg-blue-50 dark:bg-blue-950/60"
+            : info is { Kind: DayKind.Weekend or DayKind.Holiday } ? "bg-slate-50 dark:bg-slate-800/60"
+            : "";
+        return $"{pending} {background} {DayOffLook.Classes(info)}";
+    }
 }

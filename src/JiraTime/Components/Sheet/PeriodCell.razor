@@ -11,7 +11,7 @@
         {
             <span class="text-slate-400 line-through dark:text-slate-500">@Format.Hours(_saved)</span>
         }
-        <span class="motion-drop ml-0.5 inline-block rounded border border-dashed border-blue-400 px-1 text-xs text-blue-700 dark:border-blue-600 dark:text-blue-300" title="Not saved yet"
+        <span class="motion-drop ml-0.5 inline-block rounded border border-dashed border-blue-400 bg-white px-1 dark:bg-slate-900 text-xs text-blue-700 dark:border-blue-600 dark:text-blue-300" title="Not saved yet"
               style="@(Cascade ? Motion.Order(Index) : null)" data-draft-cell>@(unsaved > TimeSpan.Zero ? Format.Hours(unsaved) : "0")</span>
     }
     else if (_saved > TimeSpan.Zero)

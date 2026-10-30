@@ -27,7 +27,7 @@ To do a whole period at once, press **Fill period** and then **Save all**.
 
 Some other things you can do:
 
-- **Time off…** marks a day as vacation or sick.
+- **Time off…** marks a day, or part of it, as vacation, sick or other time off. Days off stand out in the timesheet with their own icon and colour.
 - **Export** gives you a month in the agency's format, ready to paste into Excel.
 - **Settings** sets your hours per weekday.
 - Keys: **←** and **→** change the day, **N** adds a row, **Ctrl+S** saves.
