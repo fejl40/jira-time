@@ -19,6 +19,9 @@ public sealed class JiraRequestLog(string folder, TimeProvider clock)
     private const string DayFormat = "yyyy-MM-dd";
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
+    // No byte order mark, so jq and other JSON tools read the first line too.
+    private static readonly Encoding Utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+
     // One writer at a time keeps lines whole when requests finish in parallel.
     private readonly SemaphoreSlim _lock = new(1, 1);
     private DateOnly _cleanedOn;
@@ -32,7 +35,7 @@ public sealed class JiraRequestLog(string folder, TimeProvider clock)
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-            await File.AppendAllTextAsync(file, line, Encoding.UTF8);
+            await File.AppendAllTextAsync(file, line, Utf8);
             DeleteOldOncePerDay();
         }
         finally
@@ -74,6 +77,7 @@ public sealed class JiraRequestLog(string folder, TimeProvider clock)
         var file = FileFor(owner, day);
         if (!File.Exists(file)) return "";
         // Shared with the writer, so a read never waits for or blocks a request being logged.
+        // Files written by older versions start with a byte order mark; the reader drops it.
         await using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         using var reader = new StreamReader(stream, Encoding.UTF8);
         return await reader.ReadToEndAsync();

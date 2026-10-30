@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using JiraTime.Domain;
 using JiraTime.Services;
 
@@ -170,6 +171,28 @@ public class JiraRequestLogTests : IDisposable
 
         Assert.Empty(_h.RequestLog.Days(TestUsers.Carl.Id));
         Assert.Single(await _h.RequestLog.ReadDayAsync(TestUsers.Anna.Id, Day));
+    }
+
+    [Fact]
+    public async Task A_new_log_file_starts_with_the_first_line_not_a_byte_order_mark()
+    {
+        await _h.Log.GetRangeAsync(Day, Day);
+
+        var bytes = await File.ReadAllBytesAsync(_h.RequestLog.FileFor(TestUsers.Carl.Id, Day));
+        Assert.Equal((byte)'{', bytes[0]);
+    }
+
+    [Fact]
+    public async Task A_log_file_written_with_a_byte_order_mark_still_reads()
+    {
+        var entry = new JiraLogEntry { Id = "old", Owner = TestUsers.Anna.Id, Time = _h.Clock.Now };
+        var file = _h.RequestLog.FileFor(TestUsers.Anna.Id, Day);
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        var line = JsonSerializer.Serialize(entry, new JsonSerializerOptions(JsonSerializerDefaults.Web)) + "\n";
+        await File.WriteAllTextAsync(file, line, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
+
+        Assert.Equal("old", Assert.Single(await _h.RequestLog.ReadDayAsync(TestUsers.Anna.Id, Day)).Id);
+        Assert.StartsWith("{", await _h.RequestLog.ReadDayTextAsync(TestUsers.Anna.Id, Day));
     }
 
     [Fact]
