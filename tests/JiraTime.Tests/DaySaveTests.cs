@@ -1,4 +1,5 @@
 using JiraTime.Domain;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
@@ -7,27 +8,20 @@ public class DaySaveTests
 {
     private static readonly DateOnly Day = new(2026, 10, 19);
 
-    private static TimeEntry Entry(string id = "jira-10001") => new()
+    /// <summary>Work as it was read from Jira worklog 10001, with <paramref name="id"/> to tell the copies apart.</summary>
+    private static TimeEntry Read(string id = "jira-10001")
     {
-        Id = id,
-        IssueKey = "ABC-1",
-        IssueSummary = "Login page",
-        Date = Day,
-        Duration = TimeSpan.FromHours(2),
-        Comment = "Review",
-        JiraWorklogId = "10001",
-        JiraWorklogIssueKey = "ABC-1",
-        SyncPending = false,
-    };
-
-    private static TimeEntry Row(string key, double hours) => new() { IssueKey = key, Duration = TimeSpan.FromHours(hours) };
+        var read = Saved("ABC-1", 2, Day, "Review", worklog: "10001");
+        read.Id = id;
+        return read;
+    }
 
     [Fact]
     public void Any_error_leaves_nothing_to_do()
     {
         var noIssue = Row("", 1);
 
-        var plan = DaySave.Plan(Day, [noIssue, Row("ABC-1", 20), Row("ABC-2", 5)], [Entry()]);
+        var plan = DaySave.Plan(Day, [noIssue, Row("ABC-1", 20), Row("ABC-2", 5)], [Read()]);
 
         Assert.Equal([DaySave.DayError, noIssue.Id], plan.Errors.Keys.Order());
         Assert.Equal(TimeEntry.TooManyHours, plan.Errors[DaySave.DayError]);
@@ -57,10 +51,11 @@ public class DaySaveTests
     [Fact]
     public void Missing_work_is_removed_new_and_changed_rows_are_sent_and_what_Jira_has_is_checked()
     {
-        var kept = Entry("kept");
-        var changed = Entry("changed");
-        var removed = Entry("removed");
-        var removedNotInJira = new TimeEntry { Id = "local", IssueKey = "ABC-9", Date = Day, Duration = TimeSpan.FromHours(1) };
+        var kept = Read("kept");
+        var changed = Read("changed");
+        var removed = Read("removed");
+        var removedNotInJira = Draft("ABC-9", 1, Day);
+        removedNotInJira.Id = "local";
         var edited = changed.Copy();
         edited.Duration = TimeSpan.FromHours(3);
         var added = Row("ABC-4", 1);
@@ -76,7 +71,7 @@ public class DaySaveTests
     [Fact]
     public void Rows_to_send_are_put_on_the_day_and_take_Jira_bookkeeping_from_what_was_read_and_the_time_given()
     {
-        var read = Entry();
+        var read = Read();
         read.CreatedUtc = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
         var edited = read.Copy();
         edited.Duration = TimeSpan.FromHours(3);
@@ -93,8 +88,8 @@ public class DaySaveTests
     [Fact]
     public void Planning_and_sending_work_on_copies()
     {
-        var read = Entry();
-        var gone = Entry("gone");
+        var read = Read();
+        var gone = Read("gone");
         var edited = read.Copy();
         edited.Duration = TimeSpan.FromHours(3);
         var added = Row("ABC-2", 1);
@@ -115,7 +110,7 @@ public class DaySaveTests
     [Fact]
     public void Save_all_plans_every_unsaved_day_of_the_sheet_in_order()
     {
-        var sheet = SheetDayTests.Sheet();
+        var sheet = TestSheets.For(Day);
         var tuesday = sheet.Day(Day.AddDays(1));
         tuesday.SetHours(tuesday.AddRow(new JiraIssue("ABC-1", "")), "8");
         var monday = sheet.Day(Day);

@@ -1,10 +1,10 @@
 using JiraTime.Domain;
-using static JiraTime.Tests.DayWorkTests;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
-/// <summary>Editing a row of a day: its issue, hours and comment, and adding rows.</summary>
-public class DayWorkEditTests
+/// <summary>Editing a row of a day: its issue, hours and comment, and adding rows (the rest of <see cref="DayWork"/> is in DayWorkTests.cs).</summary>
+public partial class DayWorkTests
 {
     [Fact]
     public void Editing_a_suggestion_changes_the_row_itself_and_makes_it_the_users_own()
@@ -82,7 +82,7 @@ public class DayWorkEditTests
     public void Empty_hours_are_zero_and_not_bad()
     {
         var work = new DayWork(Day);
-        var d = Draft(work, hours: 3);
+        var d = AddedRow(work, hours: 3);
         work.SetHours(d, null, "x");
 
         work.SetHours(d, null, "  ");
@@ -94,7 +94,7 @@ public class DayWorkEditTests
     [Fact]
     public void Comments_are_trimmed_and_empty_means_none()
     {
-        var a = Saved("ABC-1", 4, "old");
+        var a = Saved("ABC-1", 4, comment: "old");
         var work = new DayWork(Day);
         var s = Suggestion(work, "ABC-2", 2);
 
@@ -125,7 +125,7 @@ public class DayWorkEditTests
     [Fact]
     public void Clearing_an_empty_comment_is_no_change()
     {
-        var a = Saved("ABC-1", 4, "");
+        var a = Saved("ABC-1", 4, comment: "");
         var work = new DayWork(Day);
 
         work.SetComment(work.View(a), a, "  ");

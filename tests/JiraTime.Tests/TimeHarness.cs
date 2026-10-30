@@ -100,9 +100,6 @@ public sealed class TimeHarness : IDisposable
 
     public int JiraSeconds(string key) => Jira.Worklogs.TryGetValue(key, out var logs) ? logs.Values.Sum(l => (int)l["timeSpentSeconds"]!) : 0;
 
-    public static TimeEntry Row(string key, double hours, string? comment = null) =>
-        new() { IssueKey = key, IssueSummary = $"Summary of {key}", Duration = TimeSpan.FromHours(hours), Comment = comment };
-
     /// <summary>A new tab (DI scope) signed in as <paramref name="key"/> without asking Jira.</summary>
     private IServiceScope Tab(UserKey key, JiraConnection connection)
     {
@@ -122,24 +119,6 @@ public sealed class TimeHarness : IDisposable
 
 /// <summary>One user's stored data: the retry queue, days and work hours, and export values per epic.</summary>
 public sealed record UserData(RetryQueue Queue, WorkCalendarService Calendar, EpicExportStore ExportValues);
-
-/// <summary>Two users on <see cref="TimeHarness.Server"/>, and tabs signed in without asking Jira.</summary>
-public static class TestUsers
-{
-    public static readonly UserKey Carl = UserKey.For(TimeHarness.Server.BaseUrl, "JIRAUSER1");
-    public static readonly UserKey Anna = UserKey.For(TimeHarness.Server.BaseUrl, "JIRAUSER2");
-
-    /// <summary>A tab signed in as <paramref name="key"/> (Carl when not given) without asking Jira.</summary>
-    public static CurrentUser SignedIn(UserKey? key = null, JiraConnection? connection = null) =>
-        SignIn(new CurrentUser(), key ?? Carl, connection ?? new JiraConnection($"https://{(key ?? Carl).Host}", JiraAuthType.Pat, "token", null));
-
-    /// <summary>Signs <paramref name="user"/> in as <paramref name="key"/> without asking Jira.</summary>
-    public static CurrentUser SignIn(CurrentUser user, UserKey key, JiraConnection connection)
-    {
-        user.Set(key, new JiraProfile(key.JiraUserId, null, key.JiraUserId, null), connection, offline: false);
-        return user;
-    }
-}
 
 /// <summary>Reading one day's kind and hours, which the app always reads as part of a range.</summary>
 public static class WorkCalendarReading

@@ -1,21 +1,17 @@
 using JiraTime.Domain;
-using static JiraTime.Tests.DayWorkTests;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
 /// <summary>A day of the sheet: its rows and totals, what counts as a change, filling, copying and why it can't be saved.</summary>
 public class SheetDayTests
 {
-    /// <summary>A sheet with <paramref name="saved"/> on <see cref="DayWorkTests.Day"/> (Monday 19 October, also today).</summary>
-    internal static PeriodSheet Sheet(params TimeEntry[] saved)
-    {
-        var sheet = new PeriodSheet(Period.For(Day), () => Day);
-        var days = sheet.Period.Days.ToDictionary(d => d, d => DayInfo.For(d, new Dictionary<DateOnly, DayOff>()));
-        sheet.Load(saved, [], days);
-        return sheet;
-    }
+    /// <summary>Monday 19 October, also today.</summary>
+    private static readonly DateOnly Day = Monday;
 
-    internal static SheetDay DayWith(params TimeEntry[] saved) => Sheet(saved).Day(Day);
+    private static PeriodSheet Sheet(params TimeEntry[] saved) => TestSheets.For(Day, saved);
+
+    private static SheetDay DayWith(params TimeEntry[] saved) => Sheet(saved).Day(Day);
 
     [Fact]
     public void Rows_show_each_state()
@@ -23,7 +19,7 @@ public class SheetDayTests
         var inJira = Saved("ABC-1", 1);
         var changed = Saved("ABC-2", 1);
         var removed = Saved("ABC-3", 1);
-        var notInJira = new TimeEntry { IssueKey = "ABC-4", IssueSummary = "ABC-4 summary", Date = Day, Duration = TimeSpan.FromHours(1), JiraWorklogId = "1" };
+        var notInJira = Waiting("ABC-4", 1, Day);
         var sheet = Sheet(inJira, changed, removed, notInJira);
         sheet.Suggest(Day);
         var day = sheet.Day(Day);
@@ -46,7 +42,7 @@ public class SheetDayTests
     {
         var notInJira = Saved("ABC-1", 1);
         notInJira.Failed("Jira said no");
-        var waiting = new TimeEntry { IssueKey = "ABC-2", IssueSummary = "ABC-2 summary", Date = Day, Duration = TimeSpan.FromHours(1), JiraWorklogId = "1" };
+        var waiting = Waiting("ABC-2", 1, Day);
         var day = DayWith(notInJira, waiting);
 
         Assert.Equal([true, false], day.Rows.Select(r => r.ShowsSyncError));

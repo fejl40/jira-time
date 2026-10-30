@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json.Nodes;
 using JiraTime.Domain;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
@@ -43,7 +44,7 @@ public class MonthExportLoaderTests : IDisposable
     public async Task Work_waiting_for_Jira_is_included_and_counted()
     {
         _h.Jira.AddWorklog("ABC-1", "2026-10-05T09:00:00.000+0200", 3600);
-        await _h.Queue.AddAsync(new TimeEntry { IssueKey = "ABC-2", Date = new DateOnly(2026, 10, 6), Duration = TimeSpan.FromHours(2), SyncPending = true });
+        await _h.Queue.AddAsync(Waiting("ABC-2", 2, new DateOnly(2026, 10, 6)));
         var (loader, _) = _h.ExportLoading();
 
         var export = await loader.LoadAsync(October);

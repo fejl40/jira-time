@@ -1,4 +1,5 @@
 using JiraTime.Domain;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
@@ -8,26 +9,14 @@ public class UnsavedChangesTests
     private static readonly Period Period = Period.For(new DateOnly(2026, 10, 20));
     private static readonly DateOnly Friday = new(2026, 10, 16), Monday = new(2026, 10, 19), Tuesday = new(2026, 10, 20);
 
-    private static TimeEntry Saved(string key, double hours, DateOnly date, string? worklog = "1", string? comment = null) => new()
-    {
-        IssueKey = key, IssueSummary = key + " summary", Date = date, Duration = TimeSpan.FromHours(hours),
-        Comment = comment, JiraWorklogId = worklog, SyncPending = worklog is null,
-    };
-
     /// <summary>Adds a row the user filled in.</summary>
     private static void Add(PeriodSheet sheet, DateOnly day, string key, double hours)
     {
-        var row = sheet.Day(day).AddRow(new JiraIssue(key, key + " summary"));
+        var row = sheet.Day(day).AddRow(new JiraIssue(key, Summary(key)));
         sheet.Day(day).SetHours(row, hours.ToString(System.Globalization.CultureInfo.InvariantCulture));
     }
 
-    private static PeriodSheet Sheet(params TimeEntry[] entries)
-    {
-        var sheet = new PeriodSheet(Period, () => Tuesday);
-        var days = Period.Days.ToDictionary(d => d, d => DayInfo.For(d, new Dictionary<DateOnly, DayOff>()));
-        sheet.Load(entries, [], days);
-        return sheet;
-    }
+    private static PeriodSheet Sheet(params TimeEntry[] entries) => TestSheets.For(Tuesday, entries);
 
     [Fact]
     public void Each_unsaved_day_lists_its_added_changed_and_removed_rows_with_hours()
@@ -59,7 +48,7 @@ public class UnsavedChangesTests
     public void Totals_count_the_rows_hours_and_deleted_worklogs_of_the_days_to_save()
     {
         var gone = Saved("ABC-2", 2, Friday);
-        var waiting = Saved("ABC-3", 1, Friday, worklog: null); // not in Jira yet: removing it deletes no worklog
+        var waiting = Waiting("ABC-3", 1, Friday); // not in Jira yet: removing it deletes no worklog
         var sheet = Sheet(gone, waiting);
         sheet.Day(Friday).Remove(gone);
         sheet.Day(Friday).Remove(waiting);

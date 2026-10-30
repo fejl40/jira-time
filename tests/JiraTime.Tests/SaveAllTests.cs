@@ -1,11 +1,14 @@
 using System.Net;
 using JiraTime.Domain;
 using JiraTime.Services;
-using static JiraTime.Tests.TimeHarness;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
-/// <summary>Save all: every unsaved day of a period at once, each checked against Jira before anything is written.</summary>
+/// <summary>
+/// Save all (<see cref="WorklogSync.SaveDaysAsync"/>): every unsaved day of a period at once, each checked against Jira
+/// before anything is written. Saving one day is in WorklogSyncTests.
+/// </summary>
 public class SaveAllTests : IDisposable
 {
     private static readonly DateOnly Monday = new(2026, 10, 19), Tuesday = new(2026, 10, 20), Wednesday = new(2026, 10, 21);

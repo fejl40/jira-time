@@ -32,7 +32,7 @@ public class JiraActionTests : IDisposable
         _h.Jira.AddWorklog("ABC-1", "2026-10-27T09:00:00.000+0000", 3600);
 
         using (JiraAction.Start("Save day Tue 27 Oct"))
-            await _h.SaveDayAsync(_h.Today, [TimeHarness.Row("ABC-2", 1)]);
+            await _h.SaveDayAsync(_h.Today, [TestEntries.Row("ABC-2", 1)]);
 
         var log = await LogOfAsync(TestUsers.Carl);
         Assert.True(log.Count > 2);

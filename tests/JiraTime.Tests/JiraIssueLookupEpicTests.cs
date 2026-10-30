@@ -5,14 +5,18 @@ using JiraTime.Services;
 
 namespace JiraTime.Tests;
 
-public class EpicLookupTests : IDisposable
+/// <summary>
+/// <see cref="JiraIssueLookup"/>: the epic of each issue, for the export.
+/// The lookup's tests are split by what it looks up (sprint issues, period issues and statuses, epics), as each needs other issues in FakeJira.
+/// </summary>
+public class JiraIssueLookupEpicTests : IDisposable
 {
     private static readonly JiraConnection Server = TimeHarness.Server;
 
     private readonly TimeHarness _h = new();
     private bool _hasEpicLink = true;
 
-    public EpicLookupTests() =>
+    public JiraIssueLookupEpicTests() =>
         _h.Jira.Gets["/rest/api/2/field"] = _ => _hasEpicLink
             ? new JsonArray(
                 new JsonObject { ["id"] = "summary", ["name"] = "Summary" },
@@ -36,7 +40,7 @@ public class EpicLookupTests : IDisposable
         var epics = await _h.Issues.GetEpicsAsync(Server, ["ABC-1"]);
 
         Assert.Equal("BAC-577", epics["ABC-1"]);
-        Assert.Contains(_h.Jira.Requests, r => r.Path.Contains("fields=issuetype%2Cparent%2Ccustomfield_10008") || r.Path.Contains("fields=issuetype,parent,customfield_10008"));
+        Assert.Contains(_h.Jira.Searches, r => r.Path.Contains("fields=issuetype%2Cparent%2Ccustomfield_10008") || r.Path.Contains("fields=issuetype,parent,customfield_10008"));
     }
 
     [Fact]

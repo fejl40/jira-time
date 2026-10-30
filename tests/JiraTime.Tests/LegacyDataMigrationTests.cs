@@ -1,10 +1,14 @@
 using JiraTime.Domain;
 using JiraTime.Services;
 using JiraTime.Storage;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
-/// <summary>Data saved before multi-user support goes to its old user, after a backup.</summary>
+/// <summary>
+/// Data saved before multi-user support goes to its old user, and entries from when the app kept logged time itself are
+/// dropped once Jira has them; both after a backup.
+/// </summary>
 public class LegacyDataMigrationTests : IDisposable
 {
     private readonly TimeHarness _h = new();
@@ -143,5 +147,65 @@ public class LegacyDataMigrationTests : IDisposable
         await _h.Legacy.ClaimAsync(TestUsers.Carl);
 
         Assert.Equal(TimeSpan.FromHours(1), Assert.Single(await StoredAsync(_h.Store, TestUsers.SignedIn(TestUsers.Carl))).Duration);
+    }
+
+    // ---- Entries from when the app kept logged time itself: dropped once Jira has them, after a backup ----
+
+    private static readonly DateOnly Day = new(2026, 10, 19);
+
+    private async Task StoreAsync(UserKey owner, TimeEntry entry)
+    {
+        entry.Owner = owner.Id;
+        await _h.Store.Collection<TimeEntry>().UpsertAsync(entry);
+    }
+
+    private async Task<IReadOnlyList<string>> Left(UserKey owner) =>
+        (await _h.Store.Collection<TimeEntry>().QueryAsync(e => e.Owner == owner.Id)).Select(e => e.IssueKey).Order().ToList();
+
+    [Fact]
+    public async Task Entries_Jira_has_are_dropped_and_the_rest_stay_as_the_retry_queue()
+    {
+        await StoreAsync(TestUsers.Carl, Saved("IN-1", 1, Day, worklog: "101"));
+        var changed = Saved("CHANGED-1", 1, Day, worklog: "102");
+        changed.Failed("Jira was down");
+        await StoreAsync(TestUsers.Carl, changed);
+        await StoreAsync(TestUsers.Carl, Waiting("NEW-1", 1, Day));
+        var gone = Saved("GONE-1", 1, Day, worklog: "103");
+        gone.MarkRemovalPending();
+        await StoreAsync(TestUsers.Carl, gone);
+
+        var dropped = await _h.Legacy.RetireSyncedEntriesAsync(TestUsers.Carl);
+
+        Assert.Equal(1, dropped);
+        Assert.Equal(["CHANGED-1", "GONE-1", "NEW-1"], await Left(TestUsers.Carl));
+        var queue = await _h.Queue.GetPendingAsync(Day, Day);
+        Assert.Equal(3, queue.Count);
+    }
+
+    [Fact]
+    public async Task All_the_users_entries_are_backed_up_first()
+    {
+        await StoreAsync(TestUsers.Carl, Saved("IN-1", 1, Day, worklog: "101"));
+        await StoreAsync(TestUsers.Carl, Waiting("NEW-1", 1, Day));
+        await StoreAsync(TestUsers.Anna, Saved("ANNA-1", 1, Day, worklog: "201"));
+
+        await _h.Legacy.RetireSyncedEntriesAsync(TestUsers.Carl);
+
+        var backup = Assert.Single(await _h.Store.Collection<TimeEntriesBackup>().QueryAsync(_ => true));
+        Assert.Equal(TestUsers.Carl.Id, backup.Owner);
+        Assert.Equal(["IN-1", "NEW-1"], backup.Entries.Select(e => e.IssueKey).Order());
+        Assert.Equal(["ANNA-1"], await Left(TestUsers.Anna)); // other users are untouched
+    }
+
+    [Fact]
+    public async Task Retiring_entries_again_changes_nothing()
+    {
+        await StoreAsync(TestUsers.Carl, Saved("IN-1", 1, Day, worklog: "101"));
+        await StoreAsync(TestUsers.Carl, Waiting("NEW-1", 1, Day));
+        await _h.Legacy.RetireSyncedEntriesAsync(TestUsers.Carl);
+
+        Assert.Equal(0, await _h.Legacy.RetireSyncedEntriesAsync(TestUsers.Carl));
+        Assert.Single(await _h.Store.Collection<TimeEntriesBackup>().QueryAsync(_ => true));
+        Assert.Equal(["NEW-1"], await Left(TestUsers.Carl));
     }
 }

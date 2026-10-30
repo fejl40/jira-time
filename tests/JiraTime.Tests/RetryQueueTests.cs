@@ -1,6 +1,6 @@
 using System.Net;
 using JiraTime.Domain;
-using static JiraTime.Tests.TimeHarness;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
@@ -161,15 +161,12 @@ public class RetryQueueTests : IDisposable
         Assert.DoesNotContain(_h.Jira.Requests, r => r.Method != HttpMethod.Get);
     }
 
-    private static TimeEntry Waiting(string key, DateOnly? day = null) =>
-        new() { IssueKey = key, Date = day ?? Day, Duration = TimeSpan.FromHours(1), SyncPending = true };
-
     [Fact]
     public async Task Waiting_changes_in_the_range_come_in_day_order()
     {
-        await _h.Queue.AddAsync(Waiting("B", Day.AddDays(1)));
-        await _h.Queue.AddAsync(Waiting("A"));
-        await _h.Queue.AddAsync(Waiting("X", Day.AddDays(14)));
+        await _h.Queue.AddAsync(Waiting("B", 1, Day.AddDays(1)));
+        await _h.Queue.AddAsync(Waiting("A", 1, Day));
+        await _h.Queue.AddAsync(Waiting("X", 1, Day.AddDays(14)));
 
         Assert.Equal(["A", "B"], (await _h.Queue.GetPendingAsync(Day, Day.AddDays(13))).Select(e => e.IssueKey));
     }
@@ -177,7 +174,7 @@ public class RetryQueueTests : IDisposable
     [Fact]
     public async Task Adding_a_change_with_the_same_id_replaces_it_and_removing_takes_it_out()
     {
-        var change = Waiting("ABC-1");
+        var change = Waiting("ABC-1", 1, Day);
         await _h.Queue.AddAsync(change);
         change.Duration = TimeSpan.FromHours(3);
         await _h.Queue.AddAsync(change);

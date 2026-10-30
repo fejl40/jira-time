@@ -4,15 +4,18 @@ using JiraTime.Services;
 
 namespace JiraTime.Tests;
 
-public class PeriodIssuesTests : IDisposable
+/// <summary>
+/// <see cref="JiraIssueLookup"/>: the issues of a period and the current status of issues by key.
+/// The lookup's tests are split by what it looks up (sprint issues, period issues and statuses, epics), as each needs other issues in FakeJira.
+/// </summary>
+public class JiraIssueLookupPeriodTests : IDisposable
 {
     private static readonly JiraConnection Server = TimeHarness.Server;
-    private static readonly JiraProfile Me = new("JIRAUSER1", "carl", "Carl", null);
     private static readonly Period October2 = Period.For(new DateOnly(2026, 10, 20)); // 16–31 Oct
 
     private readonly TimeHarness _h = new();
 
-    public PeriodIssuesTests()
+    public JiraIssueLookupPeriodTests()
     {
         _h.Jira.AddIssue("ABC-1", "Login page", status: "In Progress", category: "indeterminate");
         _h.Jira.AddIssue("ABC-4", "Old story", status: "Done", category: "done");
@@ -23,7 +26,7 @@ public class PeriodIssuesTests : IDisposable
     [Fact]
     public async Task Period_issues_use_Jiras_history_search_for_the_period()
     {
-        var issues = await _h.Issues.GetPeriodAsync(Server, Me, October2);
+        var issues = await _h.Issues.GetPeriodAsync(Server, TestUsers.CarlsProfile, October2);
 
         var jql = FakeJira.Jql(Assert.Single(_h.Jira.Requests));
         Assert.Contains("assignee WAS \"carl\" DURING (\"2026-10-16\", \"2026-10-31\")", jql);
@@ -37,7 +40,7 @@ public class PeriodIssuesTests : IDisposable
     {
         _h.Jira.FailWhen = uri => FakeJira.Jql(uri).Contains("status WAS IN") ? HttpStatusCode.BadRequest : null;
 
-        var issues = await _h.Issues.GetPeriodAsync(Server, Me, October2);
+        var issues = await _h.Issues.GetPeriodAsync(Server, TestUsers.CarlsProfile, October2);
 
         Assert.Equal(2, _h.Jira.Requests.Count);
         var jql = FakeJira.Jql(_h.Jira.Requests[1]);
@@ -49,11 +52,11 @@ public class PeriodIssuesTests : IDisposable
     [Fact]
     public async Task Period_issues_are_cached_per_period()
     {
-        await _h.Issues.GetPeriodAsync(Server, Me, October2);
-        await _h.Issues.GetPeriodAsync(Server, Me, October2);
+        await _h.Issues.GetPeriodAsync(Server, TestUsers.CarlsProfile, October2);
+        await _h.Issues.GetPeriodAsync(Server, TestUsers.CarlsProfile, October2);
         Assert.Single(_h.Jira.Requests);
 
-        await _h.Issues.GetPeriodAsync(Server, Me, October2.Previous);
+        await _h.Issues.GetPeriodAsync(Server, TestUsers.CarlsProfile, October2.Previous);
         Assert.Equal(2, _h.Jira.Requests.Count);
     }
 

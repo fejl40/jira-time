@@ -1,11 +1,14 @@
 using JiraTime.Domain;
 using JiraTime.Services;
-using static JiraTime.Tests.TimeHarness;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
-/// <summary>Saving a day writes its worklogs straight to Jira; failed writes wait in the retry queue.</summary>
-public class SaveDayTests : IDisposable
+/// <summary>
+/// <see cref="WorklogSync"/> saving one day: its worklogs are written straight to Jira and failed writes wait in the
+/// retry queue. Save all's checks and results are in SaveAllTests, sending the retry queue in RetryQueueTests.
+/// </summary>
+public class WorklogSyncTests : IDisposable
 {
     private static readonly DateOnly Day = new(2026, 10, 19);
 

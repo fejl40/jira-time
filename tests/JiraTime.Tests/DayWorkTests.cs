@@ -1,30 +1,30 @@
 using JiraTime.Domain;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
-/// <summary>One day's unsaved changes on their own: edited copies, removals, new rows, suggestions and unreadable hours.</summary>
-public class DayWorkTests
+/// <summary>
+/// One day's unsaved changes on their own: edited copies, removals, new rows, suggestions and unreadable hours.
+/// <see cref="DayWork"/> is tested in two files: this one, and DayWorkTests.Edits.cs for editing a row's issue, hours and comment.
+/// </summary>
+public partial class DayWorkTests
 {
-    internal static readonly DateOnly Day = new(2026, 10, 19);
-
-    /// <summary>A row Jira has.</summary>
-    internal static TimeEntry Saved(string key, double hours, string? desc = null) =>
-        new() { IssueKey = key, IssueSummary = key + " summary", Date = Day, Duration = TimeSpan.FromHours(hours), Comment = desc, JiraWorklogId = "1", SyncPending = false };
+    private static readonly DateOnly Day = TestEntries.Monday;
 
     /// <summary>A row the user added.</summary>
-    internal static TimeEntry Draft(DayWork work, string key = "ABC-1", double hours = 0)
+    private static TimeEntry AddedRow(DayWork work, string key = "ABC-1", double hours = 0)
     {
-        var draft = work.AddRow(new JiraIssue(key, ""));
-        draft.Duration = TimeSpan.FromHours(hours);
-        return draft;
+        var row = work.AddRow(new JiraIssue(key, ""));
+        row.Duration = TimeSpan.FromHours(hours);
+        return row;
     }
 
     /// <summary>A row the app suggested.</summary>
-    internal static TimeEntry Suggestion(DayWork work, string key, double hours)
+    private static TimeEntry Suggestion(DayWork work, string key, double hours)
     {
-        var draft = new TimeEntry { IssueKey = key, Date = Day, Duration = TimeSpan.FromHours(hours) };
-        work.AddSuggestions([draft]);
-        return draft;
+        var suggested = Draft(key, hours, Day);
+        work.AddSuggestions([suggested]);
+        return suggested;
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public class DayWorkTests
     [Fact]
     public void Editing_back_to_the_saved_values_is_no_change()
     {
-        var a = Saved("ABC-1", 4, "x");
+        var a = Saved("ABC-1", 4, comment: "x");
         var work = new DayWork(Day);
         work.SetHours(a, a, "5");
 
@@ -123,7 +123,7 @@ public class DayWorkTests
     {
         var work = new DayWork(Day);
         var s = Suggestion(work, "ABC-1", 8);
-        var d = Draft(work, "ABC-2");
+        var d = AddedRow(work, "ABC-2");
         work.SetHours(d, null, "abc");
 
         work.Remove(s, null);
@@ -140,8 +140,8 @@ public class DayWorkTests
     {
         var work = new DayWork(Day);
         Suggestion(work, "SUG-1", 8);
-        var own = Draft(work, "OWN-1", 2);
-        var filled = new TimeEntry { IssueKey = "FIL-1", Date = Day, Duration = TimeSpan.FromHours(1) };
+        var own = AddedRow(work, "OWN-1", 2);
+        var filled = Draft("FIL-1", 1, Day);
         work.AddDrafts([filled]);
 
         work.DropSuggestions();
@@ -154,7 +154,7 @@ public class DayWorkTests
     public void The_new_rows_can_only_be_changed_through_the_work()
     {
         var work = new DayWork(Day);
-        Draft(work);
+        AddedRow(work);
 
         var drafts = Assert.IsAssignableFrom<ICollection<TimeEntry>>(work.Drafts);
         Assert.True(drafts.IsReadOnly);

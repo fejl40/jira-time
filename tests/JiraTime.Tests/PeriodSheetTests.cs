@@ -1,4 +1,5 @@
 using JiraTime.Domain;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
@@ -10,19 +11,13 @@ public class PeriodSheetTests
     private static readonly DateOnly Friday = new(2026, 10, 16), Monday = new(2026, 10, 19), Tuesday = new(2026, 10, 20), Wednesday = new(2026, 10, 21);
     private static readonly IssueWithStatus Doing = new("ABC-1", "Login page", "Story", "In Progress", "indeterminate");
 
-    private static TimeEntry Saved(string key, double hours, DateOnly date, string? worklog = "1") => new()
-    {
-        IssueKey = key, IssueSummary = key + " summary", Date = date, Duration = TimeSpan.FromHours(hours),
-        JiraWorklogId = worklog, SyncPending = worklog is null,
-    };
+    private static Dictionary<DateOnly, DayInfo> Days(params DayOff[] off) => TestSheets.Days(Period, off);
 
-    private static Dictionary<DateOnly, DayInfo> Days(params DayOff[] off) =>
-        Period.Days.ToDictionary(d => d, d => DayInfo.For(d, off.ToDictionary(o => o.Date)));
-
+    /// <summary>Tuesday's sheet with <paramref name="entries"/> saved and <see cref="Doing"/> in the sprint.</summary>
     private static PeriodSheet Sheet(params TimeEntry[] entries)
     {
-        var sheet = new PeriodSheet(Period, () => Tuesday) { Sprint = [Doing] };
-        sheet.Load(entries, [], Days());
+        var sheet = TestSheets.For(Tuesday, entries);
+        sheet.Sprint = [Doing];
         return sheet;
     }
 
@@ -176,7 +171,7 @@ public class PeriodSheetTests
         sheet.Load([Saved("XYZ-1", 8, Friday)], [], Days());
         Assert.Equal((TimeSpan.FromHours(8), 0), (sheet.Summary.Missing, sheet.Summary.NotInJira));
 
-        sheet.Load([Saved("XYZ-1", 8, Friday), Saved("XYZ-2", 3, Monday, worklog: null)], [], Days());
+        sheet.Load([Saved("XYZ-1", 8, Friday), Waiting("XYZ-2", 3, Monday)], [], Days());
         Assert.Equal((TimeSpan.FromHours(5), 1), (sheet.Summary.Missing, sheet.Summary.NotInJira));
 
         today = Tuesday;
@@ -197,8 +192,8 @@ public class PeriodSheetTests
     [Fact]
     public void A_grid_row_gives_its_entries_on_one_day()
     {
-        var monday = new TimeEntry { IssueKey = "ABC-1", Date = Monday, Duration = TimeSpan.FromHours(2) };
-        var tuesday = new TimeEntry { IssueKey = "ABC-1", Date = Monday.AddDays(1), Duration = TimeSpan.FromHours(3) };
+        var monday = Draft("ABC-1", 2, Monday);
+        var tuesday = Draft("ABC-1", 3, Monday.AddDays(1));
         var row = new PeriodRow("ABC-1", "", [monday, tuesday]);
 
         Assert.Equal([monday], row.On(Monday));

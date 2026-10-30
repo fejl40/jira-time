@@ -54,7 +54,7 @@ public class JiraResilienceTests : IDisposable
         _h.Jira.TooManyRequests = 1;
         _h.Jira.RetryAfter = "1";
 
-        var result = await _h.SaveDayAsync(_h.Today, [TimeHarness.Row("ABC-1", 2)], saved);
+        var result = await _h.SaveDayAsync(_h.Today, [TestEntries.Row("ABC-1", 2)], saved);
 
         Assert.Equal(0, result.SyncFailures);
         Assert.Equal(2, _h.Jira.Writes.Count());
@@ -66,7 +66,7 @@ public class JiraResilienceTests : IDisposable
     {
         _h.Jira.FailWhen = uri => uri.AbsolutePath.EndsWith("/worklog") ? HttpStatusCode.ServiceUnavailable : null;
 
-        var result = await _h.SaveDayAsync(_h.Today, [TimeHarness.Row("ABC-1", 2)]);
+        var result = await _h.SaveDayAsync(_h.Today, [TestEntries.Row("ABC-1", 2)]);
 
         Assert.Equal(1, result.SyncFailures);
         Assert.Single(_h.Jira.Writes);

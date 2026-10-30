@@ -2,7 +2,7 @@ using System.Text.Json.Nodes;
 using System.Web;
 using JiraTime.Domain;
 using JiraTime.Services;
-using static JiraTime.Tests.TimeHarness;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
@@ -20,7 +20,7 @@ public class JiraWorklogClientTests : IDisposable
     private Task<IReadOnlyList<JiraWorklog>> MineAsync() =>
         _client.GetMyWorklogsAsync(_h.Connection, _h.User.Profile!, new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31));
 
-    private int WorklogReads(string key) => _h.Jira.Requests.Count(r => r.Path.Contains($"/issue/{key}/worklog"));
+    private int WorklogReads(string key) => _h.Jira.WorklogReads.Count(r => r.Path.Contains($"/issue/{key}/worklog"));
 
     [Fact]
     public async Task Only_an_issue_with_more_worklogs_than_the_search_sends_is_read_on_its_own()
@@ -63,11 +63,11 @@ public class JiraWorklogClientTests : IDisposable
     [Fact]
     public async Task Cloud_uses_api_v3_and_a_document_comment()
     {
-        using var cloud = new TimeHarness(Cloud);
+        using var cloud = new TimeHarness(TimeHarness.Cloud);
 
         await cloud.SaveDayAsync(Day, [Row("ABC-1", 1, "Review")]);
 
-        var post = Assert.Single(cloud.Jira.Requests, r => r.Method == HttpMethod.Post);
+        var post = Assert.Single(cloud.Jira.Writes);
         Assert.StartsWith("/rest/api/3/issue/ABC-1/worklog", post.Path);
         Assert.Equal("doc", (string?)post.Body!["comment"]!["type"]);
     }
@@ -81,9 +81,9 @@ public class JiraWorklogClientTests : IDisposable
         var offset = new TimeSpan(hours, minutes, 0);
         _h.Clock.Zone = TimeZoneInfo.CreateCustomTimeZone("Test", offset, "Test", "Test");
 
-        await _client.AddWorklogAsync(_h.Connection, new TimeEntry { IssueKey = "ABC-1", Date = Day, Duration = TimeSpan.FromHours(1) });
+        await _client.AddWorklogAsync(_h.Connection, Draft("ABC-1", 1, Day));
 
-        var post = Assert.Single(_h.Jira.Requests, r => r.Method == HttpMethod.Post);
+        var post = Assert.Single(_h.Jira.Writes);
         Assert.Equal(expected, (string?)post.Body!["started"]);
     }
 

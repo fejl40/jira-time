@@ -4,16 +4,20 @@ using JiraTime.Services;
 
 namespace JiraTime.Tests;
 
-public class SprintIssuesTests : IDisposable
+/// <summary>
+/// <see cref="JiraIssueLookup"/>: the issues assigned to the user in an open sprint.
+/// The lookup's tests are split by what it looks up (sprint issues, period issues and statuses, epics), as each needs other issues in FakeJira.
+/// </summary>
+public class JiraIssueLookupSprintTests : IDisposable
 {
     private static readonly JiraConnection Server = TimeHarness.Server;
     private static readonly JiraConnection Cloud = TimeHarness.Cloud;
-    private static readonly JiraProfile ServerMe = new("JIRAUSER1", "carl", "Carl", null);
+    private static readonly JiraProfile ServerMe = TestUsers.CarlsProfile;
     private static readonly JiraProfile CloudMe = new("5b10ac8d", null, "Carl", "carl@example.com");
 
     private readonly TimeHarness _h = new();
 
-    public SprintIssuesTests()
+    public JiraIssueLookupSprintTests()
     {
         _h.Jira.AddIssue("ABC-1", "Login page", "Story", "In Progress", "indeterminate");
         _h.Jira.AddIssue("ABC-2", "Fix the build", "Task", "To Do", "new");

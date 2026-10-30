@@ -19,7 +19,7 @@ public class JiraRequestLogTests : IDisposable
     [Fact]
     public async Task Saving_a_day_logs_each_request_with_what_was_sent_and_what_came_back()
     {
-        await _h.SaveDayAsync(Day, [TimeHarness.Row("ABC-1", 2, "Reviewed the plan")]);
+        await _h.SaveDayAsync(Day, [TestEntries.Row("ABC-1", 2, "Reviewed the plan")]);
 
         var log = await CarlsLogAsync();
         var post = Assert.Single(log, e => e.Method == "POST");
@@ -101,7 +101,7 @@ public class JiraRequestLogTests : IDisposable
         h.Jira.FailWith = HttpStatusCode.Unauthorized;
         await Assert.ThrowsAsync<JiraException>(() => h.MyselfAsync());
         h.Jira.FailWith = null;
-        await h.SaveDayAsync(h.Today, [TimeHarness.Row("ABC-1", 1)]);
+        await h.SaveDayAsync(h.Today, [TestEntries.Row("ABC-1", 1)]);
 
         var text = string.Concat(Directory.EnumerateFiles(Path.Combine(h.Files.Path, "logs", "jira"), "*.jsonl", SearchOption.AllDirectories).Select(File.ReadAllText));
         Assert.NotEmpty(text);
@@ -118,7 +118,7 @@ public class JiraRequestLogTests : IDisposable
         _h.Jira.Myself = new { key = "JIRAUSER1", displayName = big };
 
         await _h.MyselfAsync();
-        await _h.SaveDayAsync(Day, [TimeHarness.Row("ABC-1", 1, big)]);
+        await _h.SaveDayAsync(Day, [TestEntries.Row("ABC-1", 1, big)]);
 
         var log = await CarlsLogAsync();
         var myself = log.Single(e => e.Path.EndsWith("/myself"));

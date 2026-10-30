@@ -2,6 +2,7 @@ using JiraTime.Domain;
 
 namespace JiraTime.Tests;
 
+/// <summary>What the issue picker offers, in which group, and filtering it as the user types (<see cref="IssueFilter"/>).</summary>
 public class IssueChoicesTests
 {
     private static IssueWithStatus S(string key, string summary, string category = "new") => new(key, summary, "Task", category == "done" ? "Done" : "To Do", category);
@@ -52,4 +53,46 @@ public class IssueChoicesTests
         Assert.True(Choices.StatusOf("XYZ-9")?.IsDone);
         Assert.Null(Choices.StatusOf("NOPE-1"));
     }
+
+    // ---- Filtering as the user types ----
+
+    private static readonly JiraIssue[] PickerIssues =
+    [
+        new("OPS-7", "Meetings and admin"),
+        new("ABC-101", "Payment retries"),
+        new("ABC-10", "Login page"),
+        new("XYZ-3", "ABC migration notes"),
+    ];
+
+    private static string Keys(string? query) => string.Join(" ", IssueFilter.Filter(PickerIssues, query).Select(i => i.Key));
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void An_empty_query_keeps_everything_in_order(string? query) =>
+        Assert.Equal("OPS-7 ABC-101 ABC-10 XYZ-3", Keys(query));
+
+    [Fact]
+    public void Exact_key_first_then_keys_starting_with_the_query() =>
+        Assert.Equal("ABC-10 ABC-101", Keys("abc-10"));
+
+    [Fact]
+    public void Key_prefixes_rank_before_summary_matches() =>
+        Assert.Equal("ABC-101 ABC-10 XYZ-3", Keys("abc"));
+
+    [Fact]
+    public void Every_word_must_match_the_key_or_summary() =>
+        Assert.Equal("ABC-101", Keys("pay ABC"));
+
+    [Fact]
+    public void No_match_gives_nothing() => Assert.Equal("", Keys("nothing like it"));
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("a", false)]
+    [InlineData(" a ", false)]
+    [InlineData("ab", true)]
+    public void Jira_is_searched_from_two_characters(string? query, bool search) =>
+        Assert.Equal(search, IssueFilter.ShouldSearchJira(query));
 }

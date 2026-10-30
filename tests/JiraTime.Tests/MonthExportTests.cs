@@ -1,5 +1,6 @@
 using JiraTime.Domain;
 using JiraTime.Services;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
@@ -8,8 +9,7 @@ public class MonthExportTests
     private const string BaseUrl = "https://jira.uim.dk";
     private static readonly DateOnly Feb = new(2026, 2, 10);
 
-    private static TimeEntry Entry(string key, int day, double hours) =>
-        new() { IssueKey = key, Date = new DateOnly(2026, 2, day), Duration = TimeSpan.FromHours(hours) };
+    private static DateOnly February(int day) => new(2026, 2, day);
 
     private static readonly Dictionary<string, string?> NoEpics = new();
     private static readonly Dictionary<string, EpicExportValues> NoValues = new();
@@ -36,7 +36,7 @@ public class MonthExportTests
     [Fact]
     public void Time_on_the_same_issue_and_day_is_added_up()
     {
-        var rows = MonthExport.Rows(Feb, [Entry("BAC-578", 2, 1.5), Entry("BAC-577", 2, 6), Entry("bac-578", 2, 0.5), Entry("BAC-577", 3, 7.5)], NoEpics);
+        var rows = MonthExport.Rows(Feb, [Draft("BAC-578", 1.5, February(2)), Draft("BAC-577", 6, February(2)), Draft("bac-578", 0.5, February(2)), Draft("BAC-577", 7.5, February(3))], NoEpics);
 
         var feb2 = rows.Where(r => r.Date == new DateOnly(2026, 2, 2)).ToList();
         Assert.Equal(["BAC-577", "BAC-578"], feb2.Select(r => r.IssueKey));
@@ -47,9 +47,9 @@ public class MonthExportTests
     [Fact]
     public void Time_outside_the_month_and_removed_time_is_left_out()
     {
-        var removed = Entry("BAC-1", 4, 2);
+        var removed = Draft("BAC-1", 2, February(4));
         removed.MarkRemovalPending();
-        var march = new TimeEntry { IssueKey = "BAC-1", Date = new DateOnly(2026, 3, 1), Duration = TimeSpan.FromHours(1) };
+        var march = Draft("BAC-1", 1, new DateOnly(2026, 3, 1));
 
         Assert.All(MonthExport.Rows(Feb, [removed, march], NoEpics), r => Assert.Null(r.IssueKey));
     }
@@ -70,7 +70,7 @@ public class MonthExportTests
         {
             ["BAC-500"] = new() { EpicKey = "BAC-500", Fase = "13. Tilpasning af eksisterende it-systemer", Forordning = "Schengen SIS / 76811", HovedleveranceNr = "4", HovedleveranceLink = "https://x/4" },
         };
-        var row = MonthExport.Rows(Feb, [Entry("BAC-577", 2, 8)], epics).Single(r => r.IssueKey is not null);
+        var row = MonthExport.Rows(Feb, [Draft("BAC-577", 8, February(2))], epics).Single(r => r.IssueKey is not null);
 
         Assert.Equal(
             ["2026-02-02", "8", "13. Tilpasning af eksisterende it-systemer", "Schengen SIS / 76811", "4", "https://x/4", "https://jira.uim.dk/browse/BAC-500", "BAC-577"],
@@ -80,7 +80,7 @@ public class MonthExportTests
     [Fact]
     public void An_issue_without_an_epic_leaves_the_epic_columns_empty()
     {
-        var row = MonthExport.Rows(Feb, [Entry("BAC-577", 2, 8)], NoEpics).Single(r => r.IssueKey is not null);
+        var row = MonthExport.Rows(Feb, [Draft("BAC-577", 8, February(2))], NoEpics).Single(r => r.IssueKey is not null);
 
         Assert.Equal(["2026-02-02", "8", "", "", "", "", "", "BAC-577"], MonthExport.Cells(row, BaseUrl, NoValues));
     }
@@ -91,7 +91,7 @@ public class MonthExportTests
         var epics = new Dictionary<string, string?> { ["BAC-577"] = "BAC-500" };
         var values = new Dictionary<string, EpicExportValues> { ["BAC-500"] = new() { Fase = "a\tb\nc" } };
 
-        var lines = MonthExport.ToTsv(MonthExport.Rows(Feb, [Entry("BAC-577", 2, 8)], epics), BaseUrl, values).Split("\r\n");
+        var lines = MonthExport.ToTsv(MonthExport.Rows(Feb, [Draft("BAC-577", 8, February(2))], epics), BaseUrl, values).Split("\r\n");
 
         Assert.Equal("Dato (yyyy-mm-dd)\tTimer\tFase (ydelsesområde)\tForordning\tHovedleverance nr.\tHovedleverance link\tEpic\tBeskrivelse", lines[0]);
         Assert.Equal("2026-02-02\t8\ta b c\t\t\t\thttps://jira.uim.dk/browse/BAC-500\tBAC-577", lines[2]);

@@ -12,11 +12,11 @@ public class WorkCalendarTests
     [InlineData(2026, "2026-04-05")]
     [InlineData(2027, "2027-03-28")]
     [InlineData(2038, "2038-04-25")]
-    public void Easter_sunday(int year, string expected) =>
+    public void Easter_sunday_is_worked_out_for_any_year(int year, string expected) =>
         Assert.Equal(D(expected), DanishHolidays.EasterSunday(year));
 
     [Fact]
-    public void Danish_holidays_2026()
+    public void The_Danish_holidays_of_2026_are_all_known()
     {
         var days = DanishHolidays.For(2026).Keys.Order().ToList();
 
@@ -37,7 +37,7 @@ public class WorkCalendarTests
     [InlineData("2026-10-24", DayKind.Weekend)]  // Saturday
     [InlineData("2026-04-03", DayKind.Holiday)]  // Good Friday
     [InlineData("2026-12-25", DayKind.Holiday)]  // Christmas, a Friday
-    public void Classify(string date, DayKind expected) =>
+    public void A_day_is_a_workday_a_weekend_or_a_holiday(string date, DayKind expected) =>
         Assert.Equal(expected, DayInfo.For(D(date), new Dictionary<DateOnly, DayOff>()).Kind);
 
     [Fact]

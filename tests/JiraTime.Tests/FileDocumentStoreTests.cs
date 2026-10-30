@@ -1,5 +1,6 @@
 using JiraTime.Domain;
 using JiraTime.Storage;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
@@ -9,13 +10,10 @@ public class FileDocumentStoreTests : IDisposable
 
     public void Dispose() => _files.Dispose();
 
-    private static TimeEntry Entry(string key, DateOnly date) =>
-        new() { IssueKey = key, Date = date, Duration = TimeSpan.FromHours(1) };
-
     [Fact]
-    public async Task Upsert_writes_one_json_file_per_document_in_the_collection_folder()
+    public async Task Each_document_is_written_as_one_json_file_in_its_collection_folder()
     {
-        var entry = Entry("ABC-1", new(2026, 10, 19));
+        var entry = Draft("ABC-1", 1, new(2026, 10, 19));
 
         await _files.Store.Collection<TimeEntry>().UpsertAsync(entry);
 
@@ -23,10 +21,10 @@ public class FileDocumentStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task Get_returns_the_stored_document_or_null()
+    public async Task A_document_is_read_back_by_id_and_a_missing_one_is_null()
     {
         var docs = _files.Store.Collection<TimeEntry>();
-        var entry = Entry("ABC-1", new(2026, 10, 19));
+        var entry = Draft("ABC-1", 1, new(2026, 10, 19));
         await docs.UpsertAsync(entry);
 
         var loaded = await docs.GetAsync(entry.Id);
@@ -39,7 +37,7 @@ public class FileDocumentStoreTests : IDisposable
     [Fact]
     public async Task Documents_survive_a_new_store_instance()
     {
-        var entry = Entry("ABC-2", new(2026, 10, 20));
+        var entry = Draft("ABC-2", 1, new(2026, 10, 20));
         await _files.Store.Collection<TimeEntry>().UpsertAsync(entry);
 
         var reopened = _files.Reopen();
@@ -51,12 +49,12 @@ public class FileDocumentStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task Query_filters_with_the_predicate()
+    public async Task A_query_returns_only_the_documents_its_filter_matches()
     {
         var docs = _files.Store.Collection<TimeEntry>();
-        await docs.UpsertAsync(Entry("A-1", new(2026, 10, 19)));
-        await docs.UpsertAsync(Entry("A-2", new(2026, 10, 20)));
-        await docs.UpsertAsync(Entry("A-3", new(2026, 10, 21)));
+        await docs.UpsertAsync(Draft("A-1", 1, new(2026, 10, 19)));
+        await docs.UpsertAsync(Draft("A-2", 1, new(2026, 10, 20)));
+        await docs.UpsertAsync(Draft("A-3", 1, new(2026, 10, 21)));
 
         var from = new DateOnly(2026, 10, 20);
         var result = await docs.QueryAsync(e => e.Date >= from);
@@ -66,10 +64,10 @@ public class FileDocumentStoreTests : IDisposable
     }
 
     [Fact]
-    public async Task Delete_removes_the_document_and_reports_whether_it_existed()
+    public async Task Deleting_removes_the_document_and_says_whether_it_was_there()
     {
         var docs = _files.Store.Collection<TimeEntry>();
-        var entry = Entry("A-1", new(2026, 10, 19));
+        var entry = Draft("A-1", 1, new(2026, 10, 19));
         await docs.UpsertAsync(entry);
 
         Assert.True(await docs.DeleteAsync(entry.Id));
@@ -83,13 +81,13 @@ public class FileDocumentStoreTests : IDisposable
     {
         var docs = _files.Store.Collection<TimeEntry>();
         var day = new DateOnly(2026, 10, 19);
-        var edited = Entry("B-1", day);
+        var edited = Draft("B-1", 1, day);
         await docs.UpsertAsync(edited);
         var editedFile = Path.Combine(_files.Path, "time-entries", edited.Id + ".json");
         var editedJson = await File.ReadAllTextAsync(editedFile);
 
         // Each write and each hand edit makes the file watcher drop the cache on another thread.
-        var writers = Enumerable.Range(0, 300).Select(i => Task.Run(() => docs.UpsertAsync(Entry($"A-{i}", day.AddDays(i % 10)))));
+        var writers = Enumerable.Range(0, 300).Select(i => Task.Run(() => docs.UpsertAsync(Draft($"A-{i}", 1, day.AddDays(i % 10)))));
         var readers = Enumerable.Range(0, 300).Select(_ => Task.Run(() => docs.QueryAsync(e => e.Date >= day)));
         var handEdits = Task.Run(() =>
         {
@@ -108,7 +106,7 @@ public class FileDocumentStoreTests : IDisposable
     public async Task A_document_edited_by_hand_is_read_again()
     {
         var docs = _files.Store.Collection<TimeEntry>();
-        var entry = Entry("A-1", new(2026, 10, 19));
+        var entry = Draft("A-1", 1, new(2026, 10, 19));
         await docs.UpsertAsync(entry);
         var file = Path.Combine(_files.Path, "time-entries", entry.Id + ".json");
 

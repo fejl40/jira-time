@@ -21,7 +21,7 @@ public class JqlTests
     [Fact]
     public void User_is_the_username_on_server_and_the_account_id_on_cloud()
     {
-        Assert.Equal("\"carl\"", Jql.User(new JiraProfile("JIRAUSER1", "carl", "Carl", null)));
+        Assert.Equal("\"carl\"", Jql.User(TestUsers.CarlsProfile));
         Assert.Equal("\"5b10ac8d\"", Jql.User(new JiraProfile("5b10ac8d", null, "Carl", null)));
     }
 

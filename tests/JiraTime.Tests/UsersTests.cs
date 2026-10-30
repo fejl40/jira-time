@@ -5,8 +5,6 @@ namespace JiraTime.Tests;
 /// <summary>Who a user is: a Jira host plus the user id it returns, and the tokens Jira confirmed for them.</summary>
 public class UsersTests
 {
-    private static readonly JiraProfile CarlsProfile = new("JIRAUSER1", "carl", "Carl Lilholm", null);
-
     [Theory]
     [InlineData("https://jira.example.com", "jira.example.com")]
     [InlineData("https://JIRA.example.com/", "jira.example.com")]
@@ -32,10 +30,10 @@ public class UsersTests
         var account = new UserAccount { VerifiedTokens = ["a", "b"] };
         var now = new DateTime(2026, 10, 27, 12, 0, 0, DateTimeKind.Utc);
 
-        account.Confirm(CarlsProfile, "b", now);
+        account.Confirm(TestUsers.CarlsProfile, "b", now);
 
         Assert.Equal(["b", "a"], account.VerifiedTokens);
-        Assert.Equal(CarlsProfile, account.Profile);
+        Assert.Equal(TestUsers.CarlsProfile, account.Profile);
         Assert.Equal(now, account.LastVerifiedUtc);
     }
 
@@ -45,7 +43,7 @@ public class UsersTests
         var account = new UserAccount();
 
         for (var i = 0; i < UserAccount.RememberedTokens + 2; i++)
-            account.Confirm(CarlsProfile, $"t{i}", DateTime.UnixEpoch);
+            account.Confirm(TestUsers.CarlsProfile, $"t{i}", DateTime.UnixEpoch);
 
         Assert.Equal(UserAccount.RememberedTokens, account.VerifiedTokens.Count);
         Assert.Equal($"t{UserAccount.RememberedTokens + 1}", account.VerifiedTokens[0]);

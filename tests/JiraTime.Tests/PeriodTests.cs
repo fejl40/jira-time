@@ -55,7 +55,7 @@ public class PeriodTests
     }
 
     [Fact]
-    public void Contains_excludes_days_outside()
+    public void A_period_does_not_contain_the_days_around_it()
     {
         var p = Period.For(D("2026-10-20"));
 

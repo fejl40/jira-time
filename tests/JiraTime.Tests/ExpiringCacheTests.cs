@@ -23,7 +23,7 @@ public class ExpiringCacheTests
     }
 
     [Fact]
-    public void Clear_forgets_every_value()
+    public void Clearing_forgets_every_value()
     {
         var cache = new ExpiringCache<int>(_clock, TimeSpan.FromMinutes(5));
         cache.Set("a", 1);

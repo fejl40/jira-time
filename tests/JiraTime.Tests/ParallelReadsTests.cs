@@ -3,7 +3,10 @@ using JiraTime.Services;
 
 namespace JiraTime.Tests;
 
-/// <summary>Reads that don't depend on each other go to Jira together, at most four at once; writes go one at a time.</summary>
+/// <summary>
+/// Reads that don't depend on each other go to Jira together, at most four at once; writes go one at a time.
+/// Named after that behaviour, as it spans PeriodLoader, TimeLog, WorklogSync and the Jira client's limiter.
+/// </summary>
 public class ParallelReadsTests : IDisposable
 {
     private static readonly TimeSpan Patience = TimeSpan.FromSeconds(5);
@@ -64,7 +67,7 @@ public class ParallelReadsTests : IDisposable
         var saved = await _h.DayAsync(_h.Today);
         while (_h.Jira.Arrived.Wait(0)) { } // forget the read
 
-        var saving = _h.SaveDayAsync(_h.Today, [TimeHarness.Row("ABC-1", 1), TimeHarness.Row("ABC-2", 2), TimeHarness.Row("ABC-3", 3)], saved);
+        var saving = _h.SaveDayAsync(_h.Today, [TestEntries.Row("ABC-1", 1), TestEntries.Row("ABC-2", 2), TestEntries.Row("ABC-3", 3)], saved);
         await ArrivedAsync(1);
         for (var i = 0; i < 20; i++) await Task.Yield();
         Assert.Single(_h.Jira.Writes);

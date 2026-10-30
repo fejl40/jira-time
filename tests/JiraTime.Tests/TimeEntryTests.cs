@@ -1,56 +1,55 @@
 using JiraTime.Domain;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
 public class TimeEntryTests
 {
-    private static readonly DateOnly Day = new(2026, 10, 19);
+    private static readonly DateOnly Day = Monday;
 
-    private static TimeEntry Entry(string key, double hours) => new() { IssueKey = key, Date = Day, Duration = TimeSpan.FromHours(hours) };
-
-    private static TimeEntry InJira(string key, double hours, string worklogIssue = "") => new()
+    /// <summary>Work Jira has as worklog 10 on <paramref name="worklogIssue"/>, which may not be the entry's own issue.</summary>
+    private static TimeEntry LoggedOn(string worklogIssue, string key) => new()
     {
-        IssueKey = key, Date = Day, Duration = TimeSpan.FromHours(hours),
-        JiraWorklogId = "10", JiraWorklogIssueKey = worklogIssue == "" ? key : worklogIssue, SyncPending = false,
+        IssueKey = key, Date = Day, Duration = TimeSpan.FromHours(1), JiraWorklogId = "10", JiraWorklogIssueKey = worklogIssue, SyncPending = false,
     };
 
     [Fact]
-    public void A_valid_entry_has_no_error() => Assert.Null(TimeEntry.Validate(Entry("ABC-1", 1.5)));
+    public void A_valid_entry_has_no_error() => Assert.Null(TimeEntry.Validate(Draft("ABC-1", 1.5, Day)));
 
     [Fact]
-    public void An_issue_is_needed() => Assert.NotNull(TimeEntry.Validate(Entry(" ", 1)));
+    public void An_issue_is_needed() => Assert.NotNull(TimeEntry.Validate(Draft(" ", 1, Day)));
 
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
-    public void Hours_must_be_positive(double hours) => Assert.NotNull(TimeEntry.Validate(Entry("ABC-1", hours)));
+    public void Hours_must_be_positive(double hours) => Assert.NotNull(TimeEntry.Validate(Draft("ABC-1", hours, Day)));
 
     [Fact]
-    public void Total_adds_up_the_hours_of_the_entries() =>
-        Assert.Equal(TimeSpan.FromHours(2.25), TimeEntry.Total([Entry("ABC-1", 1.5), Entry("ABC-2", 0.75)]));
+    public void The_hours_of_entries_are_added_up() =>
+        Assert.Equal(TimeSpan.FromHours(2.25), TimeEntry.Total([Draft("ABC-1", 1.5, Day), Draft("ABC-2", 0.75, Day)]));
 
     [Fact]
-    public void Total_of_no_entries_is_zero() => Assert.Equal(TimeSpan.Zero, TimeEntry.Total([]));
+    public void No_entries_add_up_to_zero_hours() => Assert.Equal(TimeSpan.Zero, TimeEntry.Total([]));
 
     [Fact]
     public void Entries_not_in_Jira_are_a_sync_problem()
     {
-        var synced = InJira("ABC-1", 1);
+        var synced = Saved("ABC-1", 1, Day, worklog: "10");
         Assert.False(TimeEntry.HasSyncProblem([synced]));
-        Assert.True(TimeEntry.HasSyncProblem([synced, Entry("ABC-2", 1)]));
+        Assert.True(TimeEntry.HasSyncProblem([synced, Draft("ABC-2", 1, Day)]));
     }
 
     [Fact]
     public void Sync_problems_name_each_reason_once()
     {
-        var synced = InJira("ABC-1", 1);
-        var failed = Entry("ABC-2", 1);
+        var synced = Saved("ABC-1", 1, Day, worklog: "10");
+        var failed = Draft("ABC-2", 1, Day);
         failed.Failed("Jira said no");
-        var failedToo = Entry("ABC-3", 1);
+        var failedToo = Draft("ABC-3", 1, Day);
         failedToo.Failed("Jira said no");
 
         Assert.Empty(TimeEntry.SyncProblems([synced]));
-        Assert.Equal(["Jira said no", TimeEntry.NotSentYet], TimeEntry.SyncProblems([synced, failed, failedToo, Entry("ABC-4", 1)]));
+        Assert.Equal(["Jira said no", TimeEntry.NotSentYet], TimeEntry.SyncProblems([synced, failed, failedToo, Draft("ABC-4", 1, Day)]));
     }
 
     [Fact]
@@ -60,22 +59,22 @@ public class TimeEntryTests
     [Fact]
     public void One_entry_has_at_most_24_hours()
     {
-        Assert.Null(TimeEntry.Validate(Entry("ABC-1", 24)));
-        Assert.Equal(TimeEntry.TooManyHours, TimeEntry.Validate(Entry("ABC-1", 24.5)));
+        Assert.Null(TimeEntry.Validate(Draft("ABC-1", 24, Day)));
+        Assert.Equal(TimeEntry.TooManyHours, TimeEntry.Validate(Draft("ABC-1", 24.5, Day)));
     }
 
     [Fact]
     public void The_worklog_issue_is_where_it_was_logged_else_the_entrys_own()
     {
-        var entry = Entry("ABC-2", 1);
+        var entry = Draft("ABC-2", 1, Day);
         Assert.Equal("ABC-2", entry.WorklogIssueKey);
         Assert.False(entry.MovedToAnotherIssue); // not in Jira yet
 
-        entry = InJira("ABC-2", 1, worklogIssue: "abc-2");
+        entry = LoggedOn("abc-2", "ABC-2");
         Assert.Equal("abc-2", entry.WorklogIssueKey);
         Assert.False(entry.MovedToAnotherIssue); // case doesn't count
 
-        entry = InJira("ABC-2", 1, worklogIssue: "ABC-1");
+        entry = LoggedOn("ABC-1", "ABC-2");
         Assert.Equal("ABC-1", entry.WorklogIssueKey);
         Assert.True(entry.MovedToAnotherIssue);
     }
@@ -85,7 +84,7 @@ public class TimeEntryTests
     [Fact]
     public void Sent_links_the_entry_to_its_worklog_on_its_own_issue_and_clears_the_error()
     {
-        var entry = Entry("ABC-1", 1);
+        var entry = Draft("ABC-1", 1, Day);
         entry.Failed("Jira said no");
 
         entry.Sent("42");
@@ -97,7 +96,7 @@ public class TimeEntryTests
     [Fact]
     public void Failed_keeps_the_entry_waiting_with_the_reason()
     {
-        var entry = InJira("ABC-1", 1);
+        var entry = Saved("ABC-1", 1, Day, worklog: "10");
 
         entry.Failed("Jira said no");
 
@@ -108,7 +107,7 @@ public class TimeEntryTests
     [Fact]
     public void A_pending_removal_waits_for_Jira_and_keeps_its_worklog()
     {
-        var entry = InJira("ABC-1", 1);
+        var entry = Saved("ABC-1", 1, Day, worklog: "10");
 
         entry.MarkRemovalPending();
 
@@ -118,7 +117,7 @@ public class TimeEntryTests
     [Fact]
     public void Leaving_the_old_issue_unlinks_the_worklog()
     {
-        var entry = InJira("ABC-2", 1, worklogIssue: "ABC-1");
+        var entry = LoggedOn("ABC-1", "ABC-2");
 
         entry.LeftOldIssue();
 
@@ -130,9 +129,9 @@ public class TimeEntryTests
     [Fact]
     public void Taking_the_worklog_from_what_was_read_takes_its_link_and_creation_time()
     {
-        var read = InJira("ABC-1", 1);
+        var read = Saved("ABC-1", 1, Day, worklog: "10");
         read.CreatedUtc = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc);
-        var edited = Entry("ABC-2", 3);
+        var edited = Draft("ABC-2", 3, Day);
 
         edited.TakeWorklogFrom(read);
 
@@ -162,29 +161,29 @@ public class TimeEntryTests
     [Fact]
     public void Same_work_means_same_issue_hours_and_comment()
     {
-        var a = Entry("ABC-1", 2);
-        var b = Entry("ABC-1", 2);
+        var a = Draft("ABC-1", 2, Day);
+        var b = Draft("ABC-1", 2, Day);
         b.Comment = "";
         Assert.True(a.SameWork(b));
         Assert.True(b.SameWork(a));
 
         b.Comment = "Review";
         Assert.False(a.SameWork(b));
-        Assert.False(a.SameWork(Entry("ABC-2", 2)));
-        Assert.False(a.SameWork(Entry("ABC-1", 3)));
+        Assert.False(a.SameWork(Draft("ABC-2", 2, Day)));
+        Assert.False(a.SameWork(Draft("ABC-1", 3, Day)));
     }
 
     [Fact]
     public void New_entries_have_no_time_stamps_until_saved()
     {
-        var entry = Entry("ABC-1", 1);
+        var entry = Draft("ABC-1", 1, Day);
         Assert.Equal((default(DateTime), default(DateTime)), (entry.CreatedUtc, entry.UpdatedUtc));
     }
 
     [Fact]
     public void The_comment_is_stored_as_description()
     {
-        var entry = Entry("ABC-1", 1);
+        var entry = Draft("ABC-1", 1, Day);
         entry.Comment = "Review";
         var json = System.Text.Json.JsonSerializer.Serialize(entry, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
 

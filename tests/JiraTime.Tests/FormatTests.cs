@@ -14,7 +14,7 @@ public class FormatTests
     [InlineData("0:05", 5)]
     [InlineData("7.5h", 450)]
     [InlineData("1.333", 80)]
-    public void Reads_hours(string text, int minutes) =>
+    public void Typed_hours_are_read_with_a_point_a_comma_or_a_colon(string text, int minutes) =>
         Assert.Equal(TimeSpan.FromMinutes(minutes), TypedHours.Parse(text));
 
     [Theory]

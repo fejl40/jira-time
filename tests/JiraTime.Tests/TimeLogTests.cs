@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using JiraTime.Domain;
 using JiraTime.Services;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
@@ -57,7 +58,7 @@ public class TimeLogTests : IDisposable
     [Fact]
     public async Task Work_just_saved_shows_while_Jiras_search_has_not_caught_up()
     {
-        var result = await _h.SaveDayAsync(Day, [TimeHarness.Row("NEW-1", 3)]);
+        var result = await _h.SaveDayAsync(Day, [Row("NEW-1", 3)]);
         Assert.True(result.Saved);
         _h.Jira.NotIndexed.Add("NEW-1"); // the search doesn't find the issue yet
 
@@ -76,7 +77,7 @@ public class TimeLogTests : IDisposable
     [Fact]
     public async Task Several_issues_just_saved_on_are_read_in_one_search_with_their_worklogs()
     {
-        await _h.SaveDayAsync(Day, [TimeHarness.Row("NEW-1", 3), TimeHarness.Row("NEW-2", 3), TimeHarness.Row("NEW-3", 2)]);
+        await _h.SaveDayAsync(Day, [Row("NEW-1", 3), Row("NEW-2", 3), Row("NEW-3", 2)]);
         foreach (var key in new[] { "NEW-1", "NEW-2", "NEW-3" }) _h.Jira.NotIndexed.Add(key);
         _h.Log.Refresh();
         _h.Jira.Requests.Clear();
@@ -93,7 +94,7 @@ public class TimeLogTests : IDisposable
     [Fact]
     public async Task An_issue_just_saved_on_that_is_gone_from_Jira_has_no_work()
     {
-        await _h.SaveDayAsync(Day, [TimeHarness.Row("NEW-1", 3), TimeHarness.Row("NEW-2", 1)]);
+        await _h.SaveDayAsync(Day, [Row("NEW-1", 3), Row("NEW-2", 1)]);
         _h.Jira.Worklogs.Remove("NEW-2"); // the issue was deleted
         _h.Jira.NotIndexed.Add("NEW-1");
         _h.Log.Refresh();
@@ -106,7 +107,7 @@ public class TimeLogTests : IDisposable
     [Fact]
     public async Task Issues_are_read_directly_only_for_a_while_after_a_save()
     {
-        await _h.SaveDayAsync(Day, [TimeHarness.Row("NEW-1", 3)]);
+        await _h.SaveDayAsync(Day, [Row("NEW-1", 3)]);
         _h.Jira.NotIndexed.Add("NEW-1");
         _h.Clock.Advance(RecentWorklogIssues.Window + TimeSpan.FromMinutes(1));
         _h.Log.Refresh();
@@ -128,7 +129,7 @@ public class TimeLogTests : IDisposable
             IssueKey = "ABC-2", Date = Day, Duration = TimeSpan.FromHours(1), JiraWorklogId = removed, JiraWorklogIssueKey = "ABC-2",
             SyncPending = true, DeletePending = true,
         });
-        await _h.Queue.AddAsync(new TimeEntry { IssueKey = "ABC-3", Date = Day, Duration = TimeSpan.FromHours(2), SyncPending = true });
+        await _h.Queue.AddAsync(Waiting("ABC-3", 2, Day));
 
         var entries = (await Period()).Entries;
 
@@ -139,7 +140,7 @@ public class TimeLogTests : IDisposable
     public async Task When_Jira_cannot_be_read_only_work_waiting_for_Jira_shows_with_the_reason()
     {
         _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 3600);
-        await _h.Queue.AddAsync(new TimeEntry { IssueKey = "ABC-3", Date = Day, Duration = TimeSpan.FromHours(2), SyncPending = true });
+        await _h.Queue.AddAsync(Waiting("ABC-3", 2, Day));
         _h.Jira.FailWith = HttpStatusCode.ServiceUnavailable;
 
         var time = await Period();

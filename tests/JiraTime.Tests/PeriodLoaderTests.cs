@@ -1,5 +1,6 @@
 using System.Net;
 using JiraTime.Domain;
+using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;
 
@@ -46,7 +47,7 @@ public class PeriodLoaderTests : IDisposable
     [Fact]
     public async Task Without_Jira_hours_are_unknown_and_only_waiting_work_counts()
     {
-        await _h.Queue.AddAsync(new TimeEntry { IssueKey = "ABC-3", Date = new DateOnly(2026, 10, 5), Duration = TimeSpan.FromHours(1), SyncPending = true });
+        await _h.Queue.AddAsync(Waiting("ABC-3", 1, new DateOnly(2026, 10, 5)));
         _h.Jira.FailWith = HttpStatusCode.ServiceUnavailable;
         var sheet = Sheet();
         var (loader, statuses) = _h.PeriodLoading();
