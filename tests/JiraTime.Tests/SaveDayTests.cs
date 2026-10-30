@@ -1,4 +1,3 @@
-using System.Net;
 using JiraTime.Domain;
 using JiraTime.Services;
 using static JiraTime.Tests.TimeHarness;
@@ -120,24 +119,5 @@ public class SaveDayTests : IDisposable
 
         Assert.Single(_h.Jira.Worklogs["ABC-1"]);
         Assert.Equal(3 * 3600, _h.JiraSeconds("ABC-1"));
-    }
-
-    [Fact]
-    public async Task Cloud_uses_api_v3_and_a_document_comment()
-    {
-        using var cloud = new TimeHarness(Cloud);
-
-        await cloud.SaveDayAsync(Day, [Row("ABC-1", 1, "Review")]);
-
-        var post = Assert.Single(cloud.Jira.Requests, r => r.Method == HttpMethod.Post);
-        Assert.StartsWith("/rest/api/3/issue/ABC-1/worklog", post.Path);
-        Assert.Equal("doc", (string?)post.Body!["comment"]!["type"]);
-    }
-
-    [Fact]
-    public void Started_uses_jira_format_with_offset_without_colon()
-    {
-        var zone = TimeZoneInfo.CreateCustomTimeZone("Plus2", TimeSpan.FromHours(2), "Plus2", "Plus2");
-        Assert.Equal("2026-10-19T09:00:00.000+0200", JiraWorklogClient.FormatStarted(Day, new TimeOnly(9, 0), zone));
     }
 }

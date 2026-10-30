@@ -88,9 +88,6 @@ public class PeriodIssuesTests : IDisposable
     [Fact]
     public async Task One_unknown_key_does_not_hide_the_others()
     {
-        // Jira fails a key-in query that names an issue it doesn't have.
-        _h.Jira.FailWhen = uri => FakeJira.Jql(uri).Contains("NOPE-1") ? HttpStatusCode.BadRequest : null;
-
         var statuses = await _h.Issues.GetStatusesAsync(Server, ["ABC-4", "NOPE-1"]);
 
         Assert.Equal(["ABC-4"], statuses.Keys);

@@ -45,7 +45,7 @@ public sealed class TimeHarness : IDisposable
         Issues = new JiraIssueLookup(new JiraClient(Http), Clock);
         Calendar = new WorkCalendarService(Store, user);
         Legacy = new LegacyDataMigration(Store, Clock);
-        var client = new JiraWorklogClient(Http);
+        var client = new JiraWorklogClient(Http, Clock);
         Queue = new RetryQueue(Store, user);
         Recent = new RecentWorklogIssues(Clock);
         Log = new TimeLog(client, Queue, user, Recent, Clock);
@@ -136,7 +136,7 @@ public static class TestUsers
 }
 
 /// <summary>
-/// A clock tests can set and move. Without a time it is noon UTC on Tuesday 27 October 2026. Timers fire at
+/// A clock tests can set and move. Without a time it is noon UTC on Tuesday 27 October 2026, in UTC. Timers fire at
 /// once and move the clock on to when they were due, so waits (such as a retry after a 429) take no real time
 /// and tests can see how long they waited.
 /// </summary>
@@ -154,7 +154,10 @@ public sealed class TestClock(DateTimeOffset now) : TimeProvider
     }
 
     public override DateTimeOffset GetUtcNow() => Now;
-    public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
+    /// <summary>The server's time zone; UTC unless a test sets another.</summary>
+    public TimeZoneInfo Zone { get; set; } = TimeZoneInfo.Utc;
+
+    public override TimeZoneInfo LocalTimeZone => Zone;
     public void Advance(TimeSpan by) { lock (_lock) _now += by; }
 
     /// <summary>Moves the clock to <paramref name="time"/> unless it is already later: waits that overlap don't add up.</summary>

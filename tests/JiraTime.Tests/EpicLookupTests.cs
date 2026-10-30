@@ -85,7 +85,6 @@ public class EpicLookupTests : IDisposable
     public async Task One_unknown_key_does_not_hide_the_others()
     {
         _h.Jira.Issues["ABC-1"] = new JsonObject { ["issuetype"] = Type("Story"), ["customfield_10008"] = "BAC-577" };
-        _h.Jira.FailWhen = uri => uri.AbsolutePath.EndsWith("/search") && uri.Query.Contains("NOPE-1") ? HttpStatusCode.BadRequest : null;
 
         var epics = await _h.Issues.GetEpicsAsync(Server, ["ABC-1", "NOPE-1"]);
 

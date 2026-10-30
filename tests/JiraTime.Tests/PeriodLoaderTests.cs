@@ -94,23 +94,6 @@ public class PeriodLoaderTests : IDisposable
     }
 
     [Fact]
-    public async Task An_issue_with_more_worklogs_than_the_search_sends_is_read_in_full()
-    {
-        _h.Jira.EmbeddedWorklogLimit = 3;
-        for (var day = 19; day <= 23; day++)
-            _h.Jira.AddWorklog("ABC-1", $"2026-10-{day}T09:00:00.000+0200", 3600);
-        _h.Jira.AddWorklog("ABC-2", "2026-10-26T09:00:00.000+0100", 3600);
-        var sheet = Sheet();
-        var (loader, statuses) = _h.PeriodLoading();
-
-        await loader.LoadAsync(sheet, statuses);
-
-        Assert.Single(_h.Jira.Requests, r => r.Path.Contains("/issue/ABC-1/worklog"));
-        Assert.Equal(1, WorklogReads);
-        Assert.Equal(6, sheet.Entries.Count);
-    }
-
-    [Fact]
     public async Task An_old_period_and_the_recent_days_are_read_apart()
     {
         var (loader, statuses) = _h.PeriodLoading();

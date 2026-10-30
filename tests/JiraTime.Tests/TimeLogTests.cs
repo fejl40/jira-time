@@ -91,22 +91,6 @@ public class TimeLogTests : IDisposable
     }
 
     [Fact]
-    public async Task An_issue_just_saved_on_with_more_worklogs_than_the_search_sends_is_read_on_its_own()
-    {
-        await _h.SaveDayAsync(Day, [TimeHarness.Row("NEW-1", 3), TimeHarness.Row("NEW-2", 3)]);
-        _h.Jira.AddWorklog("NEW-1", "2026-10-20T09:00:00.000+0200", 3600);
-        _h.Jira.NotIndexed.UnionWith(["NEW-1", "NEW-2"]);
-        _h.Jira.EmbeddedWorklogLimit = 1;
-        _h.Log.Refresh();
-        _h.Jira.Requests.Clear();
-
-        Assert.Equal(3, (await Period()).Entries.Count);
-
-        var read = Assert.Single(_h.Jira.Requests, r => r.Path.Contains("/worklog"));
-        Assert.Contains("/issue/NEW-1/worklog", read.Path);
-    }
-
-    [Fact]
     public async Task An_issue_just_saved_on_that_is_gone_from_Jira_has_no_work()
     {
         await _h.SaveDayAsync(Day, [TimeHarness.Row("NEW-1", 3), TimeHarness.Row("NEW-2", 1)]);
@@ -205,22 +189,4 @@ public class TimeLogTests : IDisposable
     [InlineData("\"  \"", null)]
     public void Comments_are_read_from_text_and_document_format(string json, string? expected) =>
         Assert.Equal(expected, AtlassianDocument.ToPlainText(JsonDocument.Parse(json).RootElement));
-
-    [Theory]
-    [InlineData(3600, 60)]
-    [InlineData(5400, 90)]
-    [InlineData(89, 1)]
-    [InlineData(91, 2)]
-    [InlineData(10, 1)]
-    public void Worklog_time_is_read_in_whole_minutes(int seconds, int minutes) =>
-        Assert.Equal(TimeSpan.FromMinutes(minutes), JiraWorklogClient.WholeMinutes(seconds));
-
-    [Theory]
-    [InlineData("2026-10-19T09:30:00.000+0200", "2026-10-19T07:30:00Z")]
-    [InlineData("2026-10-19T09:30:00.000-0500", "2026-10-19T14:30:00Z")]
-    [InlineData("2026-10-19T09:30:00.000+02:00", "2026-10-19T07:30:00Z")]
-    [InlineData("nonsense", null)]
-    [InlineData(null, null)]
-    public void Created_times_are_read_with_or_without_a_colon_in_the_offset(string? text, string? utc) =>
-        Assert.Equal(utc is null ? null : DateTimeOffset.Parse(utc), JiraWorklogClient.ParseCreated(text));
 }

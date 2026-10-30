@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json;
 using JiraTime.Domain;
 using static JiraTime.Services.JiraHttp;
 
@@ -8,22 +7,16 @@ namespace JiraTime.Services;
 /// <summary>Jira REST calls about issues and the user. Runs on the server, so there are no CORS issues.</summary>
 public class JiraClient(JiraHttp jira)
 {
-    private readonly JiraHttp _jira = jira;
-
     /// <summary>The user the token belongs to. Doubles as a token check.</summary>
     public async Task<JiraProfile> GetMyselfAsync(JiraConnection c, CancellationToken ct = default) =>
-        ToProfile(await _jira.GetAsync<RawUser>(c, $"{Api(c)}/myself", ct));
+        JiraIssueJson.ToProfile(await jira.GetAsync<RawUser>(c, $"{Api(c)}/myself", ct));
 
     /// <summary>Issue search for autocomplete. Uses the issue picker, which exists on both Cloud and Server/DC.</summary>
     public async Task<IReadOnlyList<JiraIssue>> SearchIssuesAsync(JiraConnection c, string query, CancellationToken ct = default)
     {
-        var result = await _jira.GetAsync<PickerResult>(c,
+        var result = await jira.GetAsync<PickerResult>(c,
             $"/rest/api/2/issue/picker?query={Uri.EscapeDataString(query)}&showSubTasks=true", ct);
-        return result.Sections
-            .SelectMany(s => s.Issues)
-            .DistinctBy(i => i.Key)
-            .Select(i => new JiraIssue(i.Key, i.SummaryText ?? ""))
-            .ToList();
+        return JiraIssueJson.ToIssues(result);
     }
 
     /// <summary>
@@ -65,7 +58,7 @@ public class JiraClient(JiraHttp jira)
 
     /// <summary>Current summary and status of the given issues. Keys Jira doesn't know are left out.</summary>
     public async Task<IReadOnlyList<IssueWithStatus>> GetIssuesAsync(JiraConnection c, IReadOnlyCollection<string> keys, CancellationToken ct = default) =>
-        (await _jira.ByKeysAsync<SearchIssue>(c, keys, StatusFields, ct)).Select(ToIssueWithStatus).ToList();
+        (await jira.ByKeysAsync<SearchIssue>(c, keys, StatusFields, ct)).Select(JiraIssueJson.ToIssueWithStatus).ToList();
 
     /// <summary>
     /// The epic of each issue, by key; null for issues with no epic (and for epics themselves). The epic is
@@ -76,60 +69,22 @@ public class JiraClient(JiraHttp jira)
     public async Task<IReadOnlyDictionary<string, string?>> GetEpicsAsync(JiraConnection c, IReadOnlyCollection<string> keys, string? epicLink, CancellationToken ct = default)
     {
         var found = await ReadEpicsAsync(c, keys, epicLink, ct);
-        // A sub-task's epic is its parent's.
-        var parents = found.Values.Where(f => f.Epic is null && f.SubtaskOf is not null).Select(f => f.SubtaskOf!).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var parentEpics = await ReadEpicsAsync(c, parents, epicLink, ct);
-        return found.ToDictionary(f => f.Key,
-            f => f.Value.Epic ?? (f.Value.SubtaskOf is { } parent ? parentEpics.GetValueOrDefault(parent)?.Epic : null),
-            StringComparer.OrdinalIgnoreCase);
+        var parents = await ReadEpicsAsync(c, JiraIssueJson.ParentsToRead(found), epicLink, ct);
+        return JiraIssueJson.Epics(found, parents);
     }
-
-    /// <summary>What one issue says about its epic.</summary>
-    /// <param name="Epic">Its epic's key, when the issue names one.</param>
-    /// <param name="SubtaskOf">The parent's key, when the issue is a sub-task (whose epic is the parent's).</param>
-    private sealed record IssueEpic(string? Epic, string? SubtaskOf);
-
-    /// <summary>Reads <see cref="IssueEpic"/> from an issue's fields as Jira returns them.</summary>
-    private static IssueEpic EpicOf(EpicFields? fields, string? epicLinkField)
-    {
-        var parent = fields?.Parent;
-        if (parent is not null && IsEpic(parent.Fields?.IssueType)) return new(parent.Key, null);
-        if (epicLinkField is not null && fields?.Other?.TryGetValue(epicLinkField, out var link) == true && link.ValueKind == JsonValueKind.String)
-            return new(link.GetString(), null);
-        return new(null, fields?.IssueType?.Subtask == true ? parent?.Key : null);
-    }
-
-    private static bool IsEpic(IssueTypeField? type) =>
-        type is not null && (type.HierarchyLevel == 1 || string.Equals(type.Name, "Epic", StringComparison.OrdinalIgnoreCase));
 
     private async Task<Dictionary<string, IssueEpic>> ReadEpicsAsync(JiraConnection c, IReadOnlyCollection<string> keys, string? epicLink, CancellationToken ct)
     {
         var fields = "issuetype,parent" + (epicLink is null ? "" : "," + epicLink);
-        var found = await _jira.ByKeysAsync<EpicSearchIssue>(c, keys, fields, ct);
-        return found
-            .Where(i => i.Key is not null)
-            .DistinctBy(i => i.Key, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(i => i.Key!, i => EpicOf(i.Fields, epicLink), StringComparer.OrdinalIgnoreCase);
+        return JiraIssueJson.EpicsOf(await jira.ByKeysAsync<EpicSearchIssue>(c, keys, fields, ct), epicLink);
     }
 
     /// <summary>The id of the Epic Link field (e.g. customfield_10008) on Jiras that have one (Server/DC); null otherwise.</summary>
-    public async Task<string?> GetEpicLinkFieldAsync(JiraConnection c, CancellationToken ct = default)
-    {
-        var all = await _jira.GetAsync<List<RawField>>(c, $"{Api(c)}/field", ct);
-        return all
-            .Where(f => f.Schema?.Custom == "com.pyxis.greenhopper.jira:gh-epic-link" || f.Name == "Epic Link")
-            .Select(f => f.Id)
-            .FirstOrDefault(id => id is not null);
-    }
+    public async Task<string?> GetEpicLinkFieldAsync(JiraConnection c, CancellationToken ct = default) =>
+        JiraIssueJson.EpicLinkField(await jira.GetAsync<List<RawField>>(c, $"{Api(c)}/field", ct));
 
     private const string StatusFields = "summary,issuetype,status";
 
     private async Task<IReadOnlyList<IssueWithStatus>> SearchAsync(JiraConnection c, string jql, CancellationToken ct) =>
-        (await _jira.SearchAllAsync<SearchIssue>(c, jql, StatusFields, ct)).Select(ToIssueWithStatus).ToList();
-
-    private static IssueWithStatus ToIssueWithStatus(SearchIssue i) =>
-        new(i.Key, i.Fields?.Summary ?? "", i.Fields?.IssueType?.Name ?? "", i.Fields?.Status?.Name ?? "", i.Fields?.Status?.StatusCategory?.Key ?? "");
-
-    private static JiraProfile ToProfile(RawUser u) =>
-        new(u.AccountId ?? u.Key ?? u.Name ?? "", u.Name, u.DisplayName ?? u.Name ?? "?", u.EmailAddress);
+        (await jira.SearchAllAsync<SearchIssue>(c, jql, StatusFields, ct)).Select(JiraIssueJson.ToIssueWithStatus).ToList();
 }
