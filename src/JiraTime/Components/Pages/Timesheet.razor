@@ -7,7 +7,7 @@
 @inject WorklogSync Sync
 @inject CurrentUser User
 @inject NavigationManager Nav
-@inject IJSRuntime JS
+@inject Modals Modals
 @inject MotionScript Animations
 @implements IDisposable
 
@@ -224,8 +224,8 @@ else
         var target = Nav.ToBaseRelativePath(Nav.ToAbsoluteUri(context.TargetLocation).ToString());
         if (Links.Read(target, Today)?.Period == Sheet.Period) return;
 
-        if (!await JS.InvokeAsync<bool>("confirm", $"You have unsaved changes on {Format.Days(Sheet.OwnChangeDays.Count)}. Leave without saving them?"))
-            context.PreventNavigation();
+        var text = $"You have unsaved changes on {Format.Days(Sheet.OwnChangeDays.Count)}. They are lost if you leave now.";
+        if (!await Modals.ConfirmAsync("Leave without saving?", text, "Leave", danger: true)) context.PreventNavigation();
     }
 
     // ---- Animations and keyboard shortcuts ----

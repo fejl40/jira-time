@@ -1,4 +1,4 @@
-// Keyboard shortcuts for the timesheet. The page attaches itself and gets called back:
+// Keyboard shortcuts for the timesheet, off while a modal is open. The page attaches itself and gets called back:
 //   Ctrl/Cmd+S  save the open day (also while typing; the field is committed first)
 //   ← / →       previous / next day (outside fields)
 //   N           add a row (outside fields)
@@ -19,8 +19,15 @@
     if (!page) return;
     const target = e.target;
     const typing = isField(target);
+    const save = (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's';
 
-    if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') {
+    // A modal is open (Components/Modals): its keys are its own, and Ctrl+S doesn't open the browser's Save.
+    if (document.querySelector('dialog[open]')) {
+      if (save) e.preventDefault();
+      return;
+    }
+
+    if (save) {
       e.preventDefault();
       // Blur first so the field's change reaches the server before the save does.
       if (typing) target.blur();

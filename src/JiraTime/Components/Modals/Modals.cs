@@ -39,6 +39,17 @@ public sealed class Modals
         return ModalResult.As<TResult>(await modal.Result);
     }
 
+    /// <summary>Asks a yes-or-no question; true when the user confirmed, false when they cancelled.</summary>
+    /// <param name="danger">The answer deletes or loses something: the button is red and the focus starts on Cancel.</param>
+    public Task<bool> ConfirmAsync(string title, string text, string confirmLabel = "OK", bool danger = false) =>
+        ShowAsync<ConfirmModal, bool>(new Dictionary<string, object?>
+        {
+            [nameof(ConfirmModal.Title)] = title,
+            [nameof(ConfirmModal.Text)] = text,
+            [nameof(ConfirmModal.ConfirmLabel)] = confirmLabel,
+            [nameof(ConfirmModal.Danger)] = danger,
+        });
+
     /// <summary>The open modal with this id; null once it closed.</summary>
     public ModalContext? Find(int id) => _queue.Open.FirstOrDefault(m => m.Id == id);
 

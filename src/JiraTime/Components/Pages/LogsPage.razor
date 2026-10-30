@@ -5,6 +5,7 @@
 @inject MyJiraLog Log
 @inject IJSRuntime JS
 @inject NavigationManager Nav
+@inject Modals Modals
 
 @* The signed-in user's Jira requests for a day, grouped by the action that made them, updated live.
    The rules (grouping, filters, live updates) are in Domain/JiraLog.cs. *@
@@ -111,7 +112,7 @@
 
     private async Task ClearAsync()
     {
-        if (!await JS.InvokeAsync<bool>("confirm", "Delete all of your Jira request logs, for every day?")) return;
+        if (!await Modals.ConfirmAsync("Clear logs?", "This deletes all of your Jira request logs, for every day.", "Clear logs", danger: true)) return;
         await Log.ClearAsync();
         (_days, _log) = (Log.Days(), new JiraLogDay(_shownDay, []));
         Regroup();

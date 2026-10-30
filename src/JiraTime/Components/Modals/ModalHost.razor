@@ -63,10 +63,15 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         _self ??= DotNetObjectReference.Create(this);
+        // The closed ones leave first, so the focus is back on the page before the next modal opens
+        // (in the render that follows their leaving).
+        if (_leaving.Count > 0)
+        {
+            foreach (var modal in _leaving.ToList()) await LeaveAsync(modal);
+            return;
+        }
         foreach (var modal in Modals.Open.Where(_shown.Add).ToList())
             await JS.InvokeVoidAsync("jiraModals.open", modal.Id, _self);
-        foreach (var modal in _leaving.ToList())
-            await LeaveAsync(modal);
     }
 
     /// <summary>Plays the closing animation, then takes the dialog out of the page.</summary>

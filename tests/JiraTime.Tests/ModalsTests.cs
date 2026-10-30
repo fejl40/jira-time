@@ -171,4 +171,20 @@ public class ModalsTests
         Assert.Null(ModalResult.As<int?>("lots"));
         Assert.Null(ModalResult.As<string>(42));
     }
+
+    [Fact]
+    public async Task A_confirm_shows_its_question_and_is_true_only_when_confirmed()
+    {
+        var confirmed = _modals.ConfirmAsync("Clear logs?", "Deletes every day.", "Clear logs", danger: true);
+        var modal = _modals.Open[0];
+        Assert.Equal(typeof(ConfirmModal), modal.Component);
+        Assert.Equal("Clear logs", modal.Parameters[nameof(ConfirmModal.ConfirmLabel)]);
+        Assert.Equal(true, modal.Parameters[nameof(ConfirmModal.Danger)]);
+        modal.Close("true"); // its data-modal-result button
+        Assert.True(await confirmed);
+
+        var cancelled = _modals.ConfirmAsync("Leave?", "Unsaved changes are lost.");
+        _modals.Open[0].Cancel();
+        Assert.False(await cancelled);
+    }
 }

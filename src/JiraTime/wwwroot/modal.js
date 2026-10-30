@@ -16,6 +16,8 @@
     return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
   };
 
+  const focusFirst = dialog => dialog.querySelector('[data-modal-autofocus]')?.focus();
+
   const wire = (dialog, host, id) => {
     dialog.addEventListener('cancel', e => {
       e.preventDefault();
@@ -38,9 +40,15 @@
     dialog.addEventListener('close', () => {
       if (dialog.hasAttribute('data-leaving')) return;
       dialog.showModal();
+      focusFirst(dialog);
       if (canDismiss(dialog)) host.invokeMethodAsync('Dismiss', id);
     });
   };
+
+  // Where the focus was before the first of a row of modals opened; it goes back there once all are
+  // closed, also when the browser can't put it back itself (the element it remembered is gone).
+  let opener = null;
+  const anyOpen = () => document.querySelector('dialog[open]:not([data-leaving])');
 
   /** The length of the dialog's current animation in ms (0 with reduced motion). */
   const animationMs = dialog => parseFloat(getComputedStyle(dialog).animationDuration || '0') * 1000;
@@ -49,9 +57,10 @@
     open: (id, host) => {
       const dialog = find(id);
       if (!dialog || dialog.open) return;
+      if (!anyOpen()) opener = document.activeElement;
       wire(dialog, host, id);
       dialog.showModal();
-      dialog.querySelector('[data-modal-autofocus]')?.focus();
+      focusFirst(dialog);
     },
 
     // Plays the closing animation, then closes the dialog; the focus goes back to where it was.
@@ -59,7 +68,11 @@
       const dialog = find(id);
       if (!dialog?.open) return resolve();
       dialog.setAttribute('data-leaving', '');
-      setTimeout(() => { dialog.close(); resolve(); }, animationMs(dialog));
+      setTimeout(() => {
+        dialog.close();
+        if (!anyOpen() && opener?.isConnected && !document.activeElement?.closest('dialog[open]')) opener.focus();
+        resolve();
+      }, animationMs(dialog));
     }),
   };
 })();

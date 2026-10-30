@@ -1,0 +1,23 @@
+@namespace JiraTime.Components
+@attribute [Modal(Size = ModalSize.Small)]
+
+@* A yes-or-no question, shown by Modals.ConfirmAsync. A question about deleting something has a red
+   button, and the focus starts on Cancel so Enter doesn't delete by accident. *@
+
+<Modal Title="@Title">
+    <ChildContent>
+        <p class="text-slate-600 dark:text-slate-300">@Text</p>
+    </ChildContent>
+    <Footer>
+        <button type="button" class="btn-secondary" data-modal-close data-modal-autofocus="@Danger" data-confirm-cancel>Cancel</button>
+        <button type="button" class="@(Danger ? "btn-destructive" : "btn-primary")" data-modal-result="true" data-modal-autofocus="@(!Danger)" data-confirm>@ConfirmLabel</button>
+    </Footer>
+</Modal>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter] public string Text { get; set; } = "";
+    [Parameter] public string ConfirmLabel { get; set; } = "OK";
+    /// <summary>The answer deletes or loses something.</summary>
+    [Parameter] public bool Danger { get; set; }
+}
