@@ -296,7 +296,7 @@ struck through next to the 0 they become, until Save all removes them from Jira.
 The Export page (`/export?month=yyyy-MM`) gives a calendar month in the agency's tab-separated format:
 `Dato (yyyy-mm-dd)`, `Timer`, `Fase (ydelsesområde)`, `Forordning`, `Hovedleverance nr.`, `Hovedleverance link`,
 `Epic`, `Beskrivelse`. Every day of the month gets a row (only the date when nothing is logged); otherwise one
-row per day and issue with the hours added up, written with a decimal comma (7,5). `Epic` is a link to the
+row per day and issue with the hours added up, written with a decimal point (7.5). `Epic` is a link to the
 issue's epic (the parent when it is an epic, else the Epic Link field, a sub-task takes its parent's epic) and
 is empty when there is none, epics included. Fase, Forordning and Hovedleverance are set once per epic by the
 user and stay empty for issues without an epic. `Beskrivelse` is the issue key. **Copy** puts header and rows

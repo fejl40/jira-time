@@ -55,11 +55,27 @@ public class MonthExportTests
 
     [Theory]
     [InlineData(8, "8")]
-    [InlineData(7.5, "7,5")]
-    [InlineData(0.25, "0,25")]
-    [InlineData(1.0 / 3, "0,33")]
-    public void Hours_have_a_decimal_comma(double hours, string text) =>
+    [InlineData(7.5, "7.5")]
+    [InlineData(0.25, "0.25")]
+    [InlineData(1.0 / 3, "0.33")]
+    public void Hours_have_a_decimal_point(double hours, string text) =>
         Assert.Equal(text, MonthExport.Hours(TimeSpan.FromHours(hours)));
+
+    [Fact]
+    public void Hours_have_a_decimal_point_on_a_danish_machine_too()
+    {
+        var before = System.Globalization.CultureInfo.CurrentCulture;
+        System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("da-DK");
+        try
+        {
+            Assert.Equal("7.5", MonthExport.Hours(TimeSpan.FromHours(7.5)));
+            Assert.Equal("7.5", JiraTime.Components.Format.Hours(TimeSpan.FromHours(7.5)));
+        }
+        finally
+        {
+            System.Globalization.CultureInfo.CurrentCulture = before;
+        }
+    }
 
     [Fact]
     public void An_issue_with_an_epic_gets_the_epic_link_and_the_epics_values()

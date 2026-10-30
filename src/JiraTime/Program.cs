@@ -1,5 +1,10 @@
+using System.Globalization;
 using JiraTime.Components;
 using JiraTime.Services;
+
+// Numbers are written with a decimal point whatever the machine's language settings are (7.5, never 7,5).
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 

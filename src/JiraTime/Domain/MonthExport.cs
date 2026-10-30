@@ -131,9 +131,9 @@ public static class MonthExport
     public static string ToTsv(IEnumerable<ExportRow> rows, string baseUrl, IReadOnlyDictionary<string, EpicExportValues> values) =>
         string.Join("\r\n", rows.Select(r => Cells(r, baseUrl, values)).Prepend(Header).Select(Line)) + "\r\n";
 
-    /// <summary>Hours with a decimal comma: 7,5 and 0,25.</summary>
+    /// <summary>Hours with a decimal point: 7.5 and 0.25.</summary>
     public static string Hours(TimeSpan hours) =>
-        Math.Round(hours.TotalHours, 2).ToString("0.##", CultureInfo.InvariantCulture).Replace('.', ',');
+        Math.Round(hours.TotalHours, 2).ToString("0.##", CultureInfo.InvariantCulture);
 
     private static string Line(IEnumerable<string> cells) =>
         string.Join('\t', cells.Select(c => c.Replace("\r\n", " ").Replace('\t', ' ').Replace('\n', ' ').Replace('\r', ' ').Trim()));
