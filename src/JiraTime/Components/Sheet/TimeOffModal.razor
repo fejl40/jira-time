@@ -11,7 +11,7 @@
         <select id="time-off-reason" class="field" @bind="_reason" data-modal-autofocus data-time-off-reason>
             @foreach (var reason in Enum.GetValues<DayOffReason>())
             {
-                <option value="@reason">@DayOffLook.Icon(reason) @reason</option>
+                <option value="@reason">@DayLook.Icon(reason) @reason</option>
             }
         </select>
 

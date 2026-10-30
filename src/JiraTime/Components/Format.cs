@@ -27,6 +27,7 @@ public static class Format
     /// <summary>"1 day", "3 days".</summary>
     public static string Days(int n) => Count(n, "day");
 
+    /// <summary>"3 Nov – 16 Nov 2026"; both years when they differ.</summary>
     public static string Range(DateOnly a, DateOnly b) =>
         a.Year == b.Year
             ? $"{Text(a, "d MMM")} – {Text(b, "d MMM yyyy")}"
@@ -67,18 +68,10 @@ public static class Format
         _ => (bytes / (1024.0 * 1024)).ToString("0.#", CultureInfo.InvariantCulture) + " MB",
     };
 
+    /// <summary>"2026-11-03".</summary>
     public static string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     /// <summary>A day written as <see cref="Iso"/>; null for anything else.</summary>
     public static DateOnly? ParseIso(string? text) =>
         DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
-}
-
-public static class IssueColors
-{
-    // Literal class names so Tailwind picks them up.
-    private static readonly string[] Bg = ["bg-blue-500", "bg-emerald-500", "bg-amber-500", "bg-violet-500", "bg-rose-500", "bg-cyan-500", "bg-lime-600", "bg-fuchsia-500"];
-
-    /// <summary>Same issue key → same color, every time.</summary>
-    public static string For(string issueKey) => Bg[issueKey.Aggregate(0, (h, c) => (h * 31 + c) & 0x7fffffff) % Bg.Length];
 }

@@ -1,9 +1,10 @@
 ---
 id: TASK-90.9
 title: Turn DayOffLook into DayLook and move IssueColors out of Format
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 11:32'
+updated_date: '2026-10-30 12:09'
 labels:
   - refactor
 dependencies:
@@ -37,12 +38,18 @@ Rules for this subtask: edit only the files listed. Do not edit AGENTS.md, READM
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 "Weekend" and the weekend/holiday background classes appear only in DayLook
-- [ ] #2 DayHeader shows the time-off badge and Undo once
-- [ ] #3 Format.cs contains only text formatting
-- [ ] #4 DayLookTests cover Background, KindName and Title
-- [ ] #5 Rendered classes are unchanged
-- [ ] #6 Only the files listed under Files are created, edited, moved or deleted
-- [ ] #7 Behaviour and what the user sees stay the same
-- [ ] #8 dotnet build has 0 warnings and dotnet test passes
+- [x] #1 "Weekend" and the weekend/holiday background classes appear only in DayLook
+- [x] #2 DayHeader shows the time-off badge and Undo once
+- [x] #3 Format.cs contains only text formatting
+- [x] #4 DayLookTests cover Background, KindName and Title
+- [x] #5 Rendered classes are unchanged
+- [x] #6 Only the files listed under Files are created, edited, moved or deleted
+- [x] #7 Behaviour and what the user sees stay the same
+- [x] #8 dotnet build has 0 warnings and dotnet test passes
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DayOffLook is now DayLook (Components/DayLook.cs) with Background (grey for weekends and holidays), KindName (holiday name, 'No work hours' or 'Weekend') and Title (the grid column's tooltip); Classes is renamed TimeOffClasses. PeriodGrid, DayList and DayHeader use them, so 'Weekend' and the weekend/holiday background are written only in DayLook. DayHeader shows the time-off badge and Undo once for whole and partial days off. IssueColors moved from Format.cs to Components/Sheet/IssueColors.cs (namespace JiraTime.Components, so DayRow and IssuePicker needed no change); Format.cs got summaries on Range and Iso. Tests: DayLookTests (was DayOffLookTests) add Background, KindName and Title. Doc changes for cleanup: AGENTS.md layout line 'Components/DayOffLook.cs' becomes 'Components/DayLook.cs  how a day looks: weekend and holiday grey and name, time off icon, tint and label per reason', add 'Components/Sheet/IssueColors.cs' (or mention IssueColors in the Components/Sheet/ line), and in 'Workdays' replace (DayOffLook, ...) with (DayLook, ...).
+<!-- SECTION:FINAL_SUMMARY:END -->

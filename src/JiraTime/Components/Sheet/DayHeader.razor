@@ -11,30 +11,22 @@
     {
         <span class="text-sm text-muted">Nothing logged</span>
     }
-    @if (Info is { Kind: DayKind.Holiday or DayKind.Weekend })
+    @if (DayLook.KindName(Info) is { } kindName)
     {
-        <span class="@Badge">@(Info.Name ?? "Weekend")</span>
+        <span class="@Badge">@kindName</span>
     }
-    else if (Info is { Kind: DayKind.DayOff })
+    @if (Info is { Kind: DayKind.Workday } && Missing > TimeSpan.Zero)
     {
-        <span class="@DayOffLook.Badge(Info.Reason!.Value)" data-time-off>@Icon @DayOffLook.Label(Info)</span>
+        <span class="text-sm text-warning"><Count Value="Missing" Unit=" h" /> missing</span>
+    }
+    @if (Info is { Reason: { } reason } && DayLook.Label(Info) is { } timeOff)
+    {
+        <span class="@DayLook.Badge(reason)" data-time-off>@Icon @timeOff</span>
         <button class="btn-ghost text-xs" disabled="@Busy" @onclick="OnUnmarkOff">Undo</button>
     }
     else if (Info is { Kind: DayKind.Workday } work)
     {
-        @if (Missing > TimeSpan.Zero)
-        {
-            <span class="text-sm text-warning"><Count Value="Missing" Unit=" h" /> missing</span>
-        }
-        @if (work.HasPartialDayOff)
-        {
-            <span class="@DayOffLook.Badge(work.Reason!.Value)" data-time-off>@Icon @DayOffLook.Label(work)</span>
-            <button class="btn-ghost text-xs" disabled="@Busy" @onclick="OnUnmarkOff">Undo</button>
-        }
-        else
-        {
-            <button class="btn-ghost text-xs" disabled="@Busy" @onclick="() => OpenTimeOffAsync(work)" data-time-off-open>Time off…</button>
-        }
+        <button class="btn-ghost text-xs" disabled="@Busy" @onclick="() => OpenTimeOffAsync(work)" data-time-off-open>Time off…</button>
     }
 </div>
 
@@ -51,7 +43,7 @@
 
     /// <summary>The reason's icon; the sun of a vacation rises in.</summary>
     private RenderFragment? Icon => Info?.Reason is { } reason
-        ? @<span class="@(reason == DayOffReason.Vacation ? "motion-sunrise" : "motion-fade") inline-block" aria-hidden="true">@DayOffLook.Icon(reason)</span>
+        ? @<span class="@(reason == DayOffReason.Vacation ? "motion-sunrise" : "motion-fade") inline-block" aria-hidden="true">@DayLook.Icon(reason)</span>
         : null;
 
     private const string Badge = "rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs text-slate-600 dark:text-slate-300";

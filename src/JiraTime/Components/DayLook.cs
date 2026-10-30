@@ -3,11 +3,27 @@ using JiraTime.Domain;
 namespace JiraTime.Components;
 
 /// <summary>
-/// How time off looks in the grid, the day list and the day header: an icon and a tint per reason
-/// (Styles/app.css, .day-off-*), stripes when the whole day is off, and a short label.
+/// How a day looks in the grid, the day list and the day header: grey for weekends and holidays, their name,
+/// and for time off an icon and a tint per reason (Styles/app.css, .day-off-*), stripes when the whole day is off,
+/// and a short label.
 /// </summary>
-public static class DayOffLook
+public static class DayLook
 {
+    /// <summary>The grey background of weekends and holidays; empty on other days.</summary>
+    public static string Background(DayInfo? info) =>
+        info is { Kind: DayKind.Weekend or DayKind.Holiday } ? "bg-slate-50 dark:bg-slate-800/60" : "";
+
+    /// <summary>The holiday's name, "No work hours" or "Weekend"; null on workdays and days off.</summary>
+    public static string? KindName(DayInfo? info) =>
+        info is { Kind: DayKind.Weekend or DayKind.Holiday } ? info.Name ?? "Weekend" : null;
+
+    /// <summary>The tooltip of the day's column: the holiday's name or the time off; null otherwise.</summary>
+    public static string? Title(DayInfo? info) => info switch
+    {
+        { Kind: DayKind.Holiday, Name: var name } => name,
+        _ => Label(info),
+    };
+
     /// <summary>A sun for vacation, a face with a thermometer for sick, a calendar for other time off.</summary>
     public static string Icon(DayOffReason reason) => reason switch
     {
@@ -36,14 +52,14 @@ public static class DayOffLook
     };
 
     /// <summary>Classes for the day's column or list entry: the reason's tint, striped when the whole day is off.</summary>
-    public static string Classes(DayInfo? info) => info switch
+    public static string TimeOffClasses(DayInfo? info) => info switch
     {
         { Reason: { } reason, Kind: DayKind.DayOff } => $"{Tint(reason)} day-off-whole",
         { Reason: { } reason, HasPartialDayOff: true } => $"{Tint(reason)} day-off-partial",
         _ => "",
     };
 
-    /// <summary>Classes for the badge in the day header, tinted like the day's column.</summary>
+    /// <summary>Classes for the time-off badge in the day header, tinted like the day's column.</summary>
     public static string Badge(DayOffReason reason) => $"{Tint(reason)} day-off-badge";
 
     /// <summary>The reason in lower case, for data-day-off attributes that browser checks read.</summary>

@@ -45,7 +45,7 @@
   .dot-not-in-jira { @apply rounded-full bg-amber-500; }
   .alert-error { @apply mt-4 rounded-md bg-red-50 px-3 py-2.5 text-sm text-red-700 ring-1 ring-red-200 dark:bg-red-950/60 dark:text-red-300 dark:ring-red-900; }
   kbd { @apply rounded border border-slate-300 bg-white px-1 font-sans text-[11px] text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300; }
-  /* Time off (Components/DayOffLook.cs): a tint per reason; a whole day off is striped, part of a day only tinted. */
+  /* Time off (Components/DayLook.cs): a tint per reason; a whole day off is striped, part of a day only tinted. */
   .day-off-vacation { --day-off: var(--color-amber-400); }
   .day-off-sick { --day-off: var(--color-rose-400); }
   .day-off-other { --day-off: var(--color-violet-400); }
