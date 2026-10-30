@@ -1,9 +1,10 @@
 ---
 id: TASK-92
 title: Slide in a period reached through Leave without saving
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-30 13:00'
+updated_date: '2026-10-30 13:04'
 labels:
   - bug
 dependencies: []
