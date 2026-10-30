@@ -13,8 +13,8 @@ public sealed class ShownPeriod(
     PeriodLoader loader, IssueStatuses statuses, WorklogSync sync, TimeLog log,
     WorkCalendarService calendar, CurrentUser user, TimeProvider clock)
 {
-    /// <summary>Read on each use, so a tab left open overnight moves on to the new day.</summary>
-    public DateOnly Today => clock.Today();
+    /// <summary>Today in the user's time zone, read on each use, so a tab left open overnight moves on to the new day.</summary>
+    public DateOnly Today => clock.Today(user.TimeZone);
 
     /// <summary>The period shown, with its unsaved changes; null until the first period has loaded.</summary>
     public PeriodSheet? Sheet { get; private set; }

@@ -75,7 +75,7 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        _month = ExportLinks.Read(MonthParam) ?? MonthExport.MonthOf(Clock.Today()).From;
+        _month = ExportLinks.Read(MonthParam) ?? MonthExport.MonthOf(Clock.Today(User.TimeZone)).From;
         await LoadAsync();
     }
 

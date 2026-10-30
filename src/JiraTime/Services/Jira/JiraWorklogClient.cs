@@ -5,7 +5,7 @@ using static JiraTime.Services.JiraHttp;
 namespace JiraTime.Services;
 
 /// <summary>Jira REST calls that read and write worklogs. Runs on the server, so there are no CORS issues.</summary>
-/// <param name="clock">Its time zone is where worklogs start: Jira gets the start time with that zone's offset.</param>
+/// <param name="clock">Its time zone is where worklogs start when the connection has no browser time zone: Jira gets the start time with that zone's offset.</param>
 public class JiraWorklogClient(JiraHttp jira, TimeProvider clock)
 {
     /// <summary>
@@ -96,5 +96,5 @@ public class JiraWorklogClient(JiraHttp jira, TimeProvider clock)
         jira.SendAsync<object>(c, HttpMethod.Delete,
             $"{WorklogUrl(c, issueKey, worklogId)}?adjustEstimate=auto", null, ct);
 
-    private object Body(JiraConnection c, TimeEntry entry) => JiraWorklogJson.Body(entry, c.IsCloud, clock.LocalTimeZone);
+    private object Body(JiraConnection c, TimeEntry entry) => JiraWorklogJson.Body(entry, c.IsCloud, c.TimeZone ?? clock.LocalTimeZone);
 }

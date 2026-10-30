@@ -24,6 +24,9 @@ public sealed class CurrentUser
 
     public bool IsSignedIn => Key is not null;
 
+    /// <summary>The time zone of this tab's browser, read at sign-in; null means the server's. Today is on its clock.</summary>
+    public TimeZoneInfo? TimeZone => Jira?.Connection.TimeZone;
+
     /// <summary>Owner id for the user's documents.</summary>
     /// <exception cref="InvalidOperationException">Nobody is signed in.</exception>
     public string Owner => Key?.Id ?? throw new InvalidOperationException("No verified user in this session.");

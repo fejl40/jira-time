@@ -26,6 +26,13 @@ public record JiraConnection(string BaseUrl, JiraAuthType AuthType, string Token
     public string? Owner { get; init; }
 
     /// <summary>
+    /// The time zone of the user's browser, read at sign-in: today and the worklogs' start time are on its clock.
+    /// Null means the server's zone (the browser gave none, or one the server doesn't know).
+    /// </summary>
+    [JsonIgnore]
+    public TimeZoneInfo? TimeZone { get; init; }
+
+    /// <summary>
     /// The Jira URL as typed, trimmed, without a trailing slash and with https:// when no scheme is given; null when
     /// it isn't an http or https URL with a host (such as https:// alone).
     /// </summary>

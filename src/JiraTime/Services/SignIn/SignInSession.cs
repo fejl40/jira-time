@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using JiraTime.Domain;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
+using Microsoft.JSInterop;
 
 namespace JiraTime.Services;
 
@@ -12,8 +13,11 @@ namespace JiraTime.Services;
 /// ASP.NET Core Data Protection (<see cref="ProtectedLocalStorage"/>). The key never leaves the server
 /// (data/keys), so the stored value is useless on its own: it can't be read by scripts, browser
 /// extensions or anyone copying the browser profile.
+///
+/// The browser's time zone is read at each sign-in and kept on the connection the tab signs in with, so today and
+/// worklog start times are on the user's clock, also when the server runs in another zone.
 /// </summary>
-public sealed class SignInSession(ProtectedLocalStorage storage, JiraIdentity identity)
+public sealed class SignInSession(ProtectedLocalStorage storage, JiraIdentity identity, IJSRuntime js)
 {
     private const string Purpose = "JiraTime.Connection.v1";
     private const string StorageKey = "jira-time.connection";
@@ -49,7 +53,7 @@ public sealed class SignInSession(ProtectedLocalStorage storage, JiraIdentity id
     {
         if (await StoredConnectionAsync() is not { } connection) return null;
         using var action = JiraAction.Start("Sign in");
-        var result = await identity.SignInAsync(connection);
+        var result = await identity.SignInAsync(connection with { TimeZone = await BrowserTimeZoneAsync() });
         if (result.Rejected)
         {
             await ForgetAsync();
@@ -63,7 +67,7 @@ public sealed class SignInSession(ProtectedLocalStorage storage, JiraIdentity id
     public async Task<string?> ConnectAsync(JiraConnection connection)
     {
         using var action = JiraAction.Start("Connect to Jira");
-        var result = await identity.SignInAsync(connection, allowOffline: false);
+        var result = await identity.SignInAsync(connection with { TimeZone = await BrowserTimeZoneAsync() }, allowOffline: false);
         if (!result.SignedIn) return result.Error;
         await storage.SetAsync(Purpose, StorageKey, connection);
         (_stored, _loaded) = (connection, true);
@@ -76,6 +80,25 @@ public sealed class SignInSession(ProtectedLocalStorage storage, JiraIdentity id
         await ForgetAsync();
         identity.SignOut();
     }
+
+    /// <summary>The browser's time zone; null (the server's zone) when the browser gives none or one the server doesn't know.</summary>
+    private async Task<TimeZoneInfo?> BrowserTimeZoneAsync()
+    {
+        string? name;
+        try
+        {
+            name = await js.InvokeAsync<string?>("jiraTimeZone.name");
+        }
+        catch (JSException)
+        {
+            return null; // an old cached page without the script
+        }
+        return TimeZoneNamed(name);
+    }
+
+    /// <summary>The time zone with this IANA (or Windows) name; null when there is none or the server doesn't know it.</summary>
+    internal static TimeZoneInfo? TimeZoneNamed(string? name) =>
+        !string.IsNullOrWhiteSpace(name) && TimeZoneInfo.TryFindSystemTimeZoneById(name, out var zone) ? zone : null;
 
     private async Task ForgetAsync()
     {

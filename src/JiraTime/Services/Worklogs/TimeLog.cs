@@ -44,7 +44,7 @@ public class TimeLog(JiraWorklogClient jira, RetryQueue pending, CurrentUser use
     /// <summary>Work from the last <see cref="RecentWork.Days"/> days, for recent issues and comments. Empty when Jira can't be read.</summary>
     public async Task<IReadOnlyList<TimeEntry>> GetRecentAsync(CancellationToken ct = default)
     {
-        var today = clock.Today();
+        var today = clock.Today(user.TimeZone);
         return (await GetRangeAsync(today.AddDays(-RecentWork.Days), today, ct)).Entries;
     }
 

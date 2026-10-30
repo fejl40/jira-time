@@ -110,6 +110,7 @@ Components/Logs/                   request toasts (in MainLayout), the log's act
 Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow, Waiting (the waiting-for-Jira spinner)
 Styles/app.css, motion.css         Tailwind input and animations (compiled to wwwroot/app.css)
 wwwroot/files.js                   copy to the clipboard and file downloads (Export and Logs)
+wwwroot/timezone.js                the browser's time zone, read at sign-in
 wwwroot/favicon.svg                the app icon (apple-touch-icon.png is it as a 180 px square PNG)
 ```
 
@@ -219,7 +220,9 @@ that is Done in Jira shows a note saying so; the day saves as usual.
 
 Time is logged per day: each row is an issue, a number of hours (`1.5`, `1,5` or `1:30`) and an
 optional comment. When during the day you did it doesn't matter. Jira needs a start time on each
-worklog, so the app uses 09:00 on the row's day, sent with the server time zone's offset (from `TimeProvider`).
+worklog, so the app uses 09:00 on the row's day, in your browser's time zone (read when the tab signs in, by
+`wwwroot/timezone.js`; the server's zone when the browser gives none or one the server doesn't know). Today (which day
+and period open, what counts as up to today, the export's month) is on the same clock (`Clock.Today` in `Domain/Period.cs`).
 
 Pick a day in the grid to edit it; the day is kept in the URL (`?day=2026-10-21`), so reload and
 back/forward keep it. A workday up to today that is short of its hours opens with suggested rows

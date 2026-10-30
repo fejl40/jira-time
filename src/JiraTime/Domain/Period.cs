@@ -32,6 +32,10 @@ public readonly record struct Period
 /// <summary>Reads today's date from a <see cref="TimeProvider"/>.</summary>
 public static class Clock
 {
-    /// <summary>Today in the server's time zone, read each time so it is right after midnight.</summary>
-    public static DateOnly Today(this TimeProvider clock) => DateOnly.FromDateTime(clock.GetLocalNow().DateTime);
+    /// <summary>
+    /// Today in <paramref name="zone"/> (the server's time zone when null), read each time so it is right after
+    /// midnight. The timesheet passes the signed-in user's zone (<c>CurrentUser.TimeZone</c>).
+    /// </summary>
+    public static DateOnly Today(this TimeProvider clock, TimeZoneInfo? zone = null) =>
+        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(clock.GetUtcNow(), zone ?? clock.LocalTimeZone).DateTime);
 }

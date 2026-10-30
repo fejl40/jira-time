@@ -53,7 +53,7 @@ internal static class JiraWorklogJson
     }
 
     /// <summary>The body that creates or overwrites a worklog with the entry's day, time and comment.</summary>
-    /// <param name="zone">The server's time zone: the entry's start time is on the clock there.</param>
+    /// <param name="zone">The user's time zone: the entry's start time is on the clock there.</param>
     public static object Body(TimeEntry e, bool isCloud, TimeZoneInfo zone)
     {
         var started = FormatStarted(e.Date, TimeEntry.JiraStartTime, zone);
