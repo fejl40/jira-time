@@ -14,7 +14,7 @@
          @onmouseenter="Pause" @onmouseleave="Resume" @onfocusin="Pause" @onfocusout="Resume" data-toasts>
         @if (_toasts.Hidden > 0)
         {
-            <a href="@LogLinks.To(Today)" class="self-start rounded-full bg-slate-800/90 px-3 py-1 text-xs text-white shadow ring-1 ring-white/10 hover:bg-slate-700 dark:bg-slate-700/90"
+            <a href="@LogLinks.To(Clock.Today())" class="self-start rounded-full bg-slate-800/90 px-3 py-1 text-xs text-white shadow ring-1 ring-white/10 hover:bg-slate-700 dark:bg-slate-700/90"
                data-toasts-more>+@_toasts.Hidden more</a>
         }
         @foreach (var (toast, i) in _toasts.Shown.Select((t, i) => (t, i)))
@@ -22,22 +22,13 @@
             var entry = toast.Entry;
             <div @key="entry.Id" role="status"
                  class="motion-rise flex items-start gap-1 rounded-lg bg-white text-xs shadow-lg ring-1 transition-opacity duration-(--motion) dark:bg-slate-800 @Ring(entry) @(toast.Leaving ? "opacity-0" : "") @(i < _toasts.Shown.Count - 2 ? "max-sm:hidden" : "")"
-                 data-toast="@entry.Id" data-toast-state="@State(entry)">
+                 data-toast="@entry.Id" data-toast-state="@entry.State">
                 <button type="button" class="flex min-w-0 flex-1 items-start gap-2 px-3 py-1.5 text-left" @onclick="() => Open(entry)"
                         title="Open in Logs: @entry.Method @entry.Path">
-                    <span class="mt-0.5 flex-none" aria-hidden="true">
-                        @if (entry.IsPending)
-                        {
-                            <span class="block size-3 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600 dark:border-slate-600 dark:border-t-blue-400"></span>
-                        }
-                        else
-                        {
-                            <span class="block size-3 rounded-full @(entry.Failed ? "bg-red-500" : "bg-emerald-500")"></span>
-                        }
-                    </span>
+                    <span class="mt-0.5 flex-none" aria-hidden="true"><RequestDot Entry="entry" /></span>
                     <span class="min-w-0 flex-1">
                         <span class="block truncate font-medium text-slate-800 dark:text-slate-100">@entry.Action</span>
-                        <span class="block truncate text-[11px] text-muted"><span class="font-mono">@entry.Method @ShortPath(entry)</span> · <span class="@(entry.Failed ? "text-red-700 dark:text-red-400" : "")">@Outcome(entry)</span></span>
+                        <span class="block truncate text-[11px] text-muted"><span class="font-mono">@entry.Method @entry.ShortPath</span> · <span class="@(entry.Failed ? "text-red-700 dark:text-red-400" : "")">@entry.Outcome(Format.Duration(entry.DurationMs ?? 0))</span></span>
                     </span>
                 </button>
                 @if (entry.Failed)
@@ -55,8 +46,6 @@
     private RequestToasts _toasts = default!;
     private IDisposable? _subscription;
     private ITimer? _timer;
-
-    private DateOnly Today => DateOnly.FromDateTime(Clock.GetLocalNow().DateTime);
 
     protected override void OnInitialized()
     {
@@ -92,28 +81,9 @@
 
     private void Open(JiraLogEntry entry) => Nav.NavigateTo(LogLinks.To(entry));
 
-    private static string State(JiraLogEntry e) => e.IsPending ? "pending" : e.Failed ? "error" : "ok";
-
     private static string Ring(JiraLogEntry e) => e.IsPending || !e.Failed
         ? "ring-slate-200 dark:ring-slate-700"
         : "ring-red-300 dark:ring-red-800";
-
-    /// <summary>The path without the REST prefix and query: "issue/ABC-1/worklog".</summary>
-    private static string ShortPath(JiraLogEntry e)
-    {
-        var path = e.Path.Split('?')[0];
-        foreach (var prefix in new[] { "/rest/api/3/", "/rest/api/2/" })
-            if (path.Contains(prefix)) return path[(path.IndexOf(prefix) + prefix.Length)..];
-        return path;
-    }
-
-    private static string Outcome(JiraLogEntry e) => e switch
-    {
-        { IsPending: true } => "Waiting for Jira…",
-        { Status: { } status, Error: null } => $"{status} · {Format.Duration(e.DurationMs ?? 0)}",
-        { Status: { } status } => $"{status} {e.Error} · {Format.Duration(e.DurationMs ?? 0)}",
-        _ => $"{e.Error} · {Format.Duration(e.DurationMs ?? 0)}",
-    };
 
     public void Dispose()
     {

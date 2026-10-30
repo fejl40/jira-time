@@ -64,6 +64,34 @@ public class JiraLogDayTests
         Assert.Equal(201, request.Status);
         Assert.Equal(1, day.Count);
     }
+
+    [Theory]
+    [InlineData("https://jira.example.com/rest/api/2/issue/ABC-1/worklog", "issue/ABC-1/worklog")]
+    [InlineData("https://jira.example.com/rest/api/3/search/jql?jql=x&fields=worklog", "search/jql")]
+    [InlineData("https://jira.example.com/jira/rest/api/2/myself", "myself")]
+    [InlineData("https://jira.example.com/rest/agile/1.0/board?type=scrum", "/rest/agile/1.0/board")]
+    public void The_short_path_drops_the_REST_prefix_and_the_query(string url, string shortPath) =>
+        Assert.Equal(shortPath, (Entry("x", 0) with { Url = url }).ShortPath);
+
+    [Fact]
+    public void A_request_is_pending_until_it_has_a_duration_then_ok_or_error()
+    {
+        Assert.Equal("pending", Entry("p", 0, status: null).State);
+        Assert.Equal("ok", Entry("o", 0).State);
+        Assert.Equal("error", Entry("e", 0, status: 404).State);
+        Assert.Equal("error", (Entry("u", 0, status: null) with { DurationMs = 30_000, Error = "Jira did not respond in time." }).State);
+    }
+
+    [Fact]
+    public void The_outcome_says_waiting_the_status_and_any_error_with_the_duration()
+    {
+        Assert.Equal("Waiting for Jira…", Entry("p", 0, status: null).Outcome("0 ms"));
+        Assert.Equal("200 · 50 ms", Entry("o", 0).Outcome("50 ms"));
+        Assert.Equal("429 Jira asked us to slow down. · 50 ms",
+            (Entry("s", 0, status: 429) with { Error = "Jira asked us to slow down." }).Outcome("50 ms"));
+        Assert.Equal("Could not reach jira.example.com. · 2 s",
+            (Entry("f", 0, status: null) with { DurationMs = 2000, Error = "Could not reach jira.example.com." }).Outcome("2 s"));
+    }
 }
 
 /// <summary>The Logs page reads, hears of and clears only the signed-in user's requests.</summary>

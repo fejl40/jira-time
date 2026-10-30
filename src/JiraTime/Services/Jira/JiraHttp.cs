@@ -8,6 +8,7 @@ using Polly.RateLimiting;
 
 namespace JiraTime.Services;
 
+/// <summary>A Jira request that failed, with a message the user can act on and Jira's status when it answered.</summary>
 public class JiraException(string message, HttpStatusCode? status = null) : Exception(message)
 {
     public HttpStatusCode? Status { get; } = status;
@@ -121,30 +122,4 @@ public class JiraHttp(HttpClient http)
         catch (JsonException) { }
         return message;
     }
-}
-
-/// <summary>
-/// What the handlers below <see cref="JiraHttp"/> need to know about a request: whose connection it is, the JSON
-/// sent, and the attempt being logged. Travels in the request's options, through every retry.
-/// </summary>
-public sealed class JiraRequest
-{
-    private static readonly HttpRequestOptionsKey<JiraRequest> Key = new("JiraTime.JiraRequest");
-
-    public required JiraConnection Connection { get; init; }
-    public string? Body { get; init; }
-    /// <summary>The latest attempt that reached Jira; null until one did.</summary>
-    public JiraCall? Call { get; set; }
-
-    public static JiraRequest Attach(HttpRequestMessage req, JiraConnection c, string? body)
-    {
-        var request = new JiraRequest { Connection = c, Body = body };
-        req.Options.Set(Key, request);
-        return request;
-    }
-
-    public static JiraRequest? Of(HttpRequestMessage req) => req.Options.TryGetValue(Key, out var r) ? r : null;
-
-    /// <summary>Logs the latest attempt with how the request ended (an attempt already logged stays as it was).</summary>
-    public Task FinishAsync(string? error) => Call?.FinishAsync(error) ?? Task.CompletedTask;
 }

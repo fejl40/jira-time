@@ -41,6 +41,34 @@ public sealed record JiraLogEntry
     [JsonIgnore] public bool IsPending => DurationMs is null;
 
     [JsonIgnore] public bool Failed => Error is not null || Status >= 400;
+
+    /// <summary>"pending", "ok" or "error"; the toasts and the Logs page mark requests with it.</summary>
+    [JsonIgnore] public string State => IsPending ? "pending" : Failed ? "error" : "ok";
+
+    /// <summary>The path without the REST prefix and query: "issue/ABC-1/worklog".</summary>
+    [JsonIgnore]
+    public string ShortPath
+    {
+        get
+        {
+            var path = Path.Split('?')[0];
+            foreach (var prefix in new[] { "/rest/api/3/", "/rest/api/2/" })
+                if (path.Contains(prefix)) return path[(path.IndexOf(prefix) + prefix.Length)..];
+            return path;
+        }
+    }
+
+    /// <summary>
+    /// How the request ended, in a few words: "200 · 1.2 s", "Waiting for Jira…". <paramref name="duration"/> is
+    /// <see cref="DurationMs"/> as the UI writes it, so the rule stays here and the formatting in the UI.
+    /// </summary>
+    public string Outcome(string duration) => this switch
+    {
+        { IsPending: true } => "Waiting for Jira…",
+        { Status: { } status, Error: null } => $"{status} · {duration}",
+        { Status: { } status } => $"{status} {Error} · {duration}",
+        _ => $"{Error} · {duration}",
+    };
 }
 
 /// <summary>The Logs page's filters: only failed requests, and text to find in a request.</summary>

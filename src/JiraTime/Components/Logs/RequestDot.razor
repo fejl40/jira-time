@@ -1,0 +1,28 @@
+@* Where a Jira request is at: a spinner while Jira hasn't answered, then a green or red dot. Inside the Logs
+   page's status badge the spinner takes the badge's colour and the answer is the status code instead of a dot. *@
+
+@if (Entry.IsPending)
+{
+    if (InBadge)
+    {
+        <span class="inline-block size-2.5 animate-spin rounded-full border-2 border-current border-t-transparent align-middle" aria-label="Waiting for Jira"></span>
+    }
+    else
+    {
+        <span class="block size-3 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600 dark:border-slate-600 dark:border-t-blue-400"></span>
+    }
+}
+else if (InBadge)
+{
+    @(Entry.Status?.ToString() ?? "Failed")
+}
+else
+{
+    <span class="block size-3 rounded-full @(Entry.Failed ? "bg-red-500" : "bg-emerald-500")"></span>
+}
+
+@code {
+    [Parameter, EditorRequired] public JiraLogEntry Entry { get; set; } = default!;
+    /// <summary>True inside a status badge: the spinner takes the badge's colour, and the answer shows as its status code.</summary>
+    [Parameter] public bool InBadge { get; set; }
+}
