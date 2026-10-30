@@ -22,26 +22,41 @@ public sealed class JiraRequestRecorder(JiraRequestLog log, JiraRequestFeed feed
     public JiraCall Start(JiraConnection c, HttpRequestMessage request, string? body)
     {
         var (requestBody, truncated) = Cap(body);
+        var action = JiraAction.Current;
         var entry = new JiraLogEntry
         {
             Id = Guid.NewGuid().ToString("N")[..16],
             Time = clock.GetLocalNow(),
-            Owner = c.Owner ?? "",
+            Owner = c.Owner ?? action?.Owner ?? "",
+            Action = action?.Name ?? JiraLogEntry.Background,
+            ActionId = action?.Id,
             Method = request.Method.Method,
             Url = request.RequestUri?.ToString() ?? "",
             RequestHeaders = Headers(request.Headers, request.Content?.Headers),
             RequestBody = requestBody,
             RequestBodyTruncated = truncated,
         };
-        var call = new JiraCall(this, entry, clock.GetTimestamp());
+        var call = new JiraCall(this, entry, action, clock.GetTimestamp());
         if (entry.Owner != "") feed.Publish(entry.Owner, new JiraRequestEvent(JiraRequestStage.Started, entry));
         return call;
     }
 
-    internal async Task FinishAsync(JiraLogEntry entry)
+    /// <summary>
+    /// Logs the finished request. One made while signing in, before anyone knew whose token it was, waits
+    /// for its action to learn the owner, and goes to the signed-out folder when it never does.
+    /// </summary>
+    internal async Task FinishAsync(JiraLogEntry entry, JiraAction? action)
     {
-        if (entry.Owner != "") feed.Publish(entry.Owner, new JiraRequestEvent(JiraRequestStage.Finished, entry));
-        await WriteAsync(entry.Owner == "" ? entry with { Owner = JiraRequestLog.SignedOut } : entry);
+        if (entry.Owner == "" && action?.Owner is { } owner) entry = entry with { Owner = owner };
+        if (entry.Owner != "")
+        {
+            feed.Publish(entry.Owner, new JiraRequestEvent(JiraRequestStage.Finished, entry));
+            await WriteAsync(entry);
+        }
+        else if (action is not null)
+            action.WhenOwnerKnown(known => _ = WriteAsync(entry with { Owner = known ?? JiraRequestLog.SignedOut }));
+        else
+            await WriteAsync(entry with { Owner = JiraRequestLog.SignedOut });
     }
 
     private async Task WriteAsync(JiraLogEntry entry)
@@ -75,12 +90,13 @@ public sealed class JiraRequestRecorder(JiraRequestLog log, JiraRequestFeed feed
 public sealed class JiraCall
 {
     private readonly JiraRequestRecorder _recorder;
+    private readonly JiraAction? _action;
     private readonly long _started;
     private JiraLogEntry _entry;
     private bool _finished;
 
-    internal JiraCall(JiraRequestRecorder recorder, JiraLogEntry entry, long started) =>
-        (_recorder, _entry, _started) = (recorder, entry, started);
+    internal JiraCall(JiraRequestRecorder recorder, JiraLogEntry entry, JiraAction? action, long started) =>
+        (_recorder, _entry, _action, _started) = (recorder, entry, action, started);
 
     /// <summary>Reads and records Jira's answer. The content stays buffered, so it can be read again.</summary>
     public async Task ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
@@ -117,6 +133,6 @@ public sealed class JiraCall
         if (_finished) return;
         _finished = true;
         _entry = _entry with { Error = error, DurationMs = (long)_recorder.Elapsed(_started).TotalMilliseconds };
-        await _recorder.FinishAsync(_entry);
+        await _recorder.FinishAsync(_entry, _action);
     }
 }

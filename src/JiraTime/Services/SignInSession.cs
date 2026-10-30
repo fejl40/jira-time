@@ -48,6 +48,7 @@ public sealed class SignInSession(ProtectedLocalStorage storage, JiraIdentity id
     public async Task<string?> RestoreAsync()
     {
         if (await StoredConnectionAsync() is not { } connection) return null;
+        using var action = JiraAction.Start("Sign in");
         var result = await identity.SignInAsync(connection);
         if (result.Rejected)
         {
@@ -61,6 +62,7 @@ public sealed class SignInSession(ProtectedLocalStorage storage, JiraIdentity id
     /// <returns>Why it failed, or null when signed in.</returns>
     public async Task<string?> ConnectAsync(JiraConnection connection)
     {
+        using var action = JiraAction.Start("Connect to Jira");
         var result = await identity.SignInAsync(connection, allowOffline: false);
         if (!result.SignedIn) return result.Error;
         await storage.SetAsync(Purpose, StorageKey, connection);

@@ -62,7 +62,6 @@ else
     /// <summary>News about the selected day, such as days Save all couldn't save.</summary>
     private string? _notice;
     private DayPanel? _panel;
-
     /// <summary>
     /// What goes around the period: why Jira couldn't be read (the period then shows only work waiting for
     /// Jira and can't be edited), the previous period's state, and what the issue picker offers.
@@ -156,6 +155,7 @@ else
     private async Task SaveAllAsync()
     {
         if (User.Connection is not { } c || !_waits.CanStart) return;
+        using var action = JiraAction.Start("Save all");
         _notice = null;
         _saveMotion.Start();
         WorklogSync.SaveAllResult? result = null;
@@ -177,6 +177,7 @@ else
     private async Task SyncPeriodAsync()
     {
         if (User.Connection is not { } c || !_waits.CanStart) return;
+        using var action = JiraAction.Start("Sync now");
         await _waits.RunAsync(JiraWait.Sync, async () =>
         {
             await Sync.SyncRangeAsync(c, Sheet.Period.Start, Sheet.Period.End);

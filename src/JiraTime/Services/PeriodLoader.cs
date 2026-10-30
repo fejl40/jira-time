@@ -1,3 +1,4 @@
+using System.Globalization;
 using JiraTime.Domain;
 
 namespace JiraTime.Services;
@@ -28,6 +29,7 @@ public class PeriodLoader(TimeLog log, WorkCalendarService calendar, JiraIssueLo
     public async Task<PeriodExtras> LoadAsync(PeriodSheet sheet, IssueStatuses statuses)
     {
         var p = sheet.Period;
+        using var action = JiraAction.Start($"Open period {p.Start.ToString("d MMM", CultureInfo.InvariantCulture)}–{p.End.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}");
         // One read covers the period, the days before it to copy from, and the period before it.
         var copyFrom = p.Start.AddDays(-DayFiller.LookBackDays);
         var time = await log.GetRangeAsync(new[] { copyFrom, p.Previous.Start }.Min(), p.End);

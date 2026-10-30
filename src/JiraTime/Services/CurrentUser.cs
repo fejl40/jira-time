@@ -36,6 +36,7 @@ public sealed class CurrentUser
     internal void Set(UserKey key, JiraProfile profile, JiraConnection connection, bool offline)
     {
         (Key, Profile, Connection, VerifiedOffline) = (key, profile, connection with { Owner = key.Id }, offline);
+        JiraAction.Current?.Claim(key.Id); // requests made while signing in are this user's
         Changed?.Invoke();
     }
 

@@ -110,7 +110,11 @@
     /// <summary>Issues on the day's rows, each once, for their recent comments.</summary>
     private IEnumerable<string> RowIssues => Rows.Select(r => r.Entry.IssueKey).Where(k => k != "").Distinct();
 
-    private Task<IReadOnlyList<JiraIssue>> Search(string query, CancellationToken ct) => Jira.SearchIssuesAsync(Connection, query, ct);
+    private async Task<IReadOnlyList<JiraIssue>> Search(string query, CancellationToken ct)
+    {
+        using var action = JiraAction.Start($"Search issues “{query}”");
+        return await Jira.SearchIssuesAsync(Connection, query, ct);
+    }
 
     private TimeSpan Total => Work.Total(Saved);
 
@@ -135,7 +139,9 @@
     {
         _picked = row.Entry.Id;
         await Changed();
-        if (issue.Key != "") await OnIssuePicked.InvokeAsync(issue.Key);
+        if (issue.Key == "") return;
+        using var action = JiraAction.Start($"Pick issue {issue.Key}");
+        await OnIssuePicked.InvokeAsync(issue.Key);
     }
 
     /// <summary>Adds an empty row, optionally on an issue. Returns it so the caller can focus it.</summary>
@@ -184,6 +190,7 @@
     /// <summary>Sends the day to Jira and, once saved, lets the page read the period again.</summary>
     private async Task SaveToJiraAsync()
     {
+        using var action = JiraAction.Start($"Save day {Format.ShortDay(Date)}");
         var result = await Sync.SaveDayAsync(Connection, Date, Work.RowsToSave(Saved), Saved);
         _errors = result.Errors.ToDictionary();
         if (result.ChangedInJira) await OnChangedInJira.InvokeAsync();

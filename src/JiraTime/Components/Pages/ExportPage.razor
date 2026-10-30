@@ -160,6 +160,7 @@
         _error = null;
         _copied = false;
         var month = _month;
+        using var action = JiraAction.Start(refresh ? $"Try again: export {Title}" : $"Open export {Title}");
         var loaded = await Loader.LoadAsync(month, refresh);
         if (month != _month) return; // another month was asked for meanwhile; its load shows it
         (_rows, _values, _noEpic, _notInJira, _error) = (loaded.Rows, loaded.Values, loaded.NoEpic, loaded.NotInJira, loaded.JiraError);

@@ -87,7 +87,7 @@ Services/JiraIssueLookup.cs        sprint and period issues and issue statuses, 
 Services/EpicExportStore.cs        Fase, Forordning and Hovedleverance per epic for the export
 Services/MonthExportLoader.cs      loads a month for the export: time, epics, values per epic
 Services/ExpiringCache.cs          small cache whose values expire
-Services/JiraLog/                  the Jira request log: recorder (called by JiraHttp), JSONL files, live feed per user
+Services/JiraLog/                  the Jira request log: user action (JiraAction), recorder (called by JiraHttp), JSONL files, live feed per user
 Components/Layout/MainLayout.razor header + redirect to setup when not signed in
 Components/Pages/Setup/            Connect
 Components/Pages/Timesheet.razor   shows a period: wires PeriodLoader, WorklogSync and the parts below

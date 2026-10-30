@@ -73,6 +73,7 @@
         var onlySuggested = Sheet.HasOnlySuggestions(day);
         var partial = off.Hours is not null;
         if (partial && onlySuggested) Sheet.Finish(day);
+        using var action = JiraAction.Start($"Time off {Format.ShortDay(day)}");
         await Calendar.MarkDayOffAsync(day, off.Reason, off.Hours);
         await OnReload.InvokeAsync();
         if (!partial) Sheet.TakeOff(day);
@@ -83,6 +84,7 @@
     private async Task UnmarkDayOffAsync()
     {
         var day = Day;
+        using var action = JiraAction.Start($"Remove time off {Format.ShortDay(day)}");
         await Calendar.UnmarkDayOffAsync(day);
         await OnReload.InvokeAsync();
         Sheet.UndoTakeOff(day);
