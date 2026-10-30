@@ -46,6 +46,25 @@ public class ShownPeriodTests : IDisposable
     }
 
     [Fact]
+    public async Task The_notice_stays_when_save_all_opens_the_day_to_fix_and_goes_when_the_user_moves_on()
+    {
+        var shown = NewShownPeriod();
+        await shown.ShowAsync(Link(Thursday));
+        Add(shown.Sheet!, Monday, "ABC-1", "lots");
+
+        var toFix = await shown.SaveDaysAsync(() => Task.CompletedTask);
+        await shown.ShowAsync(Link(toFix!.Value)); // the page selects the day through the URL
+
+        Assert.Equal(Monday, shown.Day);
+        Assert.StartsWith("1 day not saved", shown.Notice);
+
+        await shown.ShowAsync(Link(Tuesday));
+        Assert.Null(shown.Notice);
+        await shown.ShowAsync(Link(Monday));
+        Assert.Null(shown.Notice);
+    }
+
+    [Fact]
     public async Task When_every_day_is_saved_nothing_is_selected_and_the_notice_is_gone()
     {
         var shown = NewShownPeriod();

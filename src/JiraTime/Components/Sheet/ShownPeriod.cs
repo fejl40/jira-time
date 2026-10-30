@@ -31,6 +31,9 @@ public sealed class ShownPeriod(
     /// <summary>News about the selected day, such as days Save all couldn't save.</summary>
     public string? Notice { get; set; }
 
+    /// <summary>The day Save all sends the user to; its <see cref="Notice"/> stays when that day opens.</summary>
+    private DateOnly? _noticeDay;
+
     /// <summary>The last save, for its animation.</summary>
     public SaveMotion SaveMotion { get; } = new();
 
@@ -62,14 +65,16 @@ public sealed class ShownPeriod(
         var sheet = new PeriodSheet(link.Period, () => Today);
         if (await Waits.OpenAsync(link.Period, () => loader.LoadAsync(sheet, statuses)) is not { } loaded) return;
         Slide = Sheet is null ? 0 : link.Period.Start.CompareTo(Sheet.Period.Start);
-        (Sheet, Extras, Day, Notice) = (sheet, loaded, day, null);
+        (Sheet, Extras, Day, Notice, _noticeDay) = (sheet, loaded, day, null, null);
         sheet.Suggest(day);
     }
 
     private void ShowDay(DateOnly day)
     {
         if (day == Day) return;
-        (Day, Notice) = (day, null);
+        Day = day;
+        if (day != _noticeDay) Notice = null;
+        _noticeDay = null;
         Shown.Suggest(day);
     }
 
@@ -89,7 +94,7 @@ public sealed class ShownPeriod(
     public void DiscardAll()
     {
         Shown.DiscardAll();
-        Notice = null;
+        (Notice, _noticeDay) = (null, null);
     }
 
     /// <summary>
@@ -140,7 +145,7 @@ public sealed class ShownPeriod(
         });
         SaveMotion.Finish();
         if (result!.FirstToFix is not { } toFix) return null;
-        Notice = result.Notice;
+        (Notice, _noticeDay) = (result.Notice, toFix);
         return toFix;
     }
 
