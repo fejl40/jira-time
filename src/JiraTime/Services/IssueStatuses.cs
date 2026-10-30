@@ -26,7 +26,7 @@ public sealed class IssueStatuses(JiraIssueLookup issues, JiraClient jira, Curre
         if (unknown.Count == 0) return;
         try
         {
-            Add((await issues.GetStatusesAsync(signedIn.Connection, unknown)).Values);
+            Add((await issues.GetStatusesAsync(signedIn.Connection, signedIn.Profile, unknown)).Values);
         }
         catch (JiraException)
         {

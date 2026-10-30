@@ -90,7 +90,7 @@ Services/MonthExportLoader.cs      loads a month for the export: time, epics, va
 Services/ExpiringCache.cs          small cache whose values expire; expired values are dropped as new ones are stored
 Services/SignIn/                   SignInSession (restores, connects and signs out a tab; the encrypted connection in browser localStorage), JiraIdentity (signs a tab in as the user Jira says the token belongs to), CurrentUser (the verified user of this tab and its Jira connection, CurrentUser.Jira), LegacyDataMigration (data saved by older versions: owners, entries Jira has, entries with start and end times; their backups)
 Services/Worklogs/                 TimeLog (Jira worklogs plus the retry queue, cached briefly), RetryQueue (changes Jira couldn't take yet), WorklogSync (saves the Save all plans, sends the retry queue), WorklogWriter (writes or deletes one worklog, queues what fails), RecentWorklogIssues (issues just saved on, read directly while Jira's search catches up)
-Services/Jira/                     JiraHttp (the one typed HttpClient for Jira), JiraResilience (429 retries, pause, queue), JiraSearch (pages, batches of keys, POST), JiraClient (issues: myself, picker, searches, epics), JiraWorklogClient (reads and writes worklogs), JiraIssueLookup (sprint and period issues and statuses, cached briefly), JiraWorklogJson and JiraIssueJson (Jira's JSON mapped to the app's worklogs, issues, profile and epics), JQL quoting, comment format, raw JSON shapes
+Services/Jira/                     JiraHttp (the one typed HttpClient for Jira), JiraResilience (429 retries, pause, queue), JiraSearch (pages, batches of keys, POST), JiraClient (issues: myself, picker, searches, epics), JiraWorklogClient (reads and writes worklogs), JiraIssueLookup (sprint and period issues, statuses and epics, cached briefly per user), JiraWorklogJson and JiraIssueJson (Jira's JSON mapped to the app's worklogs, issues, profile and epics), JQL quoting, comment format, raw JSON shapes
 Services/JiraLog/                  the Jira request log: user action (JiraAction), JiraRecordingHandler (records each attempt for JiraHttp) and the recorder, JSONL files, live feed per user, MyJiraLog (the signed-in user's log)
 Components/Layout/MainLayout.razor header + redirect to setup when not signed in
 Components/Pages/Connect.razor     connecting to Jira (route /setup/connect)
@@ -205,7 +205,9 @@ The issue picker lists the issues assigned to you in an open sprint (not Done, w
 then issues you logged on in the last 60 days (from your Jira worklogs). Typing filters both by key or summary and, from two characters, adds
 Jira search results; arrow keys, Enter and Escape work. The comment field suggests the latest
 comments you used on the row's issue in those worklogs. Tasks and stories both count. On Jira without sprints it
-falls back to all open issues assigned to you. The list is cached for five minutes.
+falls back to all open issues assigned to you. The list is cached for five minutes. Every issue cache (sprint and period lists,
+statuses, epics, the Epic Link field) is kept per user (host and Jira user id), so one user never gets what Jira told
+another.
 
 Under **Earlier this period** it also lists issues that were assigned to you and To Do or In Progress
 at some point during the open period, even if they are Done now, so you can log time retroactively.

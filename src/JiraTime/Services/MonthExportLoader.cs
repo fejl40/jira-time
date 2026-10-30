@@ -40,7 +40,7 @@ public class MonthExportLoader(TimeLog log, JiraIssueLookup issues, EpicExportSt
         IReadOnlyDictionary<string, string?> epics;
         try
         {
-            epics = await issues.GetEpicsAsync(signedIn.Connection, entries.Select(e => e.IssueKey));
+            epics = await issues.GetEpicsAsync(signedIn.Connection, signedIn.Profile, entries.Select(e => e.IssueKey));
         }
         catch (JiraException ex)
         {

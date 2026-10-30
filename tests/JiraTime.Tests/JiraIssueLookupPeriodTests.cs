@@ -63,7 +63,7 @@ public class JiraIssueLookupPeriodTests : IDisposable
     [Fact]
     public async Task Statuses_are_looked_up_by_key_in_one_query()
     {
-        var statuses = await _h.Issues.GetStatusesAsync(Server, ["ABC-4", "abc-1", "ABC-4"]);
+        var statuses = await _h.Issues.GetStatusesAsync(Server, TestUsers.CarlsProfile, ["ABC-4", "abc-1", "ABC-4"]);
 
         var jql = FakeJira.Jql(Assert.Single(_h.Jira.Requests));
         Assert.StartsWith("key in (", jql);
@@ -75,23 +75,39 @@ public class JiraIssueLookupPeriodTests : IDisposable
     [Fact]
     public async Task Statuses_are_cached_including_unknown_keys()
     {
-        await _h.Issues.GetStatusesAsync(Server, ["ABC-4", "NOPE-1"]);
+        await _h.Issues.GetStatusesAsync(Server, TestUsers.CarlsProfile, ["ABC-4", "NOPE-1"]);
         _h.Jira.Requests.Clear();
 
-        var again = await _h.Issues.GetStatusesAsync(Server, ["ABC-4", "NOPE-1"]);
+        var again = await _h.Issues.GetStatusesAsync(Server, TestUsers.CarlsProfile, ["ABC-4", "NOPE-1"]);
 
         Assert.Empty(_h.Jira.Requests);
         Assert.Single(again);
 
         _h.Clock.Advance(JiraIssueLookup.CacheFor);
-        await _h.Issues.GetStatusesAsync(Server, ["ABC-4"]);
+        await _h.Issues.GetStatusesAsync(Server, TestUsers.CarlsProfile, ["ABC-4"]);
         Assert.Single(_h.Jira.Requests);
+    }
+
+    [Fact]
+    public async Task Two_users_on_the_same_Jira_each_get_the_status_Jira_gives_them()
+    {
+        var annasProfile = new JiraProfile("JIRAUSER2", "anna", "Anna", null);
+        var carls = await _h.Issues.GetStatusesAsync(Server, TestUsers.CarlsProfile, ["ABC-1"]);
+        _h.Jira.AddIssue("ABC-1", "Login page", status: "Done", category: "done");
+
+        var annas = await _h.Issues.GetStatusesAsync(Server, annasProfile, ["ABC-1"]);
+        var carlsAgain = await _h.Issues.GetStatusesAsync(Server, TestUsers.CarlsProfile, ["ABC-1"]);
+
+        Assert.Equal("In Progress", carls["ABC-1"].Status);
+        Assert.Equal("Done", annas["ABC-1"].Status); // asked Jira, not Carl's cached answer
+        Assert.Equal("In Progress", carlsAgain["ABC-1"].Status); // Carl's own cache still answers him
+        Assert.Equal(2, _h.Jira.Requests.Count);
     }
 
     [Fact]
     public async Task One_unknown_key_does_not_hide_the_others()
     {
-        var statuses = await _h.Issues.GetStatusesAsync(Server, ["ABC-4", "NOPE-1"]);
+        var statuses = await _h.Issues.GetStatusesAsync(Server, TestUsers.CarlsProfile, ["ABC-4", "NOPE-1"]);
 
         Assert.Equal(["ABC-4"], statuses.Keys);
     }
