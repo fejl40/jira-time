@@ -25,13 +25,16 @@ public record JiraConnection(string BaseUrl, JiraAuthType AuthType, string Token
     [JsonIgnore]
     public string? Owner { get; init; }
 
-    /// <summary>The Jira URL as typed, trimmed, without a trailing slash and with https:// when no scheme is given; null when it isn't a URL.</summary>
+    /// <summary>
+    /// The Jira URL as typed, trimmed, without a trailing slash and with https:// when no scheme is given; null when
+    /// it isn't an http or https URL with a host (such as https:// alone).
+    /// </summary>
     public static string? NormalizeUrl(string typed)
     {
-        var url = typed.Trim().TrimEnd('/');
-        if (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            url = "https://" + url;
-        return Uri.TryCreate(url, UriKind.Absolute, out _) ? url : null;
+        var url = typed.Trim();
+        if (!url.Contains("://", StringComparison.Ordinal)) url = "https://" + url;
+        url = url.TrimEnd('/');
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri) && uri.Scheme is "http" or "https" && uri.Host != "" ? url : null;
     }
 }
 

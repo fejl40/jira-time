@@ -2,6 +2,7 @@ using JiraTime.Domain;
 
 namespace JiraTime.Tests;
 
+/// <summary>The Jira URL as typed on Connect.</summary>
 public class JiraConnectionTests
 {
     [Theory]
@@ -16,6 +17,12 @@ public class JiraConnectionTests
     [Theory]
     [InlineData("not a url")]
     [InlineData("jira.example.com:port")]
+    [InlineData("https://")]
+    [InlineData("http://")]
+    [InlineData("https:///")]
+    [InlineData("  https://  ")]
+    [InlineData("ftp://jira.example.com")]
+    [InlineData("")]
     public void Text_that_is_not_a_url_is_rejected(string typed) =>
         Assert.Null(JiraConnection.NormalizeUrl(typed));
 }
