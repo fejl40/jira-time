@@ -156,8 +156,7 @@ else
     {
         if (User.Connection is not { } c || !_waits.CanStart) return;
         using var action = JiraAction.Start("Save all");
-        _notice = null;
-        _saveMotion.Start();
+        _notice = null; _saveMotion.Start();
         WorklogSync.SaveAllResult? result = null;
         await _waits.RunAsync(JiraWait.SaveAll, async () =>
         {
