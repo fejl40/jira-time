@@ -33,6 +33,7 @@ builder.Services.AddScoped<WorklogSync>();
 builder.Services.AddScoped<TimeLog>();
 builder.Services.AddScoped<PeriodLoader>();
 builder.Services.AddTransient<IssueStatuses>();
+builder.Services.AddTransient<JiraTime.Components.ShownPeriod>(); // one per timesheet page
 builder.Services.AddSingleton<RecentWorklogIssues>();
 builder.Services.AddScoped<WorkCalendarService>();
 builder.Services.AddScoped<EpicExportStore>();

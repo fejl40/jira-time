@@ -1,7 +1,6 @@
 @* The selected day: its header with time off, news about it, the rows to edit and the keyboard hint.
    Jira not readable means hours are unknown, so the day can't be edited then. *@
 @inject CurrentUser User
-@inject WorkCalendarService Calendar
 
 <section class="card p-6">
     @{ var day = Sheet.Day(Day); }
@@ -16,7 +15,7 @@
     {
         <div class="mt-4">
             <DayEditor @ref="_editor" Day="day" Choices="Choices" Comments="Extras.Comments"
-                       OnIssuePicked="key => Statuses.LookUpAsync([key])" Connection="connection" Waits="Waits"
+                       OnIssuePicked="key => Shown.Statuses.LookUpAsync([key])" Connection="connection" Waits="Waits"
                        OnChanged="OnChanged" OnDiscard="DiscardAsync" />
         </div>
         <p class="hint mt-4 hidden sm:block" data-shortcuts>
@@ -27,24 +26,23 @@
 </section>
 
 @code {
-    [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
+    /// <summary>The period shown: its sheet, notice, extras and running Jira requests.</summary>
+    [Parameter, EditorRequired] public ShownPeriod Shown { get; set; } = default!;
     [Parameter, EditorRequired] public DateOnly Day { get; set; }
-    /// <summary>News about the day, such as days Save all couldn't save.</summary>
-    [Parameter] public string? Notice { get; set; }
-    /// <summary>What the issue picker offers besides the sprint.</summary>
-    [Parameter, EditorRequired] public PeriodExtras Extras { get; set; } = default!;
-    /// <summary>The page's issue statuses; rows on Done issues get a note.</summary>
-    [Parameter, EditorRequired] public IssueStatuses Statuses { get; set; } = default!;
-    /// <summary>Requests to Jira that are running; the day's rows are pending meanwhile.</summary>
-    [Parameter, EditorRequired] public JiraWaits Waits { get; set; } = default!;
     /// <summary>Raised after the day's unsaved changes changed, so the page shows them.</summary>
     [Parameter] public EventCallback OnChanged { get; set; }
-    /// <summary>Raised when the period has to be read again (time off changed).</summary>
-    [Parameter] public EventCallback OnReload { get; set; }
 
     private DayEditor? _editor;
 
-    private IssueChoices Choices => new() { Sprint = Sheet.Sprint, Earlier = Extras.Earlier, Recent = Extras.Recent, Statuses = Statuses.Known };
+    private PeriodSheet Sheet => Shown.Sheet!;
+    /// <summary>News about the day, such as days Save all couldn't save.</summary>
+    private string? Notice => Shown.Notice;
+    /// <summary>What the issue picker offers besides the sprint.</summary>
+    private PeriodExtras Extras => Shown.Extras;
+    /// <summary>Requests to Jira that are running; the day's rows are pending meanwhile.</summary>
+    private JiraWaits Waits => Shown.Waits;
+
+    private IssueChoices Choices => new() { Sprint = Sheet.Sprint, Earlier = Extras.Earlier, Recent = Extras.Recent, Statuses = Shown.Statuses.Known };
 
     /// <summary>Adds an empty row, for the N shortcut; null when the day can't be edited.</summary>
     public async Task<TimeEntry?> AddRowAsync() => _editor is null ? null : await _editor.AddRowAsync();
@@ -55,28 +53,15 @@
         return OnChanged.InvokeAsync();
     }
 
-    /// <summary>Marks the day, or part of it, off; PeriodSheet decides what happens to the day's work.</summary>
     private async Task MarkDayOffAsync(TimeOffModal.TimeOff off)
     {
-        var day = Day;
-        using var action = JiraAction.Start($"Time off {Format.ShortDay(day)}");
-        await Sheet.MarkDayOffAsync(day, wholeDay: off.Hours is null, async () =>
-        {
-            await Calendar.MarkDayOffAsync(day, off.Reason, off.Hours);
-            await OnReload.InvokeAsync();
-        });
+        await Shown.MarkDayOffAsync(Day, off);
         await OnChanged.InvokeAsync();
     }
 
     private async Task UnmarkDayOffAsync()
     {
-        var day = Day;
-        using var action = JiraAction.Start($"Remove time off {Format.ShortDay(day)}");
-        await Sheet.UnmarkDayOffAsync(day, async () =>
-        {
-            await Calendar.UnmarkDayOffAsync(day);
-            await OnReload.InvokeAsync();
-        });
+        await Shown.UnmarkDayOffAsync(Day);
         await OnChanged.InvokeAsync();
     }
 }
