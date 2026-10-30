@@ -70,4 +70,53 @@ public class PeriodLoaderTests : IDisposable
 
         Assert.True(statuses.Known["abc-1"].IsDone);
     }
+
+    private int WorklogSearches => _h.Jira.Requests.Count(r => FakeJira.Jql(r).Contains("worklogAuthor"));
+    private int WorklogReads => _h.Jira.Requests.Count(r => r.Path.Contains("/worklog"));
+
+    [Fact]
+    public async Task A_period_with_several_issues_reads_its_worklogs_with_one_search()
+    {
+        foreach (var key in new[] { "ABC-1", "ABC-2", "ABC-3", "ABC-4", "ABC-5" })
+        {
+            _h.Jira.AddWorklog(key, "2026-10-26T09:00:00.000+0100", 3600);
+            _h.Jira.AddWorklog(key, "2026-09-10T09:00:00.000+0200", 1800, "Weeks ago"); // recent work, before the period
+        }
+        var (loader, statuses) = _h.PeriodLoading();
+
+        var extras = await loader.LoadAsync(Sheet(), statuses);
+
+        Assert.Equal(1, WorklogSearches);
+        Assert.Equal(0, WorklogReads);
+        Assert.Equal(4, _h.Jira.Requests.Count); // worklogs, sprint issues, period issues, statuses
+        Assert.Equal(5, extras.Recent.Count);
+        Assert.Equal(["Weeks ago"], extras.Comments["ABC-3"]);
+    }
+
+    [Fact]
+    public async Task An_issue_with_more_worklogs_than_the_search_sends_is_read_in_full()
+    {
+        _h.Jira.EmbeddedWorklogLimit = 3;
+        for (var day = 19; day <= 23; day++)
+            _h.Jira.AddWorklog("ABC-1", $"2026-10-{day}T09:00:00.000+0200", 3600);
+        _h.Jira.AddWorklog("ABC-2", "2026-10-26T09:00:00.000+0100", 3600);
+        var sheet = Sheet();
+        var (loader, statuses) = _h.PeriodLoading();
+
+        await loader.LoadAsync(sheet, statuses);
+
+        Assert.Single(_h.Jira.Requests, r => r.Path.Contains("/issue/ABC-1/worklog"));
+        Assert.Equal(1, WorklogReads);
+        Assert.Equal(6, sheet.Entries.Count);
+    }
+
+    [Fact]
+    public async Task An_old_period_and_the_recent_days_are_read_apart()
+    {
+        var (loader, statuses) = _h.PeriodLoading();
+
+        await loader.LoadAsync(Sheet(new DateOnly(2026, 3, 10)), statuses);
+
+        Assert.Equal(2, WorklogSearches);
+    }
 }

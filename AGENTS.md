@@ -166,6 +166,9 @@ in `data/documents/backups/` first, and nothing is deleted.
 
 The timesheet shows your Jira worklogs, however they were logged: here, in Jira or in WorklogPRO.
 They are read when a period opens, reused for a minute, and read again with **Sync now** or after a save.
+One search reads them (`fields=summary,worklog`), and Jira sends each issue's first worklogs (20 on most Jiras) with
+it; only an issue with more is read on its own. For a period near today that one search covers the period, the days
+to copy from, the period before and the last 60 days for recent picks; an old period and the recent days are read apart.
 Jira's search can take a while to find a new worklog, so for 15 minutes after a save the issues you
 saved on are read directly.
 

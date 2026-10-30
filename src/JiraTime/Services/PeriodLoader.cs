@@ -30,22 +30,36 @@ public class PeriodLoader(TimeLog log, WorkCalendarService calendar, JiraIssueLo
     {
         var p = sheet.Period;
         using var action = JiraAction.Start($"Open period {p.Start.ToString("d MMM", CultureInfo.InvariantCulture)}–{p.End.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}");
-        // One read covers the period, the days before it to copy from, and the period before it.
         var copyFrom = p.Start.AddDays(-DayFiller.LookBackDays);
-        var time = await log.GetRangeAsync(new[] { copyFrom, p.Previous.Start }.Min(), p.End);
+        var (time, recent) = await ReadTimeAsync(p, copyFrom, sheet.Today);
         sheet.Load(
             time.Between(p.Start, p.End),
             time.Between(copyFrom, p.Start.AddDays(-1)),
             await calendar.GetDaysAsync(p.Start, p.End),
             time.IsComplete);
 
-        var recent = await log.GetRecentAsync();
         sheet.Sprint = await OrEmptyAsync((c, profile) => issues.GetSprintAsync(c, profile));
         var earlier = await OrEmptyAsync((c, profile) => issues.GetPeriodAsync(c, profile, p));
         statuses.Add(sheet.Sprint.Concat(earlier));
         await statuses.LookUpAsync(sheet.Entries.Select(e => e.IssueKey));
 
         return new PeriodExtras(time.JiraError, await PreviousAsync(sheet, time), RecentWork.Issues(recent), RecentWork.Comments(recent), earlier);
+    }
+
+    /// <summary>
+    /// Logged time of the period, the days before it to copy from and the period before it, and the recent work
+    /// for the pickers. One read covers them all when they are close (a period near today); an old period is
+    /// read on its own, so the read doesn't stretch over every day since.
+    /// </summary>
+    private async Task<(LoggedTime Time, IReadOnlyList<TimeEntry> Recent)> ReadTimeAsync(Period p, DateOnly copyFrom, DateOnly today)
+    {
+        var from = copyFrom < p.Previous.Start ? copyFrom : p.Previous.Start;
+        var recentFrom = today.AddDays(-RecentWork.Days);
+        if (recentFrom > p.End.AddDays(1) || today < from.AddDays(-1))
+            return (await log.GetRangeAsync(from, p.End), await log.GetRecentAsync());
+
+        var time = await log.GetRangeAsync(from < recentFrom ? from : recentFrom, p.End > today ? p.End : today);
+        return (time, time.Between(recentFrom, today));
     }
 
     /// <summary>The period before the current one, when it has missing hours or work not in Jira.</summary>

@@ -19,18 +19,24 @@ public class JiraWorklogClient(JiraHttp jira)
         IReadOnlyCollection<JiraIssue>? alsoRead = null, CancellationToken ct = default)
     {
         var jql = $"worklogAuthor = {Jql.User(profile)} AND worklogDate >= {Jql.Date(from)} AND worklogDate <= {Jql.Date(to)}";
-        var issues = (await SearchAllAsync(c, jql, ct)).Select(i => new JiraIssue(i.Key, i.Fields?.Summary ?? "")).ToList();
-        var found = issues.Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var extra = (alsoRead ?? []).Where(i => found.Add(i.Key)).ToList();
+        // The search sends each issue's first worklogs along; only an issue with more is read on its own.
+        var found = await SearchAllAsync(c, jql, ct);
+        var keys = found.Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var range = new WorklogRange(profile, from, to);
 
         var result = new List<JiraWorklog>();
-        foreach (var issue in issues)
-            result.AddRange(await ReadWorklogsAsync(c, issue, profile, from, to, ct));
-        foreach (var issue in extra)
+        foreach (var hit in found)
+        {
+            var issue = new JiraIssue(hit.Key, hit.Fields?.Summary ?? "");
+            result.AddRange(hit.Fields?.Worklog is { IsComplete: true } embedded
+                ? range.Mine(embedded.Worklogs, issue)
+                : await ReadWorklogsAsync(c, issue, range, ct));
+        }
+        foreach (var issue in (alsoRead ?? []).Where(i => keys.Add(i.Key)))
         {
             try
             {
-                result.AddRange(await ReadWorklogsAsync(c, issue, profile, from, to, ct));
+                result.AddRange(await ReadWorklogsAsync(c, issue, range, ct));
             }
             catch (JiraException ex) when (ex.Status == HttpStatusCode.NotFound)
             {
@@ -40,23 +46,31 @@ public class JiraWorklogClient(JiraHttp jira)
         return result;
     }
 
-    /// <summary>The issue's worklogs by <paramref name="profile"/> on days from <paramref name="from"/> to <paramref name="to"/>.</summary>
-    private async Task<List<JiraWorklog>> ReadWorklogsAsync(JiraConnection c, JiraIssue issue, JiraProfile profile, DateOnly from, DateOnly to, CancellationToken ct)
+    /// <summary>The issue's worklogs by the range's user on its days, read page by page.</summary>
+    private async Task<List<JiraWorklog>> ReadWorklogsAsync(JiraConnection c, JiraIssue issue, WorklogRange range, CancellationToken ct)
     {
         var result = new List<JiraWorklog>();
         for (var startAt = 0; ; )
         {
             var page = await _jira.GetAsync<WorklogPage>(c, $"{WorklogUrl(c, issue.Key)}?startAt={startAt}&maxResults=1000", ct);
-            foreach (var w in page.Worklogs)
-            {
-                if (w.Id is null || !IsAuthor(w.Author, profile) || ToWorklog(w, w.Id, issue) is not { } worklog) continue;
-                if (worklog.Date < from || worklog.Date > to) continue;
-                result.Add(worklog);
-            }
+            result.AddRange(range.Mine(page.Worklogs, issue));
             startAt += page.Worklogs.Count;
             if (page.Worklogs.Count == 0 || startAt >= page.Total) break;
         }
         return result;
+    }
+
+    /// <summary>Whose worklogs are wanted, and on which days.</summary>
+    private sealed record WorklogRange(JiraProfile Profile, DateOnly From, DateOnly To)
+    {
+        public IEnumerable<JiraWorklog> Mine(IEnumerable<RawJiraWorklog> worklogs, JiraIssue issue)
+        {
+            foreach (var w in worklogs)
+            {
+                if (w.Id is null || !IsAuthor(w.Author, Profile) || ToWorklog(w, w.Id, issue) is not { } worklog) continue;
+                if (worklog.Date >= From && worklog.Date <= To) yield return worklog;
+            }
+        }
     }
 
     /// <summary>One worklog, or null when Jira no longer has it.</summary>
@@ -103,7 +117,7 @@ public class JiraWorklogClient(JiraHttp jira)
         return DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
     }
 
-    /// <summary>Every issue matching <paramref name="jql"/>, page by page.</summary>
+    /// <summary>Every issue matching <paramref name="jql"/> with its summary and first worklogs, page by page.</summary>
     private async Task<List<SearchIssue>> SearchAllAsync(JiraConnection c, string jql, CancellationToken ct)
     {
         var all = new List<SearchIssue>();
@@ -114,7 +128,7 @@ public class JiraWorklogClient(JiraHttp jira)
                 ? (token is null ? "" : $"&nextPageToken={Uri.EscapeDataString(token)}")
                 : $"&startAt={all.Count}";
             var result = await _jira.GetAsync<SearchResult>(c,
-                $"{SearchPath(c)}?jql={Uri.EscapeDataString(jql)}&fields=summary&maxResults=100{paging}", ct);
+                $"{SearchPath(c)}?jql={Uri.EscapeDataString(jql)}&fields=summary,worklog&maxResults=100{paging}", ct);
             all.AddRange(result.Issues);
             token = result.NextPageToken;
             var more = c.IsCloud ? token is not null && result.IsLast != true : result.Total is { } total && all.Count < total;

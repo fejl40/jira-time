@@ -14,7 +14,12 @@ internal record SearchResult(List<SearchIssue> Issues, int? Total = null, string
 internal record WorklogPage(List<RawJiraWorklog> Worklogs, int Total);
 internal record RawJiraWorklog(string? Id, string? Started, int TimeSpentSeconds, JsonElement? Comment, RawUser? Author, string? Created = null);
 internal record SearchIssue(string Key, SearchFields? Fields);
-internal record SearchFields(string? Summary, NamedField? IssueType, StatusField? Status);
+internal record SearchFields(string? Summary, NamedField? IssueType, StatusField? Status, EmbeddedWorklogs? Worklog = null);
+/// <summary>The worklogs a search returns with an issue: the first few (20 on most Jiras) of <see cref="Total"/>.</summary>
+internal record EmbeddedWorklogs(List<RawJiraWorklog> Worklogs, int Total)
+{
+    public bool IsComplete => Worklogs.Count >= Total;
+}
 internal record NamedField(string? Name);
 internal record StatusField(string? Name, StatusCategoryField? StatusCategory);
 internal record StatusCategoryField(string? Key);

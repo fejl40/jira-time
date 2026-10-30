@@ -133,7 +133,7 @@ public sealed class FakeJira : HttpMessageHandler
             return Json(HttpStatusCode.OK, get(req.RequestUri));
 
         if (req.Method == HttpMethod.Get && (path.EndsWith("/search") || path.EndsWith("/search/jql")))
-            return Json(HttpStatusCode.OK, Search(Jql(req.RequestUri)));
+            return Json(HttpStatusCode.OK, Search(req.RequestUri));
 
         var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
         // rest/api/{v}/issue/{key}/worklog[/{id}]
@@ -173,17 +173,34 @@ public sealed class FakeJira : HttpMessageHandler
         return Json(HttpStatusCode.NotFound, new { errorMessages = new[] { "No such endpoint" } });
     }
 
-    private JsonObject Search(string jql)
+    /// <summary>How many worklogs a search sends along with each issue when asked for the worklog field.</summary>
+    public int EmbeddedWorklogLimit { get; set; } = 20;
+
+    private JsonObject Search(Uri uri)
     {
+        var jql = Jql(uri);
+        var withWorklogs = (HttpUtility.ParseQueryString(uri.Query)["fields"] ?? "").Contains("worklog");
         var keys = jql.Contains("worklogAuthor")
             ? Worklogs.Where(w => w.Value.Count > 0 && !NotIndexed.Contains(w.Key)).Select(w => w.Key).ToList()
             : Issues.Keys.Where(k => !jql.StartsWith("key in") || jql.Contains($"\"{k}\"", StringComparison.OrdinalIgnoreCase)).ToList();
-        var issues = keys.Select(k => (JsonNode)new JsonObject
+        var issues = keys.Select(k =>
         {
-            ["key"] = k,
-            ["fields"] = Issues.TryGetValue(k, out var fields) ? fields.DeepClone() : new JsonObject { ["summary"] = $"Summary of {k}" },
+            var fields = Issues.TryGetValue(k, out var f) ? f.DeepClone().AsObject() : new JsonObject { ["summary"] = $"Summary of {k}" };
+            if (withWorklogs) fields["worklog"] = EmbeddedWorklogs(k);
+            return (JsonNode)new JsonObject { ["key"] = k, ["fields"] = fields };
         });
         return new JsonObject { ["startAt"] = 0, ["total"] = keys.Count, ["issues"] = new JsonArray(issues.ToArray()) };
+    }
+
+    /// <summary>The first worklogs of the issue, as Jira puts them in a search answer, with how many there are.</summary>
+    private JsonObject EmbeddedWorklogs(string key)
+    {
+        var logs = Worklogs.TryGetValue(key, out var l) ? l : [];
+        var first = logs.Take(EmbeddedWorklogLimit).Select(w => (JsonNode)WithIdAndAuthor(w.Key, w.Value));
+        return new JsonObject
+        {
+            ["startAt"] = 0, ["maxResults"] = EmbeddedWorklogLimit, ["total"] = logs.Count, ["worklogs"] = new JsonArray(first.ToArray()),
+        };
     }
 
     private JsonObject WithIdAndAuthor(string id, JsonNode body)
