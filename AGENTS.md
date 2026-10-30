@@ -11,7 +11,7 @@ truth for logged time (the user's worklogs); days off, work hours and export val
 ## Build and test
 
 ```sh
-dotnet build              # also compiles Tailwind (needs Node.js)
+dotnet build              # compiles Tailwind when Node.js is installed; otherwise uses the committed CSS
 dotnet test
 dotnet run --project src/JiraTime   # http://localhost:5115
 ```
@@ -20,6 +20,8 @@ dotnet run --project src/JiraTime   # http://localhost:5115
 - New features come with tests. Build and tests must pass before every push.
 - Never commit `data/` (encryption keys and time entries).
 - While editing styles, `npm run watch:css` alongside `dotnet watch` gives live CSS rebuilds.
+- `wwwroot/app.css` (compiled Tailwind) is committed so the app builds with only the .NET SDK. After changing
+  styles or Tailwind classes in markup, build with Node.js and commit `wwwroot/app.css` with the change.
 
 ## Task tracking
 

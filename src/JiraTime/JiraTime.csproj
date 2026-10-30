@@ -7,22 +7,28 @@
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
 
-  <!-- Tailwind: Styles/app.css is compiled to wwwroot/app.css on every build.
-       Needs Node.js; `npm install` runs automatically the first time. -->
+  <!-- Tailwind: Styles/app.css is compiled to wwwroot/app.css, which is committed, so a build without
+       Node.js uses the committed file. With Node.js the build compiles it again (`npm install` runs the
+       first time); commit wwwroot/app.css after changing styles. -->
   <ItemGroup>
     <UpToDateCheckInput Include="Styles/**/*.css" />
     <Content Remove="package.json;package-lock.json" />
   </ItemGroup>
 
-  <Target Name="NpmInstall" BeforeTargets="TailwindBuild" Condition="!Exists('node_modules/.bin/tailwindcss')">
-    <Exec Command="npm install" />
+  <Target Name="FindNode" BeforeTargets="NpmInstall;TailwindBuild">
+    <Exec Command="node --version" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" EchoOff="true">
+      <Output TaskParameter="ExitCode" PropertyName="NodeExitCode" />
+    </Exec>
+    <Message Importance="high" Text="Node.js not found: using the committed wwwroot/app.css." Condition="'$(NodeExitCode)' != '0'" />
   </Target>
 
-  <Target Name="TailwindBuild" BeforeTargets="ResolveStaticWebAssetsInputs;Build">
-    <Exec Command="npm run --silent build:css" />
-    <ItemGroup>
-      <Content Include="wwwroot/app.css" Condition="!@(Content-&gt;AnyHaveMetadataValue('Identity','wwwroot/app.css'))" />
-    </ItemGroup>
+  <Target Name="NpmInstall" BeforeTargets="TailwindBuild" DependsOnTargets="FindNode"
+          Condition="!Exists('node_modules/.bin/tailwindcss')">
+    <Exec Command="npm install" Condition="'$(NodeExitCode)' == '0'" />
+  </Target>
+
+  <Target Name="TailwindBuild" BeforeTargets="ResolveStaticWebAssetsInputs;Build" DependsOnTargets="FindNode">
+    <Exec Command="npm run --silent build:css" Condition="'$(NodeExitCode)' == '0'" />
   </Target>
 
 </Project>
