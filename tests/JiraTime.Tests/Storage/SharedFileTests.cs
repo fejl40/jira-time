@@ -48,5 +48,6 @@ public class SharedFileTests : IDisposable
         var missing = Path.Combine(_dir, "missing.json");
 
         await Assert.ThrowsAsync<FileNotFoundException>(() => SharedFile.ReplaceAsync(missing, Path.Combine(_dir, "doc.json")));
+        await Assert.ThrowsAsync<FileNotFoundException>(() => SharedFile.ReadAllTextAsync(missing, default));
     }
 }

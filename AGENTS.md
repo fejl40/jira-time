@@ -83,7 +83,7 @@ Domain/JiraLog/                    one logged Jira request (JiraLogEntry: state,
 Storage/IDocumentStore.cs          the document store interfaces
 Storage/FileDocumentStore.cs       the file store: one JSON file per document
 Storage/FileDocumentCollection.cs  one collection of the file store, cached in memory
-Storage/SharedFile.cs              reads that never block other programs, and replaces and deletes that wait briefly while Windows has the file in use
+Storage/SharedFile.cs              reads that never block other programs; reads, replaces and deletes wait briefly while Windows has the file in use
 Services/AppServices.cs            AddJiraTime: registers the app's services, for Program.cs and the tests
 Services/OwnedCollection.cs        one collection of the signed-in user's documents: the only owner filter
 Services/WorkCalendarService.cs    days and work hours of the signed-in user

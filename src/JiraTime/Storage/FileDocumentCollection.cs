@@ -111,7 +111,10 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
             var changesBefore = Volatile.Read(ref _changesOnDisk);
             var docs = new Dictionary<string, string>();
             foreach (var file in Directory.EnumerateFiles(_dir, "*.json"))
-                docs[Path.GetFileNameWithoutExtension(file)] = await SharedFile.ReadAllTextAsync(file, ct);
+            {
+                try { docs[Path.GetFileNameWithoutExtension(file)] = await SharedFile.ReadAllTextAsync(file, ct); }
+                catch (FileNotFoundException) { } // deleted since it was listed: it's gone
+            }
             // A file that changed while we read may be missing or old here: use it once, don't keep it.
             if (Volatile.Read(ref _changesOnDisk) == changesBefore) Interlocked.CompareExchange(ref _cache, docs, null);
             return docs;

@@ -4,7 +4,7 @@ title: Don't block or fail on files replaced while the store reads them on Windo
 status: Done
 assignee: []
 created_date: '2026-10-30 15:06'
-updated_date: '2026-10-30 15:08'
+updated_date: '2026-10-30 15:10'
 labels: []
 dependencies: []
 priority: high
@@ -23,4 +23,5 @@ On Carl's Windows PC Writes_and_reads_at_the_same_time_while_files_change_on_dis
 - [x] #2 The store's move into place is retried a few times, briefly, when Windows says the file is in use (IOException or UnauthorizedAccessException), then fails as before
 - [x] #3 The test's simulated hand edit retries the same way a person or editor would when the file is busy for a moment
 - [x] #4 Build has 0 warnings and all tests pass
+- [x] #5 Reading a document also waits briefly while Windows has it in use (a hand edit replacing it at that moment), and a document deleted between listing and reading is skipped
 <!-- AC:END -->
