@@ -45,6 +45,21 @@ public class ParallelReadsTests : IDisposable
     }
 
     [Fact]
+    public async Task Opening_an_old_period_reads_it_and_the_recent_days_at_the_same_time()
+    {
+        var (loader, statuses) = _h.PeriodLoading();
+        var sheet = new PeriodSheet(Period.For(new DateOnly(2026, 3, 2)), () => _h.Today);
+
+        var loading = loader.LoadAsync(sheet, statuses);
+        await ArrivedAsync(4); // the period's worklogs, the recent days, sprint issues and period issues
+        _h.Jira.Hold!.SetResult();
+        await loading;
+
+        Assert.Equal(2, _h.Jira.WorklogSearches.Count());
+        Assert.Equal(4, _h.Jira.MostInFlight);
+    }
+
+    [Fact]
     public async Task Issues_read_on_their_own_go_out_together_up_to_the_limit()
     {
         _h.Jira.EmbeddedWorklogLimit = 0; // the search sends no worklogs, so each issue is read on its own

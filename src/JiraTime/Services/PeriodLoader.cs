@@ -65,7 +65,13 @@ public class PeriodLoader(TimeLog log, WorkCalendarService calendar, JiraIssueLo
         var from = copyFrom < p.Previous.Start ? copyFrom : p.Previous.Start;
         var recentFrom = today.AddDays(-RecentWork.Days);
         if (recentFrom > p.End.AddDays(1) || today < from.AddDays(-1))
-            return (await log.GetRangeAsync(from, p.End), await log.GetRecentAsync());
+        {
+            // Two reads that don't depend on each other: they go out together.
+            var period = log.GetRangeAsync(from, p.End);
+            var recent = log.GetRecentAsync();
+            await Task.WhenAll(period, recent);
+            return (await period, await recent);
+        }
 
         var time = await log.GetRangeAsync(from < recentFrom ? from : recentFrom, p.End > today ? p.End : today);
         return (time, time.Between(recentFrom, today));
