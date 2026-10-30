@@ -24,7 +24,10 @@ dotnet run --project src/JiraTime   # http://localhost:5115
 ## Task tracking
 
 Tasks live in `backlog/` and are managed with Backlog.md through its MCP server (`backlog` in `.mcp.json`),
-or the `backlog` CLI. Pick up work from the backlog, move a task to In Progress when you start it,
+or the `backlog` CLI.
+
+**Tasks come first.** Every change is described in a backlog task (description and acceptance criteria)
+before any code for it is written. When the ask changes during the work, update the task first, then the code. Pick up work from the backlog, move a task to In Progress when you start it,
 tick its acceptance criteria, and set it to Done in the commit that finishes it.
 The `backlog/` folder is committed with the code.
 
