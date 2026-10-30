@@ -106,6 +106,7 @@ Components/Logs/                   request toasts (in MainLayout), the log's act
 Components/Pages/Error.razor, NotFound.razor
 Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow, Waiting (the waiting-for-Jira spinner)
 Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
+wwwroot/favicon.svg                the app icon (apple-touch-icon.png is it as a 180 px square PNG)
 ```
 
 ## Where data lives
