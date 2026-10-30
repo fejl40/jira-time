@@ -99,6 +99,31 @@ public class MonthExportTests
     }
 
     [Fact]
+    public void The_epic_columns_are_the_header_columns_after_the_date_and_hours()
+    {
+        Assert.Equal(MonthExport.Header.Skip(2).Take(4), MonthExport.EpicColumns.Select(c => c.Label));
+        Assert.Equal(MonthExport.Header, MonthExport.Columns.Select(c => c.Label));
+    }
+
+    [Fact]
+    public void Each_epic_column_reads_back_what_it_sets_and_leaves_the_others_alone()
+    {
+        foreach (var column in MonthExport.EpicColumns)
+        {
+            var values = new EpicExportValues();
+            column.Set(values, "x " + column.Name);
+
+            Assert.Equal("x " + column.Name, column.Get(values));
+            Assert.Single(MonthExport.EpicColumns, c => c.Get(values) is not null);
+            Assert.False(values.IsEmpty);
+        }
+    }
+
+    [Fact]
+    public void Values_without_text_in_any_epic_column_are_empty() =>
+        Assert.True(new EpicExportValues { Fase = " ", Forordning = "" }.IsEmpty);
+
+    [Fact]
     public void Totals_count_hours_issue_rows_and_issues_without_an_epic()
     {
         ExportRow[] rows =

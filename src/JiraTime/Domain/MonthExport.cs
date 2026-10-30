@@ -19,9 +19,7 @@ public class EpicExportValues : IOwnedDocument
     public string? HovedleveranceNr { get; set; }
     public string? HovedleveranceLink { get; set; }
 
-    public bool IsEmpty =>
-        string.IsNullOrWhiteSpace(Fase) && string.IsNullOrWhiteSpace(Forordning)
-        && string.IsNullOrWhiteSpace(HovedleveranceNr) && string.IsNullOrWhiteSpace(HovedleveranceLink);
+    public bool IsEmpty => MonthExport.EpicColumns.All(column => string.IsNullOrWhiteSpace(column.Get(this)));
 
     public static string IdFor(string owner, string epicKey) => $"{owner}-{epicKey.ToUpperInvariant()}";
 }
@@ -31,16 +29,44 @@ public class EpicExportValues : IOwnedDocument
 /// <param name="EpicKey">The issue's epic; null when it has none.</param>
 public record ExportRow(DateOnly Date, TimeSpan Hours = default, string? IssueKey = null, string? EpicKey = null);
 
+/// <summary>An export column the user sets once per epic: its header, its short name, and where its value is kept.</summary>
+/// <param name="Label">The column's header in the export, e.g. "Fase (ydelsesområde)".</param>
+/// <param name="Name">The short name the values form uses for its field, e.g. "Fase".</param>
+public record EpicColumn(string Label, string Name, Func<EpicExportValues, string?> Get, Action<EpicExportValues, string?> Set);
+
+/// <summary>What a column's cells hold, so the table can align them: a date, hours, the epic link or plain text.</summary>
+public enum ExportColumnKind { Text, Date, Hours, EpicLink }
+
+/// <summary>One column of the export: its header and what its cells hold.</summary>
+public record ExportColumn(string Label, ExportColumnKind Kind);
+
 /// <summary>
 /// A calendar month of logged time in the agency's tab-separated format: every day of the month, one row
 /// per day and issue, blank apart from the date on days with no time.
 /// </summary>
 public static class MonthExport
 {
-    public static readonly IReadOnlyList<string> Header =
+    /// <summary>The columns set per epic, in export order.</summary>
+    public static readonly IReadOnlyList<EpicColumn> EpicColumns =
     [
-        "Dato (yyyy-mm-dd)", "Timer", "Fase (ydelsesområde)", "Forordning", "Hovedleverance nr.", "Hovedleverance link", "Epic", "Beskrivelse",
+        new("Fase (ydelsesområde)", "Fase", v => v.Fase, (v, text) => v.Fase = text),
+        new("Forordning", "Forordning", v => v.Forordning, (v, text) => v.Forordning = text),
+        new("Hovedleverance nr.", "Hovedleverance nr.", v => v.HovedleveranceNr, (v, text) => v.HovedleveranceNr = text),
+        new("Hovedleverance link", "Hovedleverance link", v => v.HovedleveranceLink, (v, text) => v.HovedleveranceLink = text),
     ];
+
+    /// <summary>All eight columns, in export order.</summary>
+    public static readonly IReadOnlyList<ExportColumn> Columns =
+    [
+        new("Dato (yyyy-mm-dd)", ExportColumnKind.Date),
+        new("Timer", ExportColumnKind.Hours),
+        .. EpicColumns.Select(column => new ExportColumn(column.Label, ExportColumnKind.Text)),
+        new("Epic", ExportColumnKind.EpicLink),
+        new("Beskrivelse", ExportColumnKind.Text),
+    ];
+
+    /// <summary>The export's header line: the column labels.</summary>
+    public static readonly IReadOnlyList<string> Header = Columns.Select(column => column.Label).ToList();
 
     /// <summary>First and last day of the month <paramref name="day"/> is in.</summary>
     public static (DateOnly From, DateOnly To) MonthOf(DateOnly day)
@@ -84,20 +110,18 @@ public static class MonthExport
         return keys.Distinct().Order(StringComparer.Ordinal).ToList();
     }
 
-    /// <summary>The row's eight cells, in <see cref="Header"/> order.</summary>
+    /// <summary>The row's eight cells, in <see cref="Columns"/> order.</summary>
     /// <param name="values">Epic key → the user's values for it.</param>
     public static IReadOnlyList<string> Cells(ExportRow row, string baseUrl, IReadOnlyDictionary<string, EpicExportValues> values)
     {
-        if (row.IssueKey is null) return [row.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), "", "", "", "", "", "", ""];
-        var v = row.EpicKey is null ? null : values.GetValueOrDefault(row.EpicKey);
+        var date = row.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        if (row.IssueKey is null) return [date, .. Enumerable.Repeat("", Columns.Count - 1)];
+        var epicValues = row.EpicKey is null ? null : values.GetValueOrDefault(row.EpicKey);
         return
         [
-            row.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            date,
             Hours(row.Hours),
-            v?.Fase ?? "",
-            v?.Forordning ?? "",
-            v?.HovedleveranceNr ?? "",
-            v?.HovedleveranceLink ?? "",
+            .. EpicColumns.Select(column => epicValues is null ? "" : column.Get(epicValues) ?? ""),
             row.EpicKey is null ? "" : JiraIssue.Url(baseUrl, row.EpicKey),
             row.IssueKey,
         ];

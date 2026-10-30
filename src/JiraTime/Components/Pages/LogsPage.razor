@@ -107,7 +107,7 @@
     {
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(await Log.ReadDayTextAsync(_shownDay)));
         using var file = new DotNetStreamReference(stream);
-        await JS.InvokeVoidAsync("jiraLogs.download", $"jira-log-{Format.Iso(_shownDay)}.jsonl", file);
+        await JS.InvokeVoidAsync("jiraFiles.download", $"jira-log-{Format.Iso(_shownDay)}.jsonl", "application/x-ndjson", file);
     }
 
     private async Task ClearAsync()

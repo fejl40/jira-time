@@ -25,7 +25,7 @@
     transition-duration: 0ms !important;
   }
   /* Waiting to show is no motion: keep the delay so fast answers still don't flicker. */
-  .waiting, .waiting-pending { animation-duration: var(--waiting-delay) !important; }
+  .waiting { animation-duration: var(--waiting-delay) !important; }
 }
 
 /* ---- Entrances ---- */
@@ -118,10 +118,6 @@
    takes no clicks meanwhile. */
 .waiting-dim { transition: opacity var(--motion-fast) var(--motion-ease); }
 .waiting-dim[aria-busy="true"] { opacity: 0.5; pointer-events: none; transition-delay: var(--waiting-delay); }
-
-/* A part that appears pending at once, e.g. the grid column of the day being saved, dimmed after the delay. */
-.waiting-pending { opacity: 0.5; animation: waiting-hold var(--waiting-delay) steps(1, end) both; }
-@keyframes waiting-hold { from { opacity: 1; } }
 
 /* ---- Modals (Components/Modals, wwwroot/modal.js) ---- */
 

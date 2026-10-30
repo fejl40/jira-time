@@ -49,7 +49,7 @@
         if (!_open.Remove(path)) _open.Add(path);
     }
 
-    private async Task CopyAsync() => _copied = await JS.InvokeAsync<bool>("jiraExport.copy", Body.Pretty);
+    private async Task CopyAsync() => _copied = await JS.InvokeAsync<bool>("jiraFiles.copy", Body.Pretty);
 
     private RenderFragment Node(string? label, JsonNode? node, int level) => node is JsonObject or JsonArray
         ? Container(label, node, level)

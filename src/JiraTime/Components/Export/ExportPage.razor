@@ -1,0 +1,103 @@
+@page "/export"
+@inject CurrentUser User
+@inject MonthExportLoader Loader
+@inject TimeProvider Clock
+@inject IJSRuntime JS
+
+<PageTitle>Export @Title · Jira Time</PageTitle>
+
+<div class="mx-auto max-w-6xl space-y-6">
+    <div class="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <StepNav Unit="month" PreviousHref="@ExportLinks.To(_month.AddMonths(-1))" NextHref="@ExportLinks.To(_month.AddMonths(1))"
+                 CurrentHref="export" CurrentLabel="This month" CurrentTitle="This month" />
+        <div>
+            <h1 class="text-xl font-semibold leading-tight">Export @Title</h1>
+            <p class="text-sm text-muted" data-export-status>
+                @if (!_loading && _error is null)
+                {
+                    <span><span class="font-semibold text-slate-800 dark:text-slate-100">@Format.Hours(MonthExport.Total(_rows)) h</span> on @Format.Count(MonthExport.IssueRowCount(_rows), "row")</span>
+                    <span> · <a class="underline" href="@Links.To(Period.For(_month))">timesheet</a></span>
+                }
+            </p>
+        </div>
+        @if (!_loading && _error is null)
+        {
+            <div class="ml-auto flex items-center gap-2">
+                @if (_copied)
+                {
+                    <span class="text-sm text-emerald-700 dark:text-emerald-400" role="status">Copied. Paste it into Excel.</span>
+                }
+                <button class="btn-secondary" @onclick="DownloadAsync" data-download>Download .tsv</button>
+                <button class="btn-primary" @onclick="CopyAsync" data-copy>Copy</button>
+            </div>
+        }
+    </div>
+
+    @if (_error is not null)
+    {
+        <ErrorCard Compact Class="p-6" Title="Can't export this month" Error="@_error">
+            <ChildContent>The export needs your worklogs and their epics from Jira, and Jira couldn't be read:</ChildContent>
+            <Actions><button class="btn-primary" @onclick="() => LoadAsync(refresh: true)">Try again</button></Actions>
+        </ErrorCard>
+    }
+    else if (_loading)
+    {
+        <Waiting Block Label="@($"Reading your worklogs for {Title} from Jira…")" Class="card p-10 text-sm text-muted" data-export-loading />
+    }
+    else
+    {
+        @if (_notInJira > 0)
+        {
+            <p class="alert-warning" data-not-in-jira>
+                @Format.Count(_notInJira, "entry") this month @(_notInJira == 1 ? "is" : "are") saved here but not in Jira yet. @(_notInJira == 1 ? "It is" : "They are") included; use Sync on the timesheet to send @(_notInJira == 1 ? "it" : "them").
+            </p>
+        }
+
+        <EpicValuesForm Values="_values" NoEpic="_noEpic" BaseUrl="@BaseUrl" OnChanged="() => _copied = false" />
+        <ExportTable Rows="_rows" Values="_values" BaseUrl="@BaseUrl" />
+    }
+</div>
+
+@code {
+    /// <summary>The month to show, as yyyy-MM; this month when missing or unreadable.</summary>
+    [SupplyParameterFromQuery(Name = "month")] public string? MonthParam { get; set; }
+
+    private DateOnly _month;
+    private bool _loading = true, _copied;
+    private string? _error;
+    private IReadOnlyList<ExportRow> _rows = [];
+    private IReadOnlyDictionary<string, EpicExportValues> _values = new Dictionary<string, EpicExportValues>();
+    private IReadOnlyList<string> _noEpic = [];
+    private int _notInJira;
+
+    private string BaseUrl => User.Connection?.BaseUrl ?? "";
+    private string Title => Format.Month(_month);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _month = ExportLinks.Read(MonthParam) ?? MonthExport.MonthOf(Clock.Today()).From;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync(bool refresh = false)
+    {
+        if (!User.IsSignedIn || User.Connection is null) return;
+        _loading = true;
+        _error = null;
+        _copied = false;
+        var month = _month;
+        using var action = JiraAction.Start(refresh ? $"Try again: export {Title}" : $"Open export {Title}");
+        var loaded = await Loader.LoadAsync(month, refresh);
+        if (month != _month) return; // another month was asked for meanwhile; its load shows it
+        (_rows, _values, _noEpic, _notInJira, _error) = (loaded.Rows, loaded.Values, loaded.NoEpic, loaded.NotInJira, loaded.JiraError);
+        _loading = false;
+    }
+
+    private string Tsv() => MonthExport.ToTsv(_rows, BaseUrl, _values);
+
+    private async Task CopyAsync() => _copied = await JS.InvokeAsync<bool>("jiraFiles.copy", Tsv());
+
+    /// <summary>Saves the export as UTF-8 with a byte order mark, so Excel reads æ, ø and å right.</summary>
+    private async Task DownloadAsync() =>
+        await JS.InvokeVoidAsync("jiraFiles.download", $"timer-{_month:yyyy-MM}.tsv", "text/tab-separated-values;charset=utf-8", "\uFEFF" + Tsv());
+}

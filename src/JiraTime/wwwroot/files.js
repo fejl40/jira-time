@@ -1,5 +1,5 @@
-// Clipboard and file download for the month export page.
-window.jiraExport = {
+// Clipboard and file downloads, for the month export and the Jira request log.
+window.jiraFiles = {
   // Puts the text on the clipboard; true when it worked.
   copy: async text => {
     try {
@@ -19,10 +19,10 @@ window.jiraExport = {
     }
   },
 
-  // Saves the text as a UTF-8 file with a byte order mark, so Excel reads æ, ø and å right.
-  download: (name, text) => {
-    const blob = new Blob(['﻿' + text], { type: 'text/tab-separated-values;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
+  // Saves text, or a stream from the server (DotNetStreamReference), as a file of the given type.
+  download: async (name, type, content) => {
+    const data = typeof content === 'string' ? content : await content.arrayBuffer();
+    const url = URL.createObjectURL(new Blob([data], { type }));
     const a = document.createElement('a');
     a.href = url;
     a.download = name;

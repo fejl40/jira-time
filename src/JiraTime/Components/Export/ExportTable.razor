@@ -1,0 +1,43 @@
+@* The month's export as a table, the same columns and cells as the copied and downloaded text. *@
+
+<section class="card overflow-x-auto p-0">
+    <table class="w-full min-w-[60rem] text-sm" data-export-rows>
+        <thead class="bg-slate-50 text-left text-xs text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+            <tr>
+                @foreach (var column in MonthExport.Columns)
+                {
+                    <th class="px-3 py-2 font-medium whitespace-nowrap">@column.Label</th>
+                }
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+            @foreach (var row in Rows)
+            {
+                var cells = MonthExport.Cells(row, BaseUrl, Values);
+                <tr class="@(row.IssueKey is null ? "text-slate-400 dark:text-slate-500" : "")">
+                    @foreach (var (column, cell) in MonthExport.Columns.Zip(cells))
+                    {
+                        <td class="px-3 py-1.5 @CellClass(column.Kind)">@cell</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<ExportRow> Rows { get; set; } = [];
+
+    /// <summary>Epic key → the user's values for it.</summary>
+    [Parameter, EditorRequired] public IReadOnlyDictionary<string, EpicExportValues> Values { get; set; } = default!;
+
+    [Parameter, EditorRequired] public string BaseUrl { get; set; } = "";
+
+    private static string CellClass(ExportColumnKind kind) => kind switch
+    {
+        ExportColumnKind.Date => "whitespace-nowrap tabular-nums",
+        ExportColumnKind.Hours => "text-right tabular-nums",
+        ExportColumnKind.EpicLink => "whitespace-nowrap",
+        _ => "",
+    };
+}

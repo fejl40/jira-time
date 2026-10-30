@@ -1,0 +1,93 @@
+@* The export's values per epic (Fase, Forordning, Hovedleverance): one row per epic, each field saved as the user leaves it. *@
+@inject EpicExportStore EpicValues
+
+@if (Values.Count > 0 || NoEpic.Count > 0)
+{
+    <section class="card p-6" data-epic-values>
+        <h2 class="flex items-center gap-3 font-semibold">Values per epic
+            @if (_saving > 0)
+            {
+                <Waiting Label="Saving…" Class="text-xs font-normal text-muted" data-epic-saving />
+            }
+        </h2>
+        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Set once per epic and remembered for later months. Changes are saved as you leave a field.</p>
+        @if (Values.Count > 0)
+        {
+            <div class="mt-4 overflow-x-auto">
+                <table class="w-full min-w-[48rem] text-sm">
+                    <thead class="text-left text-xs text-muted">
+                        <tr>
+                            <th class="pb-2 pr-3 font-medium">Epic</th>
+                            @foreach (var column in MonthExport.EpicColumns)
+                            {
+                                <th class="pb-2 font-medium @(IsLast(column) ? "" : "pr-3")">@column.Label</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var epic in Values.Values.OrderBy(v => v.EpicKey, StringComparer.Ordinal))
+                        {
+                            <tr @key="epic.EpicKey" data-epic="@epic.EpicKey">
+                                <td class="py-1 pr-3 whitespace-nowrap"><a class="underline" href="@JiraIssue.Url(BaseUrl, epic.EpicKey)" target="_blank" rel="noopener">@epic.EpicKey</a></td>
+                                @foreach (var column in MonthExport.EpicColumns)
+                                {
+                                    <td class="py-1 @(IsLast(column) ? "" : "pr-3")">
+                                        <input class="field py-1.5 text-sm" aria-label="@epic.EpicKey @column.Name" value="@column.Get(epic)"
+                                               @onchange="e => SaveAsync(epic, column, e)" />
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+        @if (NoEpic.Count > 0)
+        {
+            <p class="hint mt-3" data-no-epic>No epic in Jira, so their epic columns stay empty: @string.Join(", ", NoEpic)</p>
+        }
+        @if (_saveError is not null)
+        {
+            <div class="alert-error" role="alert">@_saveError</div>
+        }
+    </section>
+}
+
+@code {
+    /// <summary>Epic key → the user's values for it; changed in place as the user types.</summary>
+    [Parameter, EditorRequired] public IReadOnlyDictionary<string, EpicExportValues> Values { get; set; } = default!;
+
+    /// <summary>Issues of the month that have no epic.</summary>
+    [Parameter, EditorRequired] public IReadOnlyList<string> NoEpic { get; set; } = [];
+
+    [Parameter, EditorRequired] public string BaseUrl { get; set; } = "";
+
+    /// <summary>Called when a value changed, before it is saved, so the page can show the new export.</summary>
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private string? _saveError;
+    /// <summary>Epic values being saved right now.</summary>
+    private int _saving;
+
+    private static bool IsLast(EpicColumn column) => column == MonthExport.EpicColumns[^1];
+
+    private async Task SaveAsync(EpicExportValues values, EpicColumn column, ChangeEventArgs e)
+    {
+        column.Set(values, e.Value?.ToString() ?? "");
+        _saving++;
+        await OnChanged.InvokeAsync();
+        try
+        {
+            await EpicValues.SaveAsync(values);
+            _saveError = null;
+        }
+        catch (IOException ex)
+        {
+            _saveError = $"Couldn't save the values for {values.EpicKey}: {ex.Message}";
+        }
+        finally
+        {
+            _saving--;
+        }
+    }
+}
