@@ -32,7 +32,7 @@ internal static class JiraWorklogJson
 
     /// <summary>The day of a worklog's "started" value, as Jira wrote it (2026-10-19T09:00:00.000+0200).</summary>
     public static DateOnly? ParseStarted(string? started) =>
-        started is { Length: >= 10 } && DateOnly.TryParseExact(started[..10], "yyyy-MM-dd", out var d) ? d : null;
+        started is { Length: >= 10 } && DateOnly.TryParseExact(started[..10], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
 
     /// <summary>A worklog's "created" value, e.g. 2026-10-19T09:00:00.000+0200; null when it can't be read.</summary>
     public static DateTimeOffset? ParseCreated(string? created)
@@ -49,7 +49,9 @@ internal static class JiraWorklogJson
         var local = date.ToDateTime(time);
         var offset = zone.GetUtcOffset(local);
         var sign = offset < TimeSpan.Zero ? "-" : "+";
-        return $"{local:yyyy-MM-dd'T'HH:mm:ss}.000{sign}{Math.Abs(offset.Hours):00}{Math.Abs(offset.Minutes):00}";
+        // Jira's format, whatever the machine's language settings are (some write 09.00.00 for 09:00:00).
+        return string.Create(CultureInfo.InvariantCulture,
+            $"{local:yyyy-MM-dd'T'HH:mm:ss}.000{sign}{Math.Abs(offset.Hours):00}{Math.Abs(offset.Minutes):00}");
     }
 
     /// <summary>The body that creates or overwrites a worklog with the entry's day, time and comment.</summary>
