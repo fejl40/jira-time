@@ -136,18 +136,19 @@ public class JiraResilienceTests : IDisposable
     }
 
     [Fact]
-    public async Task At_most_four_requests_are_out_at_once_and_the_rest_wait_in_turn()
+    public async Task No_more_than_the_limit_are_out_at_once_and_the_rest_wait_in_turn()
     {
         _h.Jira.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var requests = Enumerable.Range(0, 7).Select(_ => _h.MyselfAsync()).ToList();
+        var count = JiraResilience.MaxInFlight + 3;
+        var requests = Enumerable.Range(0, count).Select(_ => _h.MyselfAsync()).ToList();
         for (var i = 0; i < JiraResilience.MaxInFlight; i++)
             Assert.True(await _h.Jira.Arrived.WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal(JiraResilience.MaxInFlight, _h.Jira.Requests.Count);
         _h.Jira.Hold.SetResult();
         await Task.WhenAll(requests);
 
-        Assert.Equal(7, _h.Jira.Requests.Count);
+        Assert.Equal(count, _h.Jira.Requests.Count);
         Assert.Equal(JiraResilience.MaxInFlight, _h.Jira.MostInFlight);
     }
 }

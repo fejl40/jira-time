@@ -6,7 +6,7 @@ using JiraTime.Tests.Support;
 namespace JiraTime.Tests.Services.Worklogs;
 
 /// <summary>
-/// Reads that don't depend on each other go to Jira together, at most four at once; writes go one at a time.
+/// Reads that don't depend on each other go to Jira together, at most JiraResilience.MaxInFlight at once; writes go one at a time.
 /// Named after that behaviour, as it spans PeriodLoader, TimeLog, WorklogSync and the Jira client's limiter.
 /// </summary>
 public class ParallelReadsTests : IDisposable
@@ -45,20 +45,21 @@ public class ParallelReadsTests : IDisposable
     }
 
     [Fact]
-    public async Task Issues_read_on_their_own_go_out_together_at_most_four_at_once()
+    public async Task Issues_read_on_their_own_go_out_together_up_to_the_limit()
     {
         _h.Jira.EmbeddedWorklogLimit = 0; // the search sends no worklogs, so each issue is read on its own
-        for (var i = 1; i <= 6; i++) _h.Jira.AddWorklog($"ABC-{i}", "2026-10-26T09:00:00.000+0100", 3600);
+        var issues = JiraResilience.MaxInFlight + 2;
+        for (var i = 1; i <= issues; i++) _h.Jira.AddWorklog($"ABC-{i}", "2026-10-26T09:00:00.000+0100", 3600);
         _h.Jira.HoldWhen = r => r.Path.Contains("/worklog");
 
         var reading = _h.Log.GetRangeAsync(_h.Today.AddDays(-7), _h.Today);
-        await ArrivedAsync(1 + JiraResilience.MaxInFlight); // the search, then four issues
+        await ArrivedAsync(1 + JiraResilience.MaxInFlight); // the search, then as many issues as the limit allows
         Assert.Equal(JiraResilience.MaxInFlight, _h.Jira.WorklogReads.Count());
         _h.Jira.Hold!.SetResult();
         var time = await reading;
 
-        Assert.Equal(6, time.Entries.Count);
-        Assert.Equal(6, _h.Jira.WorklogReads.Count());
+        Assert.Equal(issues, time.Entries.Count);
+        Assert.Equal(issues, _h.Jira.WorklogReads.Count());
         Assert.Equal(JiraResilience.MaxInFlight, _h.Jira.MostInFlight);
     }
 

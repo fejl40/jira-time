@@ -20,7 +20,7 @@ namespace JiraTime.Services.Jira;
 /// </summary>
 public static class JiraResilience
 {
-    public const int MaxInFlight = 4;
+    public const int MaxInFlight = 10;
     public const int MaxQueued = 200;
     public const int MaxRetries = 5;
     /// <summary>A longer pause than this isn't waited out: the request fails as it did before.</summary>

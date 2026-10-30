@@ -192,7 +192,7 @@ it; only an issue with more is read on its own. For a period near today that one
 to copy from, the period before and the last 60 days for recent picks; an old period and the recent days are read apart.
 Reads that don't depend on each other go out together: opening a period reads the worklogs, the sprint issues and the
 period's issues at the same time, and issues read on their own are read in parallel; the Jira client's limiter keeps
-at most 4 in flight per host (see Jira rate limits). Writes stay one at a time, so the changed-in-Jira check and
+at most 10 in flight per host (see Jira rate limits). Writes stay one at a time, so the changed-in-Jira check and
 Jira's per-issue write limits keep working. `JiraAction` is AsyncLocal, so parallel requests still log under their action.
 Jira's search can take a while to find a new worklog, so for 15 minutes after a save the issues you
 saved on, when the worklog search doesn't return them, are read by key in one search with their worklogs
@@ -350,7 +350,7 @@ user and tab, with three strategies, outermost first:
    from 1 s with jitter) and the request sent again, at most 5 times; a pause longer than 10 s isn't waited out and
    the request fails as before (a write goes to the retry queue). Only 429 and the open circuit are retried, never
    5xx, timeouts or network errors, so a worklog is never logged twice; Jira did nothing with a request it refused with 429.
-2. **Concurrency limiter**: at most 4 requests to a host at once; the rest wait in a FIFO queue (200 places; a full
+2. **Concurrency limiter**: at most 10 requests to a host at once (the top of what Atlassian suggests; 429s are what slow it down); the rest wait in a FIFO queue (200 places; a full
    queue fails like any Jira error). It sits outside the breaker, so a request turned away by the open circuit gives
    its place back while the retry waits.
 3. **Circuit breaker**: a 429 opens it for Retry-After plus up to 20% jitter, so no request goes to that host,
@@ -450,7 +450,7 @@ format (embedded worklogs, pages, the worklog body), loading a period, saving da
 period summary (unknown hours, work not in Jira), links, Jira queries, issue lookups and the picker, fill
 suggestions, the Save all change list, Settings work hours and the Jira URL from Connect, the expiring cache, modals
 (queue, results, defaults), the waits on Jira (what shows pending and which buttons wait), Jira rate limits (retries
-after 429, the pause across users and hosts, the queue), parallel reads (overlap, the cap of four, writes one at a
+after 429, the pause across users and hosts, the queue), parallel reads (overlap, the cap of ten, writes one at a
 time), the profile picture (read once per two days, logged, the default avatar and failures keep the initials, each
 user only their own), and searches by key (batches, pages, POST, unknown keys).
 

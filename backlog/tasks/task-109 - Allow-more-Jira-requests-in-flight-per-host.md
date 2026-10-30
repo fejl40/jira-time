@@ -1,9 +1,10 @@
 ---
 id: TASK-109
 title: Allow more Jira requests in flight per host
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 15:19'
+updated_date: '2026-10-30 15:20'
 labels:
   - jira
   - performance
@@ -20,8 +21,8 @@ The resilience pipeline allows 4 requests to a Jira host at once (TASK-83, the c
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 JiraResilience.MaxInFlight is 10
-- [ ] #2 Tests for the cap and the queue use the constant and pass
-- [ ] #3 AGENTS.md says 10 instead of 4
-- [ ] #4 Build has 0 warnings and all tests pass
+- [x] #1 JiraResilience.MaxInFlight is 10
+- [x] #2 Tests for the cap and the queue use the constant and pass
+- [x] #3 AGENTS.md says 10 instead of 4
+- [x] #4 Build has 0 warnings and all tests pass
 <!-- AC:END -->
