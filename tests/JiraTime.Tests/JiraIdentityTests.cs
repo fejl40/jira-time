@@ -13,16 +13,9 @@ public class JiraIdentityTests : IDisposable
     private readonly CurrentUser _user = new();
     private readonly JiraIdentity _identity;
 
-    public JiraIdentityTests()
-    {
-        _identity = _h.Identity(_user);
-        Me("JIRAUSER1", "carl", "Carl Lilholm");
-    }
+    public JiraIdentityTests() => _identity = _h.Identity(_user);
 
     public void Dispose() => _h.Dispose();
-
-    private void Me(string key, string name, string display) =>
-        _h.Jira.Gets["/rest/api/2/myself"] = _ => new { key, name, displayName = display };
 
     [Fact]
     public async Task Signing_in_uses_the_user_Jira_returns_for_the_token()
@@ -42,7 +35,7 @@ public class JiraIdentityTests : IDisposable
     public async Task Another_token_on_the_same_host_is_another_user()
     {
         await _identity.SignInAsync(Server);
-        Me("JIRAUSER2", "anna", "Anna Berg");
+        _h.Jira.Myself = new { key = "JIRAUSER2", name = "anna", displayName = "Anna Berg" };
 
         await _identity.SignInAsync(Server with { Token = "token-2" });
 
@@ -52,8 +45,6 @@ public class JiraIdentityTests : IDisposable
     [Fact]
     public async Task The_same_user_id_on_another_host_is_another_user()
     {
-        _h.Jira.Gets["/rest/api/2/myself"] = _ => new { key = "JIRAUSER1", name = "carl", displayName = "Carl" };
-
         await _identity.SignInAsync(Server with { BaseUrl = "https://jira.other.com" });
 
         Assert.Equal("jira.other.com", _user.Key!.Host);

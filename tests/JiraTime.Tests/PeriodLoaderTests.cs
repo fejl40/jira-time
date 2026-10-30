@@ -72,9 +72,6 @@ public class PeriodLoaderTests : IDisposable
         Assert.True(statuses.Known["abc-1"].IsDone);
     }
 
-    private int WorklogSearches => _h.Jira.Requests.Count(r => FakeJira.Jql(r).Contains("worklogAuthor"));
-    private int WorklogReads => _h.Jira.Requests.Count(r => r.Path.Contains("/worklog"));
-
     [Fact]
     public async Task A_period_with_several_issues_reads_its_worklogs_with_one_search()
     {
@@ -87,8 +84,8 @@ public class PeriodLoaderTests : IDisposable
 
         var extras = await loader.LoadAsync(Sheet(), statuses);
 
-        Assert.Equal(1, WorklogSearches);
-        Assert.Equal(0, WorklogReads);
+        Assert.Single(_h.Jira.WorklogSearches);
+        Assert.Empty(_h.Jira.WorklogReads);
         Assert.Equal(4, _h.Jira.Requests.Count); // worklogs, sprint issues, period issues, statuses
         Assert.Equal(5, extras.Recent.Count);
         Assert.Equal(["Weeks ago"], extras.Comments["ABC-3"]);
@@ -101,6 +98,6 @@ public class PeriodLoaderTests : IDisposable
 
         await loader.LoadAsync(Sheet(new DateOnly(2026, 3, 10)), statuses);
 
-        Assert.Equal(2, WorklogSearches);
+        Assert.Equal(2, _h.Jira.WorklogSearches.Count());
     }
 }

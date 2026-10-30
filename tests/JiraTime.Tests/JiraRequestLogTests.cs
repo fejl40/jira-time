@@ -16,9 +16,6 @@ public class JiraRequestLogTests : IDisposable
 
     private Task<IReadOnlyList<JiraLogEntry>> CarlsLogAsync() => _h.RequestLog.ReadDayAsync(TestUsers.Carl.Id, Day);
 
-    private Task<JiraProfile> MyselfAsync(TimeHarness? h = null) =>
-        new JiraClient((h ?? _h).Http).GetMyselfAsync((h ?? _h).Connection);
-
     [Fact]
     public async Task Saving_a_day_logs_each_request_with_what_was_sent_and_what_came_back()
     {
@@ -49,7 +46,7 @@ public class JiraRequestLogTests : IDisposable
     {
         _h.Jira.FailWith = HttpStatusCode.InternalServerError;
 
-        await Assert.ThrowsAsync<JiraException>(() => MyselfAsync());
+        await Assert.ThrowsAsync<JiraException>(() => _h.MyselfAsync());
 
         var entry = Assert.Single(await CarlsLogAsync());
         Assert.Equal(500, entry.Status);
@@ -62,7 +59,7 @@ public class JiraRequestLogTests : IDisposable
     {
         _h.Jira.Offline = true;
 
-        await Assert.ThrowsAsync<JiraException>(() => MyselfAsync());
+        await Assert.ThrowsAsync<JiraException>(() => _h.MyselfAsync());
 
         var entry = Assert.Single(await CarlsLogAsync());
         Assert.Null(entry.Status);
@@ -102,11 +99,11 @@ public class JiraRequestLogTests : IDisposable
         const string token = "s3cret-token-4711";
         using var h = new TimeHarness((cloud ? TimeHarness.Cloud : TimeHarness.Server) with { Token = token });
         h.Jira.FailWith = HttpStatusCode.Unauthorized;
-        await Assert.ThrowsAsync<JiraException>(() => MyselfAsync(h));
+        await Assert.ThrowsAsync<JiraException>(() => h.MyselfAsync());
         h.Jira.FailWith = null;
         await h.SaveDayAsync(h.Today, [TimeHarness.Row("ABC-1", 1)]);
 
-        var text = string.Concat(Directory.EnumerateFiles(Path.Combine(h.Files.Path, "jira-logs"), "*.jsonl", SearchOption.AllDirectories).Select(File.ReadAllText));
+        var text = string.Concat(Directory.EnumerateFiles(Path.Combine(h.Files.Path, "logs", "jira"), "*.jsonl", SearchOption.AllDirectories).Select(File.ReadAllText));
         Assert.NotEmpty(text);
         Assert.DoesNotContain(token, text);
         Assert.DoesNotContain(Convert.ToBase64String(Encoding.UTF8.GetBytes($"carl@example.com:{token}")), text);
@@ -118,9 +115,9 @@ public class JiraRequestLogTests : IDisposable
     public async Task Large_bodies_are_cut_and_marked_truncated()
     {
         var big = new string('x', JiraRequestRecorder.MaxBody + 10);
-        _h.Jira.Gets["/rest/api/2/myself"] = _ => new { key = "JIRAUSER1", displayName = big };
+        _h.Jira.Myself = new { key = "JIRAUSER1", displayName = big };
 
-        await new JiraClient(_h.Http).GetMyselfAsync(_h.Connection);
+        await _h.MyselfAsync();
         await _h.SaveDayAsync(Day, [TimeHarness.Row("ABC-1", 1, big)]);
 
         var log = await CarlsLogAsync();

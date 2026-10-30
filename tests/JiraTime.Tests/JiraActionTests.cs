@@ -10,9 +10,6 @@ public class JiraActionTests : IDisposable
     private static readonly TimeSpan Wait = TimeSpan.FromSeconds(5);
     private readonly TimeHarness _h = new();
 
-    public JiraActionTests() =>
-        _h.Jira.Gets["/rest/api/2/myself"] = _ => new { key = "JIRAUSER1", name = "carl", displayName = "Carl Lilholm" };
-
     public void Dispose() => _h.Dispose();
 
     private Task<IReadOnlyList<JiraLogEntry>> LogOfAsync(UserKey user) => _h.RequestLog.ReadDayAsync(user.Id, _h.Today);

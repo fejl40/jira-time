@@ -6,7 +6,7 @@ using System.Text.Json.Nodes;
 namespace JiraTime.Tests;
 
 /// <summary>
-/// In-memory stand-in for Jira's worklog and issue search endpoints, plugged into HttpClient.
+/// In-memory stand-in for Jira's myself, worklog and issue search endpoints, plugged into HttpClient.
 /// Records every request so tests can check what was sent.
 /// </summary>
 public sealed partial class FakeJira : HttpMessageHandler
@@ -17,38 +17,24 @@ public sealed partial class FakeJira : HttpMessageHandler
     public Dictionary<string, Dictionary<string, JsonNode>> Worklogs { get; } = new(StringComparer.OrdinalIgnoreCase);
     public List<Request> Requests { get; } = [];
 
-    /// <summary>When set, every request fails with this status.</summary>
-    public HttpStatusCode? FailWith { get; set; }
+    /// <summary>Worklogs created, changed or deleted.</summary>
+    public IEnumerable<Request> Writes => Requests.Where(r => IsWorklog(r) && r.Method != HttpMethod.Get);
 
-    /// <summary>When set and it returns a status, that request fails with it.</summary>
-    public Func<Uri, HttpStatusCode?>? FailWhen { get; set; }
+    /// <summary>Worklogs read on their own, one issue (or one worklog) at a time.</summary>
+    public IEnumerable<Request> WorklogReads => Requests.Where(r => IsWorklog(r) && r.Method == HttpMethod.Get);
 
-    /// <summary>How many of the next requests Jira refuses with 429 Too Many Requests.</summary>
-    public int TooManyRequests { get; set; }
+    private static bool IsWorklog(Request request) => PathOf(request).Contains("/worklog");
 
-    /// <summary>The Retry-After header sent with a 429 (seconds or an HTTP date); none when null.</summary>
-    public string? RetryAfter { get; set; }
-
-    /// <summary>When set, requests wait for it before Jira answers, so tests can see how many are out at once.</summary>
-    public TaskCompletionSource? Hold { get; set; }
-
-    /// <summary>The requests <see cref="Hold"/> holds back; all of them when null.</summary>
-    public Func<Request, bool>? HoldWhen { get; set; }
-
-    /// <summary>Released once for each request that reached Jira.</summary>
-    public SemaphoreSlim Arrived { get; } = new(0);
-
-    /// <summary>The most requests that were out at the same time.</summary>
-    public int MostInFlight { get; private set; }
+    /// <summary>The request's path without its query.</summary>
+    private static string PathOf(Request request) => request.Path.Split('?')[0];
 
     private readonly Lock _lock = new();
-    private int _inFlight;
-
-    /// <summary>When set, requests throw as if the server can't be reached.</summary>
-    public bool Offline { get; set; }
 
     /// <summary>Extra GET handlers: path (without query) → JSON response.</summary>
     public Dictionary<string, Func<Uri, object>> Gets { get; } = new();
+
+    /// <summary>Who Jira says the token belongs to (<c>/myself</c>): Carl unless a test needs someone else.</summary>
+    public object Myself { get; set; } = new { key = "JIRAUSER1", name = "carl", displayName = "Carl Lilholm" };
 
     /// <summary>Author put on worklogs that don't name one.</summary>
     public JsonObject DefaultAuthor { get; set; } = new() { ["key"] = "JIRAUSER1", ["name"] = "carl" };
@@ -68,8 +54,6 @@ public sealed partial class FakeJira : HttpMessageHandler
 
     private int _nextId = 10000;
 
-    public HttpClient Client() => new(this);
-
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req, CancellationToken ct)
     {
         if (Offline) throw new HttpRequestException("Connection refused");
@@ -79,17 +63,17 @@ public sealed partial class FakeJira : HttpMessageHandler
         lock (_lock)
         {
             Requests.Add(request);
-            MostInFlight = Math.Max(MostInFlight, ++_inFlight);
+            Arrive();
         }
         Arrived.Release();
         try
         {
-            if (Hold is { } hold && HoldWhen?.Invoke(request) != false) await hold.Task.WaitAsync(ct);
-            lock (_lock) return Answer(req, body);
+            await HoldAsync(request, ct);
+            lock (_lock) return Refusal(req.RequestUri) ?? Answer(req, body);
         }
         finally
         {
-            lock (_lock) _inFlight--;
+            lock (_lock) Leave();
         }
     }
 
@@ -97,19 +81,11 @@ public sealed partial class FakeJira : HttpMessageHandler
     private HttpResponseMessage Answer(HttpRequestMessage req, JsonNode? body)
     {
         var path = req.RequestUri!.AbsolutePath;
-        if (TooManyRequests > 0)
-        {
-            TooManyRequests--;
-            var refused = Json(HttpStatusCode.TooManyRequests, new { errorMessages = new[] { "Rate limit exceeded" } });
-            if (RetryAfter is { } after) refused.Headers.TryAddWithoutValidation("Retry-After", after);
-            return refused;
-        }
-
-        if ((FailWith ?? FailWhen?.Invoke(req.RequestUri)) is { } status)
-            return Json(status, new { errorMessages = new[] { $"Failed with {(int)status}" } });
-
         if (req.Method == HttpMethod.Get && Gets.TryGetValue(path, out var get))
             return Json(HttpStatusCode.OK, get(req.RequestUri));
+
+        if (req.Method == HttpMethod.Get && path.EndsWith("/myself"))
+            return Json(HttpStatusCode.OK, Myself);
 
         if ((req.Method == HttpMethod.Get || req.Method == HttpMethod.Post) && (path.EndsWith("/search") || path.EndsWith("/search/jql")))
             return Search(FakeSearch.Read(req.RequestUri, body));

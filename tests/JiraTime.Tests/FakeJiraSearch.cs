@@ -26,6 +26,12 @@ public sealed partial class FakeJira
             ["status"] = new JsonObject { ["name"] = status, ["statusCategory"] = new JsonObject { ["key"] = category } },
         };
 
+    /// <summary>Issue searches, GET or POST.</summary>
+    public IEnumerable<Request> Searches => Requests.Where(r => PathOf(r).EndsWith("/search") || PathOf(r).EndsWith("/search/jql"));
+
+    /// <summary>Searches for the user's worklogs (<c>worklogAuthor</c>), not for issues by key, sprint or period.</summary>
+    public IEnumerable<Request> WorklogSearches => Searches.Where(r => Jql(r).Contains("worklogAuthor"));
+
     /// <summary>The JQL of a search request.</summary>
     public static string Jql(Uri uri) => HttpUtility.ParseQueryString(uri.Query)["jql"] ?? "";
 

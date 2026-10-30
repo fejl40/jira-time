@@ -10,15 +10,9 @@ public class JiraResilienceTests : IDisposable
     private readonly TimeHarness _h = new();
     private readonly DateTimeOffset _start;
 
-    public JiraResilienceTests()
-    {
-        _start = _h.Clock.Now;
-        _h.Jira.Gets["/rest/api/2/myself"] = _ => new { key = "JIRAUSER1", name = "carl", displayName = "Carl Lilholm" };
-    }
+    public JiraResilienceTests() => _start = _h.Clock.Now;
 
     public void Dispose() => _h.Dispose();
-
-    private Task<JiraProfile> MyselfAsync(JiraConnection? c = null) => new JiraClient(_h.Http).GetMyselfAsync(c ?? _h.Connection);
 
     private static JiraConnection Anna => TimeHarness.Server with { Token = "annas-token", Owner = TestUsers.Anna.Id };
 
@@ -32,7 +26,7 @@ public class JiraResilienceTests : IDisposable
         _h.Jira.TooManyRequests = 1;
         _h.Jira.RetryAfter = "2";
 
-        await MyselfAsync();
+        await _h.MyselfAsync();
 
         Assert.Equal(2, _h.Jira.Requests.Count);
         Assert.InRange(_h.Clock.Now - _start, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(3));
@@ -48,7 +42,7 @@ public class JiraResilienceTests : IDisposable
         _h.Jira.TooManyRequests = 1;
         _h.Jira.RetryAfter = (_start + TimeSpan.FromSeconds(4)).ToString("r");
 
-        await MyselfAsync();
+        await _h.MyselfAsync();
 
         Assert.InRange(_h.Clock.Now - _start, TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(5));
     }
@@ -63,7 +57,7 @@ public class JiraResilienceTests : IDisposable
         var result = await _h.SaveDayAsync(_h.Today, [TimeHarness.Row("ABC-1", 2)], saved);
 
         Assert.Equal(0, result.SyncFailures);
-        Assert.Equal(2, _h.Jira.Requests.Count(r => r.Method == HttpMethod.Post));
+        Assert.Equal(2, _h.Jira.Writes.Count());
         Assert.Single(_h.Jira.Worklogs["ABC-1"]);
     }
 
@@ -75,7 +69,7 @@ public class JiraResilienceTests : IDisposable
         var result = await _h.SaveDayAsync(_h.Today, [TimeHarness.Row("ABC-1", 2)]);
 
         Assert.Equal(1, result.SyncFailures);
-        Assert.Single(_h.Jira.Requests, r => r.Method == HttpMethod.Post);
+        Assert.Single(_h.Jira.Writes);
         Assert.Single(await _h.QueuedAsync());
     }
 
@@ -85,7 +79,7 @@ public class JiraResilienceTests : IDisposable
         _h.Jira.TooManyRequests = 100;
         _h.Jira.RetryAfter = "1";
 
-        var ex = await Assert.ThrowsAsync<JiraException>(() => MyselfAsync());
+        var ex = await Assert.ThrowsAsync<JiraException>(() => _h.MyselfAsync());
 
         Assert.Equal(HttpStatusCode.TooManyRequests, ex.Status);
         Assert.Equal(JiraResilience.SlowDownMessage, ex.Message);
@@ -96,11 +90,11 @@ public class JiraResilienceTests : IDisposable
     [Fact]
     public async Task A_longer_pause_than_the_cap_fails_at_once()
     {
-        await MyselfAsync();
+        await _h.MyselfAsync();
         _h.Jira.TooManyRequests = 1;
         _h.Jira.RetryAfter = "60";
 
-        await Assert.ThrowsAsync<JiraException>(() => MyselfAsync());
+        await Assert.ThrowsAsync<JiraException>(() => _h.MyselfAsync());
 
         Assert.Equal(2, _h.Jira.Requests.Count);
         Assert.Equal(_start, _h.Clock.Now);
@@ -109,18 +103,18 @@ public class JiraResilienceTests : IDisposable
     [Fact]
     public async Task A_429_for_one_user_pauses_another_users_requests_to_the_same_host()
     {
-        await MyselfAsync();
+        await _h.MyselfAsync();
         _h.Jira.TooManyRequests = 1;
         _h.Jira.RetryAfter = "30"; // over the cap, so Carl's request gives up and the pause stays open
-        await Assert.ThrowsAsync<JiraException>(() => MyselfAsync());
+        await Assert.ThrowsAsync<JiraException>(() => _h.MyselfAsync());
 
         // While the host is paused, Anna's request doesn't reach Jira.
-        await Assert.ThrowsAsync<JiraException>(() => MyselfAsync(Anna));
+        await Assert.ThrowsAsync<JiraException>(() => _h.MyselfAsync(Anna));
         Assert.Equal(2, _h.Jira.Requests.Count);
 
         // Near the end of the pause it waits for the rest, then goes.
         _h.Clock.Advance(TimeSpan.FromSeconds(29));
-        await MyselfAsync(Anna);
+        await _h.MyselfAsync(Anna);
         var annas = Assert.Single(await LogAsync(TestUsers.Anna.Id));
         Assert.True(annas.Time >= _start + TimeSpan.FromSeconds(30));
     }
@@ -128,12 +122,12 @@ public class JiraResilienceTests : IDisposable
     [Fact]
     public async Task A_429_from_one_Jira_host_does_not_pause_another()
     {
-        await MyselfAsync();
+        await _h.MyselfAsync();
         _h.Jira.TooManyRequests = 1;
         _h.Jira.RetryAfter = "30";
-        await Assert.ThrowsAsync<JiraException>(() => MyselfAsync());
+        await Assert.ThrowsAsync<JiraException>(() => _h.MyselfAsync());
 
-        await MyselfAsync(OtherHost);
+        await _h.MyselfAsync(OtherHost);
 
         Assert.Equal(3, _h.Jira.Requests.Count);
         Assert.Equal(_start, _h.Clock.Now);
@@ -144,7 +138,7 @@ public class JiraResilienceTests : IDisposable
     {
         _h.Jira.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var requests = Enumerable.Range(0, 7).Select(_ => MyselfAsync()).ToList();
+        var requests = Enumerable.Range(0, 7).Select(_ => _h.MyselfAsync()).ToList();
         for (var i = 0; i < JiraResilience.MaxInFlight; i++)
             Assert.True(await _h.Jira.Arrived.WaitAsync(TimeSpan.FromSeconds(5)));
         Assert.Equal(JiraResilience.MaxInFlight, _h.Jira.Requests.Count);

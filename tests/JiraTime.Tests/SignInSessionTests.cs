@@ -17,9 +17,6 @@ public class SignInSessionTests : IDisposable
     private readonly EphemeralDataProtectionProvider _keys = new();
     private readonly CurrentUser _user = new();
 
-    public SignInSessionTests() =>
-        _h.Jira.Gets["/rest/api/2/myself"] = _ => new { key = "JIRAUSER1", name = "carl", displayName = "Carl Lilholm" };
-
     public void Dispose() => _h.Dispose();
 
     /// <summary>A new tab (circuit) over the same browser storage, server keys and store.</summary>

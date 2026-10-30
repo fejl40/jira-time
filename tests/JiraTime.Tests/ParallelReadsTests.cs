@@ -48,12 +48,12 @@ public class ParallelReadsTests : IDisposable
 
         var reading = _h.Log.GetRangeAsync(_h.Today.AddDays(-7), _h.Today);
         await ArrivedAsync(1 + JiraResilience.MaxInFlight); // the search, then four issues
-        Assert.Equal(JiraResilience.MaxInFlight, _h.Jira.Requests.Count(r => r.Path.Contains("/worklog")));
+        Assert.Equal(JiraResilience.MaxInFlight, _h.Jira.WorklogReads.Count());
         _h.Jira.Hold!.SetResult();
         var time = await reading;
 
         Assert.Equal(6, time.Entries.Count);
-        Assert.Equal(6, _h.Jira.Requests.Count(r => r.Path.Contains("/worklog")));
+        Assert.Equal(6, _h.Jira.WorklogReads.Count());
         Assert.Equal(JiraResilience.MaxInFlight, _h.Jira.MostInFlight);
     }
 
@@ -67,11 +67,11 @@ public class ParallelReadsTests : IDisposable
         var saving = _h.SaveDayAsync(_h.Today, [TimeHarness.Row("ABC-1", 1), TimeHarness.Row("ABC-2", 2), TimeHarness.Row("ABC-3", 3)], saved);
         await ArrivedAsync(1);
         for (var i = 0; i < 20; i++) await Task.Yield();
-        Assert.Single(_h.Jira.Requests, r => r.Method == HttpMethod.Post);
+        Assert.Single(_h.Jira.Writes);
         _h.Jira.Hold!.SetResult();
         await saving;
 
-        Assert.Equal(3, _h.Jira.Requests.Count(r => r.Method == HttpMethod.Post));
+        Assert.Equal(3, _h.Jira.Writes.Count());
         Assert.Equal(1, _h.Jira.MostInFlight);
     }
 }

@@ -66,8 +66,8 @@ public class SaveAllTests : IDisposable
         Assert.Equal([Monday, Tuesday, Wednesday], result.Saved.Keys.Order());
         var check = Assert.Single(_h.Jira.Requests.TakeWhile(r => r.Method != HttpMethod.Put));
         Assert.StartsWith("key in (", FakeJira.Jql(check));
-        Assert.Equal(6, _h.Jira.Requests.Count(r => r.Method == HttpMethod.Put));
-        Assert.Single(_h.Jira.Requests, r => FakeJira.Jql(r).StartsWith("key in")); // not one per day
+        Assert.Equal(6, _h.Jira.Writes.Count());
+        Assert.Single(_h.Jira.Searches, r => FakeJira.Jql(r).StartsWith("key in")); // not one per day
     }
 
     [Fact]
@@ -147,7 +147,7 @@ public class SaveAllTests : IDisposable
         var search = Assert.Single(check);
         Assert.StartsWith("key in (", FakeJira.Jql(search));
         Assert.Contains("validateQuery=warn", search.Path);
-        Assert.Equal(6, _h.Jira.Requests.Count(r => r.Method == HttpMethod.Put));
+        Assert.Equal(6, _h.Jira.Writes.Count());
     }
 
     [Fact]
@@ -163,7 +163,7 @@ public class SaveAllTests : IDisposable
         _h.Jira.Requests.Clear();
 
         Assert.True((await _h.SaveDayAsync(Monday, rows, saved)).ChangedInJira);
-        Assert.Single(_h.Jira.Requests, r => r.Path.StartsWith("/rest/api/2/issue/ABC-1/worklog?"));
+        Assert.StartsWith("/rest/api/2/issue/ABC-1/worklog?", Assert.Single(_h.Jira.WorklogReads).Path);
     }
 
     [Fact]
@@ -178,7 +178,7 @@ public class SaveAllTests : IDisposable
         _h.Jira.Requests.Clear();
 
         Assert.True((await _h.SaveDayAsync(Monday, rows, saved)).ChangedInJira);
-        Assert.DoesNotContain(_h.Jira.Requests, r => r.Method == HttpMethod.Put);
+        Assert.Empty(_h.Jira.Writes);
     }
 
     [Fact]
@@ -202,6 +202,6 @@ public class SaveAllTests : IDisposable
 
         Assert.True((await _h.SaveDayAsync(Monday, rows)).Saved);
 
-        Assert.DoesNotContain(_h.Jira.Requests, r => FakeJira.Jql(r).StartsWith("key in"));
+        Assert.DoesNotContain(_h.Jira.Searches, r => FakeJira.Jql(r).StartsWith("key in"));
     }
 }

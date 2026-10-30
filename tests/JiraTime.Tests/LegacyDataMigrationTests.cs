@@ -104,7 +104,6 @@ public class LegacyDataMigrationTests : IDisposable
     public async Task Signing_in_moves_the_old_data_to_the_verified_user()
     {
         await WriteOldDataAsync();
-        _h.Jira.Gets["/rest/api/2/myself"] = _ => new { key = "JIRAUSER1", name = "carl", displayName = "Carl Lilholm" };
         var user = new CurrentUser();
 
         await _h.Identity(user).SignInAsync(TimeHarness.Server);

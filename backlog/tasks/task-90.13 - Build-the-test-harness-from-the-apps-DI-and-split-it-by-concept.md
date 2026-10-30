@@ -1,9 +1,10 @@
 ---
 id: TASK-90.13
 title: Build the test harness from the app's DI and split it by concept
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 11:32'
+updated_date: '2026-10-30 12:34'
 labels:
   - refactor
 dependencies:
@@ -47,12 +48,18 @@ Rules for this subtask: edit only the files listed. Do not edit AGENTS.md, READM
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Adding a constructor parameter to an app service needs no harness change; TimeHarness has no new XxxService(...) for app services
-- [ ] #2 TimeHarness.cs holds only TimeHarness, UserData and TestUsers and is <= 150 lines
-- [ ] #3 No test registers /myself unless it needs a non-default user and no test declares its own MyselfAsync
-- [ ] #4 FakeJira.Client is gone and request-count assertions use the named queries
-- [ ] #5 Same number of tests, all green
-- [ ] #6 Only the files listed under Files are created, edited, moved or deleted
-- [ ] #7 Behaviour and what the user sees stay the same
-- [ ] #8 dotnet build has 0 warnings and dotnet test passes
+- [x] #1 Adding a constructor parameter to an app service needs no harness change; TimeHarness has no new XxxService(...) for app services
+- [x] #2 TimeHarness.cs holds only TimeHarness, UserData and TestUsers and is <= 150 lines
+- [x] #3 No test registers /myself unless it needs a non-default user and no test declares its own MyselfAsync
+- [x] #4 FakeJira.Client is gone and request-count assertions use the named queries
+- [x] #5 Same number of tests, all green
+- [x] #6 Only the files listed under Files are created, edited, moved or deleted
+- [x] #7 Behaviour and what the user sees stay the same
+- [x] #8 dotnet build has 0 warnings and dotnet test passes
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added services.AddJiraTime(dataDir) (Services/AppServices.cs): storage, data protection, TimeProvider, the scoped/singleton data services, the Jira request log and AddJiraHttp. Program.cs calls it and registers only the UI services (MotionScript, Modals, ShownPeriod). TimeHarness builds a ServiceProvider from AddJiraTime(Files.Path), swapping in TestClock (TimeProvider), the TempStore's store (IDocumentStore) and FakeJira (ConfigureHttpClientDefaults primary handler); Carl's tab is a DI scope whose CurrentUser is signed in via TestUsers.SignIn; services are read with Get<T>(); For(key) is another scope; Identity(tab) uses ActivatorUtilities; new MyselfAsync(connection?). TestClock and TempStore moved to their own files. FakeJira answers /myself with Myself (Carl) by default, has Writes and WorklogReads (FakeJira.cs) and Searches and WorklogSearches (FakeJiraSearch.cs); faults, 429s, offline and hold/in-flight knobs moved to FakeJiraFaults.cs; Client() deleted. Tests drop their /myself registrations and own MyselfAsync and count with the named queries. The request log of a harness now lives in <temp>/logs/jira as in the app. The test-only WorkCalendarReading.GetDayAsync extension (from TASK-90.12) stays at the end of TimeHarness.cs (149 lines): moving it would need an unlisted file. 566 tests, same as before. Doc changes for cleanup: AGENTS.md Layout add 'Services/AppServices.cs  AddJiraTime: registers the app's services, for Program.cs and the tests' and change Program.cs to 'AddJiraTime plus the UI's own services (modals, motion, shown period)'; the Tests section can say TimeHarness builds the app's services from AddJiraTime with a TestClock, a temp store and FakeJira (Myself, Writes, WorklogReads, Searches, WorklogSearches; faults in FakeJiraFaults.cs).
+<!-- SECTION:FINAL_SUMMARY:END -->

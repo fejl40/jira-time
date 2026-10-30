@@ -1,54 +1,17 @@
 using JiraTime.Components;
 using JiraTime.Services;
-using JiraTime.Storage;
-using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
 var dataDir = Path.GetFullPath(builder.Configuration["DataDirectory"] ?? "data", builder.Environment.ContentRootPath);
 
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddJiraTime(dataDir);
 
-// Storage: JSON files on disk for now. Swap this line for a document database later.
-builder.Services.AddSingleton<IDocumentStore>(_ => new FileDocumentStore(Path.Combine(dataDir, "documents")));
-
-// Encrypts the Jira connection (incl. token) before it is put in the browser's localStorage.
-// The keys stay on the server, next to the data, so they survive restarts.
-var dataProtection = builder.Services.AddDataProtection()
-    .SetApplicationName("JiraTime")
-    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataDir, "keys")));
-// On Windows the key file itself is encrypted to your Windows account.
-if (OperatingSystem.IsWindows())
-    dataProtection.ProtectKeysWithDpapi();
-
-// Per browser tab: who is signed in (verified with Jira), and that user's data.
-builder.Services.AddScoped<CurrentUser>();
-builder.Services.AddScoped<JiraIdentity>();
-builder.Services.AddScoped<SignInSession>();
-builder.Services.AddScoped<JiraTime.Components.MotionScript>();
-builder.Services.AddScoped<JiraTime.Components.Modals>();
-builder.Services.AddSingleton<LegacyDataMigration>();
-builder.Services.AddScoped<RetryQueue>();
-builder.Services.AddScoped<WorklogSync>();
-builder.Services.AddScoped<TimeLog>();
-builder.Services.AddScoped<PeriodLoader>();
-builder.Services.AddTransient<IssueStatuses>();
-builder.Services.AddTransient<JiraTime.Components.ShownPeriod>(); // one per timesheet page
-builder.Services.AddSingleton<RecentWorklogIssues>();
-builder.Services.AddScoped<WorkCalendarService>();
-builder.Services.AddScoped<EpicExportStore>();
-builder.Services.AddScoped<MonthExportLoader>();
-builder.Services.AddSingleton(TimeProvider.System);
-builder.Services.AddSingleton<JiraIssueLookup>();
-// Every Jira request is logged per user and day (data/logs/jira) and told live to the user's open tabs.
-builder.Services.AddSingleton(sp => new JiraRequestLog(Path.Combine(dataDir, "logs", "jira"), sp.GetRequiredService<TimeProvider>()));
-builder.Services.AddSingleton<JiraRequestFeed>();
-builder.Services.AddSingleton<JiraRequestRecorder>();
-builder.Services.AddScoped<MyJiraLog>();
-// One typed client for every Jira request: timeout, rate-limit retries, queue and logging (JiraResilience).
-builder.Services.AddJiraHttp();
-builder.Services.AddTransient<JiraClient>();
-builder.Services.AddTransient<JiraWorklogClient>();
+// The UI's own services, per browser tab.
+builder.Services.AddScoped<MotionScript>();
+builder.Services.AddScoped<Modals>();
+builder.Services.AddTransient<ShownPeriod>(); // one per timesheet page
 
 var app = builder.Build();
 
