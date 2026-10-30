@@ -38,6 +38,10 @@ builder.Services.AddScoped<EpicExportStore>();
 builder.Services.AddScoped<MonthExportLoader>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<JiraIssueLookup>();
+// Every Jira request is logged per user and day (data/logs/jira) and told live to the user's open tabs.
+builder.Services.AddSingleton(sp => new JiraRequestLog(Path.Combine(dataDir, "logs", "jira"), sp.GetRequiredService<TimeProvider>()));
+builder.Services.AddSingleton<JiraRequestFeed>();
+builder.Services.AddSingleton<JiraRequestRecorder>();
 builder.Services.AddHttpClient<JiraClient>(c => c.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddHttpClient<JiraWorklogClient>(c => c.Timeout = TimeSpan.FromSeconds(30));
 

@@ -6,9 +6,9 @@ using static JiraTime.Services.JiraHttp;
 namespace JiraTime.Services;
 
 /// <summary>Jira REST calls that read and write worklogs. Runs on the server, so there are no CORS issues.</summary>
-public class JiraWorklogClient(HttpClient http)
+public class JiraWorklogClient(HttpClient http, JiraRequestRecorder recorder)
 {
-    private readonly JiraHttp _jira = new(http);
+    private readonly JiraHttp _jira = new(http, recorder);
 
     /// <summary>
     /// Worklogs <paramref name="profile"/> logged on days from <paramref name="from"/> to <paramref name="to"/>,

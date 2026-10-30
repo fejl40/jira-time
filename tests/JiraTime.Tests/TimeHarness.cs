@@ -1,6 +1,7 @@
 using JiraTime.Domain;
 using JiraTime.Services;
 using JiraTime.Storage;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace JiraTime.Tests;
 
@@ -26,15 +27,20 @@ public sealed class TimeHarness : IDisposable
     public JiraIssueLookup Issues { get; }
     public WorkCalendarService Calendar { get; }
     public LegacyDataMigration Legacy { get; }
+    public JiraRequestLog RequestLog { get; }
+    public JiraRequestFeed Feed { get; } = new(NullLogger<JiraRequestFeed>.Instance);
+    public JiraRequestRecorder Recorder { get; }
 
     public TimeHarness(JiraConnection? connection = null)
     {
-        Connection = connection ?? Server;
-        var user = User = CurrentUser.SignedIn(TestUsers.Carl, connection: Connection);
-        Issues = new JiraIssueLookup(new JiraClient(Jira.Client()), Clock);
+        var user = User = CurrentUser.SignedIn(TestUsers.Carl, connection: connection ?? Server);
+        Connection = user.Connection!;
+        RequestLog = new JiraRequestLog(System.IO.Path.Combine(Files.Path, "jira-logs"), Clock);
+        Recorder = new JiraRequestRecorder(RequestLog, Feed, Clock, NullLogger<JiraRequestRecorder>.Instance);
+        Issues = new JiraIssueLookup(new JiraClient(Jira.Client(), Recorder), Clock);
         Calendar = new WorkCalendarService(Store, user);
         Legacy = new LegacyDataMigration(Store, Clock);
-        var client = new JiraWorklogClient(Jira.Client());
+        var client = new JiraWorklogClient(Jira.Client(), Recorder);
         Queue = new RetryQueue(Store, user);
         Recent = new RecentWorklogIssues(Clock);
         Log = new TimeLog(client, Queue, user, Recent, Clock);
@@ -51,7 +57,7 @@ public sealed class TimeHarness : IDisposable
     }
 
     /// <summary>Signing in through the fake Jira; <paramref name="tab"/> becomes the user Jira confirms.</summary>
-    public JiraIdentity Identity(CurrentUser tab) => new(new JiraClient(Jira.Client()), Store, tab, Legacy, Clock);
+    public JiraIdentity Identity(CurrentUser tab) => new(new JiraClient(Jira.Client(), Recorder), Store, tab, Legacy, Clock);
 
     /// <summary>A period loader and status book over the same fake Jira and store.</summary>
     public (PeriodLoader Loader, IssueStatuses Statuses) PeriodLoading() =>

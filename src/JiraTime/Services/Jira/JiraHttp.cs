@@ -15,7 +15,7 @@ public class JiraException(string message, HttpStatusCode? status = null) : Exce
 /// Sends requests to Jira: picks the API version, adds auth, and turns failures into <see cref="JiraException"/>s
 /// with messages a user can act on.
 /// </summary>
-internal class JiraHttp(HttpClient http)
+internal class JiraHttp(HttpClient http, JiraRequestRecorder recorder)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -31,14 +31,33 @@ internal class JiraHttp(HttpClient http)
     /// <summary>Sends <paramref name="body"/> as JSON and reads the answer as <typeparamref name="T"/> (default when there is none).</summary>
     public async Task<T> SendAsync<T>(JiraConnection c, HttpMethod method, string path, object? body, CancellationToken ct)
     {
+        var json = body is null ? null : JsonSerializer.Serialize(body, Json);
         using var req = new HttpRequestMessage(method, c.BaseUrl.TrimEnd('/') + path);
         req.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        if (body is not null)
-            req.Content = JsonContent.Create(body, options: Json);
+        if (json is not null)
+            req.Content = new StringContent(json, Encoding.UTF8, "application/json");
         req.Headers.Authorization = c.IsCloud
             ? new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{c.Email}:{c.Token}")))
             : new AuthenticationHeaderValue("Bearer", c.Token);
 
+        // Every request is logged, however it ends.
+        var call = recorder.Start(c, req, json);
+        try
+        {
+            var result = await SendAsync<T>(c, req, call, ct);
+            await call.FinishAsync(null);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            await call.FinishAsync(ex is OperationCanceledException ? "Cancelled before Jira answered." : ex.Message);
+            throw;
+        }
+    }
+
+    private async Task<T> SendAsync<T>(JiraConnection c, HttpRequestMessage req, JiraCall call, CancellationToken ct)
+    {
+        var method = req.Method;
         HttpResponseMessage res;
         try
         {
@@ -55,6 +74,7 @@ internal class JiraHttp(HttpClient http)
 
         using (res)
         {
+            await call.ReadResponseAsync(res, ct);
             if (res.StatusCode == HttpStatusCode.Unauthorized)
                 throw new JiraException("Jira rejected the token (401). Check that it is correct and not expired.", res.StatusCode);
 

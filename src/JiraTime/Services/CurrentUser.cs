@@ -11,6 +11,7 @@ public sealed class CurrentUser
 {
     public UserKey? Key { get; private set; }
     public JiraProfile? Profile { get; private set; }
+    /// <summary>The verified connection; it carries the owner, so its Jira requests are logged under this user.</summary>
     public JiraConnection? Connection { get; private set; }
 
     /// <summary>True when Jira could not be reached and a token verified earlier was accepted.</summary>
@@ -34,7 +35,7 @@ public sealed class CurrentUser
 
     internal void Set(UserKey key, JiraProfile profile, JiraConnection connection, bool offline)
     {
-        (Key, Profile, Connection, VerifiedOffline) = (key, profile, connection, offline);
+        (Key, Profile, Connection, VerifiedOffline) = (key, profile, connection with { Owner = key.Id }, offline);
         Changed?.Invoke();
     }
 

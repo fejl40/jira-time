@@ -6,9 +6,9 @@ using static JiraTime.Services.JiraHttp;
 namespace JiraTime.Services;
 
 /// <summary>Jira REST calls about issues and the user. Runs on the server, so there are no CORS issues.</summary>
-public class JiraClient(HttpClient http)
+public class JiraClient(HttpClient http, JiraRequestRecorder recorder)
 {
-    private readonly JiraHttp _jira = new(http);
+    private readonly JiraHttp _jira = new(http, recorder);
 
     /// <summary>The user the token belongs to. Doubles as a token check.</summary>
     public async Task<JiraProfile> GetMyselfAsync(JiraConnection c, CancellationToken ct = default) =>

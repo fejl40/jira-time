@@ -16,6 +16,13 @@ public record JiraConnection(string BaseUrl, JiraAuthType AuthType, string Token
     public bool IsCloud => AuthType == JiraAuthType.Cloud;
     [JsonIgnore]
     public string Host => Uri.TryCreate(BaseUrl, UriKind.Absolute, out var u) ? u.Host : BaseUrl;
+
+    /// <summary>
+    /// Owner id (<see cref="UserKey.Id"/>) of the user Jira confirmed this token for; null until then.
+    /// Requests are logged under it.
+    /// </summary>
+    [JsonIgnore]
+    public string? Owner { get; init; }
 }
 
 /// <param name="Id">accountId on Cloud, user key on Server/DC.</param>

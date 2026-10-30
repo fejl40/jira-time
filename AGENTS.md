@@ -64,6 +64,7 @@ Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work ho
 Domain/Milestones.cs               things reached while the user watches (a day becoming complete), to celebrate once
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount, IOwnedDocument
 Domain/MonthExport.cs              the month export: rows per day and issue, tab-separated text
+Domain/JiraLog.cs                  one logged Jira request (JiraLogEntry)
 Storage/IDocumentStore.cs          the document store interfaces
 Storage/FileDocumentStore.cs       the file store: one JSON file per document
 Storage/FileDocumentCollection.cs  one collection of the file store, cached in memory
@@ -86,6 +87,7 @@ Services/JiraIssueLookup.cs        sprint and period issues and issue statuses, 
 Services/EpicExportStore.cs        Fase, Forordning and Hovedleverance per epic for the export
 Services/MonthExportLoader.cs      loads a month for the export: time, epics, values per epic
 Services/ExpiringCache.cs          small cache whose values expire
+Services/JiraLog/                  the Jira request log: recorder (called by JiraHttp), JSONL files, live feed per user
 Components/Layout/MainLayout.razor header + redirect to setup when not signed in
 Components/Pages/Setup/            Connect
 Components/Pages/Timesheet.razor   shows a period: wires PeriodLoader, WorklogSync and the parts below
@@ -114,6 +116,7 @@ Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
 | Export values per epic (Fase, Forordning, Hovedleverance) | `data/documents/epic-export-values/<owner>-<epic>.json` |
 | Logged time | **Jira** (your worklogs) |
 | Changes Jira couldn't take yet (the retry queue) | `data/documents/time-entries/<id>.json`, one file per change, with its owner; removed once Jira has it |
+| Jira request log (every request and response, without the token) | `data/logs/jira/<owner>/yyyy-MM-dd.jsonl`, one JSON line per request; deleted after 30 days |
 | Copy of the data from before multi-user support | `data/documents/backups/` |
 | Copy of the time entries from before Jira became the source of truth | `data/documents/time-entry-backups/` |
 
