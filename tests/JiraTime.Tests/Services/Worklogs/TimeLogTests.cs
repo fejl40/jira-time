@@ -86,11 +86,21 @@ public class TimeLogTests : IDisposable
 
         Assert.Equal(["NEW-1", "NEW-2", "NEW-3"], (await Period()).Entries.Select(e => e.IssueKey).Order());
 
-        Assert.Equal(2, _h.Jira.Requests.Count); // the worklog search, then one search by key
-        var byKey = FakeJira.Jql(_h.Jira.Requests[1]);
-        Assert.StartsWith("key in (", byKey);
+        Assert.Equal(2, _h.Jira.Requests.Count); // the worklog search and one search by key
+        var request = Assert.Single(_h.Jira.Requests, r => FakeJira.Jql(r).StartsWith("key in ("));
+        var byKey = FakeJira.Jql(request);
         Assert.All(new[] { "NEW-1", "NEW-2", "NEW-3" }, key => Assert.Contains(key, byKey));
-        Assert.Contains("fields=summary,worklog", _h.Jira.Requests[1].Path);
+        Assert.Contains("fields=summary,worklog", request.Path);
+    }
+
+    [Fact]
+    public async Task An_issue_just_saved_on_that_the_search_also_finds_counts_once()
+    {
+        await _h.SaveDayAsync(Day, [Row("NEW-1", 3)]);
+        _h.Log.Refresh();
+
+        var entry = Assert.Single((await Period()).Entries);
+        Assert.Equal(TimeSpan.FromHours(3), entry.Duration);
     }
 
     [Fact]

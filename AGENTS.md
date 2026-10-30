@@ -195,8 +195,9 @@ period's issues at the same time, and issues read on their own are read in paral
 at most 10 in flight per host (see Jira rate limits). Writes stay one at a time, so the changed-in-Jira check and
 Jira's per-issue write limits keep working. `JiraAction` is AsyncLocal, so parallel requests still log under their action.
 Jira's search can take a while to find a new worklog, so for 15 minutes after a save the issues you
-saved on, when the worklog search doesn't return them, are read by key in one search with their worklogs
-(`key in (...)`, `fields=summary,worklog`): field values come from the issue itself, not the worklog index.
+saved on are also read by key in one search with their worklogs (`key in (...)`, `fields=summary,worklog`), sent
+together with the worklog search: field values come from the issue itself, not the worklog index, and an issue both
+return is taken from the search by key.
 
 Several issues are always read in one search, never one request each (`Services/Jira/JiraSearch.cs`): status and epic
 lookups, the recently saved issues and the changed-in-Jira check all use `key in (...)`, 100 keys per search (the

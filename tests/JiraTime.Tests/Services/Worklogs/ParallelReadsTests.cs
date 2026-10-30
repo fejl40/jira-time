@@ -64,6 +64,24 @@ public class ParallelReadsTests : IDisposable
     }
 
     [Fact]
+    public async Task Issues_just_saved_on_are_read_together_with_the_worklog_search()
+    {
+        _h.Jira.Hold = null;
+        await _h.SaveDayAsync(_h.Today, [TestEntries.Row("NEW-1", 3)]);
+        _h.Jira.NotIndexed.Add("NEW-1");
+        _h.Log.Refresh();
+        while (_h.Jira.Arrived.Wait(0)) { } // forget the save
+        _h.Jira.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var reading = _h.Log.GetRangeAsync(_h.Today.AddDays(-7), _h.Today);
+        await ArrivedAsync(2); // both are out before Jira answered either
+        _h.Jira.Hold.SetResult();
+        var time = await reading;
+
+        Assert.Equal("NEW-1", Assert.Single(time.Entries).IssueKey);
+    }
+
+    [Fact]
     public async Task Saving_a_day_writes_one_worklog_at_a_time()
     {
         _h.Jira.HoldWhen = r => r.Method == HttpMethod.Post;

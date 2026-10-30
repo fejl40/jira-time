@@ -1,9 +1,10 @@
 ---
 id: TASK-105
 title: Read recently saved issues together with the worklog search
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 15:19'
+updated_date: '2026-10-30 15:22'
 labels:
   - jira
   - performance
@@ -20,8 +21,8 @@ For 15 minutes after a save, GetMyWorklogsAsync reads the issues just saved on b
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The worklog search and the search by key for recently saved issues go out at the same time
-- [ ] #2 An issue both return is read and shown once
-- [ ] #3 Tests show the requests overlap and the results are unchanged
-- [ ] #4 Build has 0 warnings and all tests pass
+- [x] #1 The worklog search and the search by key for recently saved issues go out at the same time
+- [x] #2 An issue both return is read and shown once
+- [x] #3 Tests show the requests overlap and the results are unchanged
+- [x] #4 Build has 0 warnings and all tests pass
 <!-- AC:END -->

@@ -17,11 +17,15 @@ public class JiraWorklogClient(JiraHttp jira, TimeProvider clock)
         IReadOnlyCollection<JiraIssue>? alsoRead = null, CancellationToken ct = default)
     {
         var jql = $"worklogAuthor = {Jql.User(profile)} AND worklogDate >= {Jql.Date(from)} AND worklogDate <= {Jql.Date(to)}";
-        var found = await jira.SearchAllAsync<SearchIssue>(c, jql, WorklogFields, ct);
-        var keys = found.Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
         // A search by key reads the issues themselves, so their worklogs are there before the worklog search finds them.
-        var notFound = (alsoRead ?? []).Where(i => keys.Add(i.Key)).Select(i => i.Key).ToList();
-        if (notFound.Count > 0) found.AddRange(await jira.ByKeysAsync<SearchIssue>(c, notFound, WorklogFields, ct));
+        // Both go out together; an issue both return is taken from the search by key, which reads the issue itself.
+        var searching = jira.SearchAllAsync<SearchIssue>(c, jql, WorklogFields, ct);
+        var alsoKeys = (alsoRead ?? []).Select(i => i.Key).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var byKey = alsoKeys.Count > 0 ? jira.ByKeysAsync<SearchIssue>(c, alsoKeys, WorklogFields, ct) : Task.FromResult(new List<SearchIssue>());
+        await Task.WhenAll(searching, byKey);
+        var direct = await byKey;
+        var keys = direct.Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var found = direct.Concat((await searching).Where(i => keys.Add(i.Key))).ToList();
 
         var range = new WorklogRange(profile, from, to);
         // Only an issue with more worklogs than the search sent is read on its own; those go out together.
