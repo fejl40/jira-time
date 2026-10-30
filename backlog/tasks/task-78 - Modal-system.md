@@ -1,9 +1,10 @@
 ---
 id: TASK-78
 title: Modal system
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-30 09:11'
+updated_date: '2026-10-30 09:14'
 labels: []
 dependencies: []
 ordinal: 123000

@@ -122,3 +122,18 @@
 /* A part that appears pending at once, e.g. the grid column of the day being saved, dimmed after the delay. */
 .waiting-pending { opacity: 0.5; animation: waiting-hold var(--waiting-delay) steps(1, end) both; }
 @keyframes waiting-hold { from { opacity: 1; } }
+
+/* ---- Modals (Components/Modals, wwwroot/modal.js) ---- */
+
+/* A modal rises in over a backdrop that fades in; closing (data-leaving) plays it backwards.
+   On phones the sheet slides up from the bottom. */
+.modal[open] { animation: modal-in var(--motion-fast) var(--motion-ease); }
+.modal[open]::backdrop { animation: modal-fade var(--motion-fast) var(--motion-ease); }
+.modal[data-leaving] { animation: modal-in var(--motion-fast) var(--motion-ease) reverse forwards; }
+.modal[data-leaving]::backdrop { animation: modal-fade var(--motion-fast) var(--motion-ease) reverse forwards; }
+@keyframes modal-in { from { opacity: 0; transform: translateY(8px) scale(0.97); } }
+@keyframes modal-fade { from { opacity: 0; } }
+@media (width < 40rem) {
+  .modal[open], .modal[data-leaving] { animation-name: modal-sheet; animation-duration: var(--motion); }
+  @keyframes modal-sheet { from { transform: translateY(100%); } }
+}

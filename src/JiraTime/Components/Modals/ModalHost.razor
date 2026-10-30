@@ -1,0 +1,103 @@
+@namespace JiraTime.Components
+@implements IAsyncDisposable
+@inject Modals Modals
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+@* Draws the tab's open modals, each in a native <dialog> opened by wwwroot/modal.js. The server owns
+   which are open; the script reports Esc, backdrop clicks and the data-modal-* buttons. A closed modal
+   stays in the page until its closing animation has played. Placed once, in MainLayout. *@
+
+@foreach (var modal in Modals.Open.Concat(_leaving))
+{
+    <dialog @key="modal" id="modal-@modal.Id" class="modal" aria-labelledby="modal-@modal.Id-title"
+            data-modal="@modal.Id" data-modal-dismiss="@modal.CanDismiss" data-modal-busy="@modal.Busy">
+        <CascadingValue Value="modal">
+            <DynamicComponent Type="modal.Component" Parameters="modal.Parameters" />
+        </CascadingValue>
+    </dialog>
+}
+
+@code {
+    /// <summary>Modals drawn last time; one that is gone from <see cref="Modals.Open"/> has been closed.</summary>
+    private List<ModalContext> _drawn = [];
+    /// <summary>Closed modals whose dialog still plays its closing animation.</summary>
+    private readonly List<ModalContext> _leaving = [];
+    /// <summary>Modals the browser has opened.</summary>
+    private readonly HashSet<ModalContext> _shown = [];
+    private DotNetObjectReference<ModalHost>? _self;
+    private string _path = "";
+
+    protected override void OnInitialized()
+    {
+        _path = PathOf(Nav.Uri);
+        Modals.Changed += OnModalsChanged;
+        Nav.LocationChanged += OnLocationChanged;
+    }
+
+    private void OnModalsChanged() => InvokeAsync(() =>
+    {
+        _leaving.AddRange(_drawn.Where(m => !Modals.Open.Contains(m) && _shown.Contains(m) && !_leaving.Contains(m)));
+        _drawn = Modals.Open.ToList();
+        StateHasChanged();
+    });
+
+    /// <summary>Another page closes every modal as cancelled; a new query on the same page (another day) doesn't.</summary>
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        var path = PathOf(e.Location);
+        if (path == _path) return;
+        _path = path;
+        InvokeAsync(Modals.CloseAll);
+    }
+
+    private static string PathOf(string uri) => new Uri(uri).AbsolutePath;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        _self ??= DotNetObjectReference.Create(this);
+        foreach (var modal in Modals.Open.Where(_shown.Add).ToList())
+            await JS.InvokeVoidAsync("jiraModals.open", modal.Id, _self);
+        foreach (var modal in _leaving.ToList())
+            await LeaveAsync(modal);
+    }
+
+    /// <summary>Plays the closing animation, then takes the dialog out of the page.</summary>
+    private async Task LeaveAsync(ModalContext modal)
+    {
+        if (!_shown.Remove(modal)) return;
+        try
+        {
+            await JS.InvokeVoidAsync("jiraModals.close", modal.Id);
+        }
+        catch (JSDisconnectedException)
+        {
+            // The tab is gone.
+        }
+        _leaving.Remove(modal);
+        StateHasChanged();
+    }
+
+    /// <summary>Esc or a click on the backdrop: cancels, unless the modal must be answered or is busy.</summary>
+    [JSInvokable]
+    public Task Dismiss(int id) => InvokeAsync(() =>
+    {
+        if (Modals.Find(id) is { CanDismiss: true } modal) modal.Cancel();
+    });
+
+    /// <summary>A data-modal-close (no result) or data-modal-result button.</summary>
+    [JSInvokable]
+    public Task CloseWith(int id, string? result) => InvokeAsync(() =>
+    {
+        if (Modals.Find(id) is { Busy: false } modal) modal.Close(result);
+    });
+
+    public ValueTask DisposeAsync()
+    {
+        Modals.Changed -= OnModalsChanged;
+        Nav.LocationChanged -= OnLocationChanged;
+        Modals.CloseAll();
+        _self?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}
