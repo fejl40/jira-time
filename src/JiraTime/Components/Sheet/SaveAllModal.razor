@@ -1,0 +1,87 @@
+@attribute [Modal(Size = ModalSize.Large)]
+
+@* Save all asks here first: every unsaved day with the rows it adds, changes and removes in Jira, and
+   the totals. Save closes with true and the page saves; the rules are in Domain/UnsavedChanges.cs. *@
+
+<Modal Title="@($"Save {Format.Days(Changes.ToSave.Count)} to Jira?")">
+    <ChildContent>
+        <p class="text-slate-600 dark:text-slate-300" data-save-all-summary>
+            @Summary
+            @if (Changes.DeletedWorklogs is var deleted and > 0)
+            {
+                @(" ")<span class="font-medium text-red-700 dark:text-red-400">@deleted @(deleted == 1 ? "worklog is" : "worklogs are") deleted in Jira.</span>
+            }
+        </p>
+        <ul class="mt-4 space-y-4">
+            @foreach (var day in Changes.Days)
+            {
+                <li data-save-all-day="@Format.Iso(day.Day)">
+                    <div class="flex items-baseline gap-2 border-b border-slate-100 pb-1 dark:border-slate-800">
+                        <span class="font-semibold">@Format.LongDay(day.Day)</span>
+                        <span class="ml-auto tabular-nums text-muted">@Format.HoursText(day.Before) → <span class="font-medium text-slate-800 dark:text-slate-100">@Format.HoursText(day.After)</span></span>
+                    </div>
+                    <ul class="mt-1">
+                        @foreach (var row in day.Rows)
+                        {
+                            <li class="flex flex-wrap items-baseline gap-x-2 py-1" data-change="@row.Kind.ToString().ToLowerInvariant()">
+                                <span class="@KindClass(row.Kind) w-16 flex-none text-xs font-medium">@row.Kind</span>
+                                <span class="min-w-0 flex-1 truncate @(row.Kind == RowChangeKind.Removed ? "line-through text-muted" : "")">
+                                    @if (row.IssueBefore is { } before) { <span class="text-muted line-through">@before</span> <text> → </text> }
+                                    <span class="font-semibold">@(row.IssueKey == "" ? "No issue" : row.IssueKey)</span> @row.IssueSummary
+                                    @if (row.CommentChanged || row.Kind == RowChangeKind.Added && row.Comment is not null)
+                                    {
+                                        <span class="text-muted">· “@(row.Comment ?? "no comment")”</span>
+                                    }
+                                </span>
+                                <span class="flex flex-none gap-1 tabular-nums">
+                                    @if (row.HoursBefore is { } was) { <span class="text-muted line-through">@Format.HoursText(was)</span> <span>→</span> }
+                                    @Format.HoursText(row.Hours)
+                                </span>
+                                @if (row.DeletesWorklog)
+                                {
+                                    <span class="basis-full pl-[4.5rem] text-xs text-red-700 dark:text-red-400">Deletes the worklog in Jira</span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                    @if (day.Problem is { } problem)
+                    {
+                        <p class="mt-1 text-xs text-warning" data-save-all-problem>Not saved until fixed: @problem</p>
+                    }
+                </li>
+            }
+        </ul>
+    </ChildContent>
+    <Footer>
+        <button type="button" class="btn-secondary" data-modal-close>Cancel</button>
+        <button type="button" class="btn-primary" disabled="@(Changes.ToSave.Count == 0)" data-modal-result="true" data-modal-autofocus data-save-all-confirm>
+            Save @Format.Days(Changes.ToSave.Count)
+        </button>
+    </Footer>
+</Modal>
+
+@code {
+    [Parameter, EditorRequired] public UnsavedChanges Changes { get; set; } = default!;
+
+    private static readonly (RowChangeKind Kind, string Label)[] Kinds =
+        [(RowChangeKind.Added, "added"), (RowChangeKind.Changed, "changed"), (RowChangeKind.Removed, "removed")];
+
+    private string Summary
+    {
+        get
+        {
+            if (Changes.ToSave.Count == 0) return "No day can be saved yet. Fix the days below first.";
+            var counts = new List<string>();
+            foreach (var (kind, label) in Kinds)
+                if (Changes.Count(kind) is var n and > 0) counts.Add($"{Format.Count(n, "row")} {label}");
+            return $"{string.Join(", ", counts)}. Jira then has {Format.HoursText(Changes.After)} on these days, now {Format.HoursText(Changes.Before)}.";
+        }
+    }
+
+    private static string KindClass(RowChangeKind kind) => kind switch
+    {
+        RowChangeKind.Added => "text-emerald-700 dark:text-emerald-400",
+        RowChangeKind.Changed => "text-unsaved",
+        _ => "text-red-700 dark:text-red-400",
+    };
+}

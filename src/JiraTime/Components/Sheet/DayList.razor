@@ -41,17 +41,14 @@
 @code {
     [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
     [Parameter] public DateOnly Selected { get; set; }
-    /// <summary>The day Save day is saving; it shows as pending.</summary>
-    [Parameter] public DateOnly? PendingDay { get; set; }
     [Parameter] public EventCallback<DateOnly> OnSelect { get; set; }
 
-    /// <summary>Selected in blue, weekends and holidays grey, time off in its reason's tint; pending while Save day saves it.</summary>
+    /// <summary>Selected in blue, weekends and holidays grey, time off in its reason's tint.</summary>
     private string RowClass(DateOnly day, DayInfo? info)
     {
-        var pending = day == PendingDay ? "waiting-pending" : "";
         var background = day == Selected ? "bg-blue-50 dark:bg-blue-950/60"
             : info is { Kind: DayKind.Weekend or DayKind.Holiday } ? "bg-slate-50 dark:bg-slate-800/60"
             : "";
-        return $"{pending} {background} {DayOffLook.Classes(info)}";
+        return $"{background} {DayOffLook.Classes(info)}";
     }
 }

@@ -18,11 +18,11 @@
                        Choices="Choices" Comments="Extras.Comments"
                        OnIssuePicked="key => Statuses.LookUpAsync([key])" Connection="connection" Expected="@(Sheet.Day(Day)?.Expected ?? TimeSpan.Zero)"
                        Previous="Sheet.PreviousWorkedDay(Day)" Waits="Waits"
-                       OnChanged="OnChanged" OnSaved="OnSaved" OnChangedInJira="OnReload" OnDiscard="DiscardAsync" />
+                       OnChanged="OnChanged" OnDiscard="DiscardAsync" />
         </div>
         <p class="hint mt-4 hidden sm:block" data-shortcuts>
             Keys: <kbd>←</kbd> <kbd>→</kbd> previous / next day · <kbd>N</kbd> add a row ·
-            <kbd>Enter</kbd> next row · <kbd>Esc</kbd> leave a field · <kbd>Ctrl</kbd>+<kbd>S</kbd> save the day
+            <kbd>Enter</kbd> next row · <kbd>Esc</kbd> leave a field · <kbd>Ctrl</kbd>+<kbd>S</kbd> save all
         </p>
     }
 </section>
@@ -40,8 +40,7 @@
     [Parameter, EditorRequired] public JiraWaits Waits { get; set; } = default!;
     /// <summary>Raised after the day's unsaved changes changed, so the page shows them.</summary>
     [Parameter] public EventCallback OnChanged { get; set; }
-    [Parameter] public EventCallback<WorklogSync.DayResult> OnSaved { get; set; }
-    /// <summary>Raised when the period has to be read again (time off changed, or Jira changed meanwhile).</summary>
+    /// <summary>Raised when the period has to be read again (time off changed).</summary>
     [Parameter] public EventCallback OnReload { get; set; }
 
     private DayEditor? _editor;
@@ -49,9 +48,6 @@
     private IReadOnlyList<TimeEntry> Saved => Sheet.SavedOn(Day);
 
     private IssueChoices Choices => new() { Sprint = Sheet.Sprint, Earlier = Extras.Earlier, Recent = Extras.Recent, Statuses = Statuses.Known };
-
-    /// <summary>Saves the day, for the Ctrl+S shortcut.</summary>
-    public Task SaveAsync() => _editor?.SaveAsync() ?? Task.CompletedTask;
 
     /// <summary>Adds an empty row, for the N shortcut; null when the day can't be edited.</summary>
     public async Task<TimeEntry?> AddRowAsync() => _editor is null ? null : await _editor.AddRowAsync();
@@ -63,7 +59,7 @@
     }
 
     /// <summary>
-    /// Marks the day, or part of it, off. A whole day off marks the day's saved work removed, so Save day
+    /// Marks the day, or part of it, off. A whole day off marks the day's saved work removed, so Save all
     /// deletes it from Jira. A suggestion made for the old hours no longer fits and is made again; changes
     /// the user made are kept.
     /// </summary>

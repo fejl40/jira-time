@@ -9,7 +9,6 @@ public enum JiraWait
     Period,
     Sync,
     SaveAll,
-    SaveDay,
 }
 
 /// <summary>
@@ -32,17 +31,8 @@ public sealed class JiraWaits
     /// <summary>A button that sends a request to Jira works only while no other request runs.</summary>
     public bool CanStart => _running.Count == 0;
 
-    /// <summary>The day Save day is saving, until the period has been read again after it; null otherwise.</summary>
-    public DateOnly? SavingDay { get; private set; }
-
-    /// <summary>
-    /// The period's time is being read or changed: the grid and the day list are pending. A day save reads
-    /// the period again afterwards; then only its day is pending (<see cref="IsPending"/>).
-    /// </summary>
-    public bool PeriodPending => Has(JiraWait.Sync) || Has(JiraWait.SaveAll) || (Has(JiraWait.Period) && !Has(JiraWait.SaveDay));
-
-    /// <summary>The day's column and list entry are pending while Save day saves it.</summary>
-    public bool IsPending(DateOnly day) => SavingDay == day;
+    /// <summary>The period's time is being read or changed: the grid and the day list are pending.</summary>
+    public bool PeriodPending => !CanStart;
 
     /// <summary>Anything running may change the selected day's rows, so they are pending meanwhile.</summary>
     public bool DayPending => !CanStart;
@@ -55,7 +45,6 @@ public sealed class JiraWaits
     {
         if (Opening is { } opening && opening != shown) return $"Opening {Format.Range(opening.Start, opening.End)}…";
         if (Has(JiraWait.SaveAll)) return "Saving to Jira…";
-        if (Has(JiraWait.SaveDay)) return "Saving the day to Jira…";
         if (Has(JiraWait.Sync)) return "Syncing with Jira…";
         if (Has(JiraWait.Period)) return "Reading Jira…";
         return null;
@@ -73,21 +62,6 @@ public sealed class JiraWaits
         finally
         {
             if (--_running[wait] == 0) _running.Remove(wait);
-            Changed?.Invoke();
-        }
-    }
-
-    /// <summary>Saves <paramref name="day"/> with <paramref name="save"/>, which includes reading the period again.</summary>
-    public async Task SaveDayAsync(DateOnly day, Func<Task> save)
-    {
-        SavingDay = day;
-        try
-        {
-            await RunAsync(JiraWait.SaveDay, save);
-        }
-        finally
-        {
-            SavingDay = null;
             Changed?.Invoke();
         }
     }

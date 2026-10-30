@@ -76,7 +76,7 @@ public class PeriodSheetTests
     }
 
     [Fact]
-    public void Unsaved_totals_and_removals_cover_every_changed_day()
+    public void Unsaved_totals_cover_every_changed_day()
     {
         var keep = Saved("XYZ-1", 4, Friday);
         var gone = Saved("XYZ-2", 4, Friday);
@@ -85,7 +85,6 @@ public class PeriodSheetTests
         sheet.WorkFor(Monday).Drafts.Add(new TimeEntry { IssueKey = "ABC-1", Date = Monday, Duration = TimeSpan.FromHours(8) });
 
         Assert.Equal(TimeSpan.FromHours(12), sheet.UnsavedTotal);
-        Assert.Equal(1, sheet.UnsavedRemovals);
         Assert.Equal(TimeSpan.Zero, sheet.UnsavedFor(Friday, "XYZ-2"));
         Assert.Null(sheet.UnsavedFor(Friday, "XYZ-1")); // unchanged
         Assert.Equal(TimeSpan.FromHours(8), sheet.UnsavedFor(Monday, "ABC-1"));

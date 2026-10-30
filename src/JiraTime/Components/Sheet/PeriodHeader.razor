@@ -1,5 +1,5 @@
-@* Period header: navigation and title, one status line, the main action, and the Save all question.
-   Confetti when the period shown becomes complete. *@
+@* Period header: navigation and title, one status line and the main action (Save all asks in
+   SaveAllModal, opened by the page). Confetti when the period shown becomes complete. *@
 @inject MotionScript Animations
 @inject CurrentUser User
 
@@ -38,8 +38,8 @@
     <div class="ml-auto flex items-center gap-2">
         @if (Unsaved.Count > 0)
         {
-            <button class="btn-ghost" disabled="@(!Waits.CanStart)" @onclick="DiscardAllAsync">Discard all</button>
-            <button class="btn-primary" disabled="@(!Waits.CanStart)" @onclick="() => _confirming = true" data-save-all>@if (Waits.Has(JiraWait.SaveAll)) { <Waiting /> } Save all (@Format.Days(Unsaved.Count))</button>
+            <button class="btn-ghost" disabled="@(!Waits.CanStart)" @onclick="OnDiscardAll">Discard all</button>
+            <button class="btn-primary" disabled="@(!Waits.CanStart)" @onclick="OnSaveAll" title="Save every day with unsaved changes to Jira (Ctrl+S)" data-save-all>@if (Waits.Has(JiraWait.SaveAll)) { <Waiting /> } Save all (@Format.Days(Unsaved.Count))</button>
         }
         else if (CanFillAny)
         {
@@ -52,20 +52,6 @@
     </div>
 </div>
 
-@if (_confirming && Unsaved.Count > 0)
-{
-    <div class="flex flex-wrap items-center gap-3 rounded-lg bg-blue-50 px-4 py-3 text-sm ring-1 ring-blue-200 dark:bg-blue-950/40 dark:ring-blue-900" role="alertdialog" data-confirm-save-all>
-        <span>Save @Format.Days(Unsaved.Count) (@Format.HoursText(Sheet.UnsavedTotal)) and update Jira to match?
-            @if (Sheet.UnsavedRemovals is var removals and > 0)
-            {
-                <span class="text-red-700 dark:text-red-400">@removals @(removals == 1 ? "worklog is" : "worklogs are") deleted.</span>
-            }
-        </span>
-        <button class="btn-secondary ml-auto" @onclick="() => _confirming = false">Cancel</button>
-        <button class="btn-primary" disabled="@(!Waits.CanStart)" @onclick="SaveAllAsync">Save @Format.Days(Unsaved.Count)</button>
-    </div>
-}
-
 @code {
     [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
     /// <summary>Saved entries in the period that Jira doesn't have yet.</summary>
@@ -74,12 +60,12 @@
     [Parameter, EditorRequired] public JiraWaits Waits { get; set; } = default!;
     [Parameter] public EventCallback OnSync { get; set; }
     [Parameter] public EventCallback OnFillPeriod { get; set; }
+    /// <summary>Asks to save every unsaved day (the page opens SaveAllModal).</summary>
     [Parameter] public EventCallback OnSaveAll { get; set; }
     [Parameter] public EventCallback OnDiscardAll { get; set; }
 
     private const string FillTitle = "Suggest work for every workday so far that is short of hours";
 
-    private bool _confirming;
     private Period? _shown;
     /// <summary>Notices the period becoming complete while it is shown (not one that already was).</summary>
     private Milestones<Period> _completed = new();
@@ -92,10 +78,9 @@
 
     protected override void OnParametersSet()
     {
-        // A new period starts without the Save all question, and is complete or not at first look.
+        // A new period is complete or not at first look.
         if (_shown == Period) return;
         _shown = Period;
-        _confirming = false;
         _completed = new();
     }
 
@@ -106,17 +91,5 @@
         var complete = Summary.IsComplete(Unsynced, Unsaved.Count > 0);
         if (_completed.Update(complete ? [Period] : []).Count > 0)
             await Animations.CelebrateAsync(user, Period);
-    }
-
-    private Task SaveAllAsync()
-    {
-        _confirming = false;
-        return OnSaveAll.InvokeAsync();
-    }
-
-    private Task DiscardAllAsync()
-    {
-        _confirming = false;
-        return OnDiscardAll.InvokeAsync();
     }
 }

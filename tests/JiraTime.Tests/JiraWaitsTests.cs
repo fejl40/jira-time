@@ -49,27 +49,6 @@ public class JiraWaitsTests
     }
 
     [Fact]
-    public async Task Saving_a_day_marks_only_that_day_pending_also_while_the_period_is_read_again()
-    {
-        var waits = new JiraWaits();
-        var day = new DateOnly(2026, 10, 21);
-        var reread = new TaskCompletionSource();
-
-        var save = waits.SaveDayAsync(day, () => waits.RunAsync(JiraWait.Period, () => reread.Task));
-
-        Assert.True(waits.IsPending(day));
-        Assert.False(waits.IsPending(day.AddDays(1)));
-        Assert.False(waits.PeriodPending);
-        Assert.True(waits.DayPending);
-        Assert.Equal("Saving the day to Jira…", waits.Status(October));
-
-        reread.SetResult();
-        await save;
-        Assert.False(waits.IsPending(day));
-        Assert.True(waits.CanStart);
-    }
-
-    [Fact]
     public async Task Every_start_and_end_is_announced()
     {
         var waits = new JiraWaits();

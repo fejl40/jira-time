@@ -62,9 +62,9 @@ public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log, 
         /// <summary>What to tell the user about the days not saved; null when every day was saved.</summary>
         public string? Notice =>
             ChangedInJira.Count > 0
-                ? $"{Days(ChangedInJira.Count)} not saved because the worklogs were changed in Jira meanwhile. Each shows Jira's version with your changes on top; check it and press Save day."
+                ? $"{Days(ChangedInJira.Count)} not saved because the worklogs were changed in Jira meanwhile. Each shows Jira's version with your changes on top; check it and press Save all."
                 : NeedsWork.Count > 0
-                    ? $"{Days(NeedsWork.Count)} not saved because a row needs an issue or hours. Finish it below and press Save day."
+                    ? $"{Days(NeedsWork.Count)} not saved because a row needs an issue or hours. Finish it below and press Save all."
                     : null;
 
         private static string Days(int n) => n == 1 ? "1 day" : $"{n} days";

@@ -137,7 +137,7 @@ public sealed class DayWork(DateOnly date)
 
     /// <summary>
     /// Sets the row's hours from what was typed. Text that can't be read is kept in
-    /// <see cref="BadHours"/> (so Save day can report it) and the hours become zero.
+    /// <see cref="BadHours"/> (so the day editor and Save all can report it) and the hours become zero.
     /// </summary>
     public void SetHours(TimeEntry row, TimeEntry? saved, string? text)
     {
@@ -218,7 +218,7 @@ public sealed class DayWork(DateOnly date)
     public void Restore(TimeEntry saved) => Removed.Remove(saved.Id);
 
     /// <summary>
-    /// The whole day was taken off: every saved row is marked removed, so Save day deletes its worklogs,
+    /// The whole day was taken off: every saved row is marked removed, so Save all deletes its worklogs,
     /// and suggestions go. Rows the user added stay.
     /// </summary>
     public void TakeOff(IReadOnlyList<TimeEntry> saved)

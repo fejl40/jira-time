@@ -87,10 +87,6 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
     /// <summary>Hours a day will have once its changes are saved.</summary>
     public TimeSpan UnsavedDayTotal(DateOnly day) => WorkFor(day).Total(SavedOn(day));
 
-    /// <summary>Jira worklogs that saving the unsaved days deletes.</summary>
-    public int UnsavedRemovals =>
-        UnsavedDays.Sum(d => SavedOn(d).Count(e => _work[d].IsRemoved(e) && e.JiraWorklogId is not null));
-
     /// <summary>Hours an issue will have on a day once saved, when the day has unsaved changes for it; otherwise null.</summary>
     public TimeSpan? UnsavedFor(DateOnly day, string issueKey)
     {

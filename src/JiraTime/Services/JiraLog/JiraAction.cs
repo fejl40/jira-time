@@ -1,7 +1,7 @@
 namespace JiraTime.Services;
 
 /// <summary>
-/// The user action Jira requests are made for, such as "Save day Tue 27 Oct". The UI starts one around
+/// The user action Jira requests are made for, such as "Time off Tue 27 Oct". The UI starts one around
 /// what the user did; it flows with the async calls below it (AsyncLocal), so requests from parallel
 /// actions and other tabs never mix. Requests outside any action are logged as Background.
 /// </summary>
@@ -26,7 +26,7 @@ public sealed class JiraAction : IDisposable
 
     /// <summary>
     /// Starts an action until the result is disposed. Inside a running action this joins it instead, so a
-    /// reload after Save day still counts as Save day.
+    /// reload after Save all still counts as Save all.
     /// </summary>
     public static IDisposable Start(string name)
     {

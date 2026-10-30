@@ -66,8 +66,8 @@
     /// <summary>What the issue picker offers; its statuses also mark rows on Done issues.</summary>
     [Parameter, EditorRequired] public IssueChoices Choices { get; set; } = default!;
     [Parameter, EditorRequired] public Func<string, CancellationToken, Task<IReadOnlyList<JiraIssue>>> Search { get; set; } = default!;
-    /// <summary>The day editor's errors by row id: why a row can't be saved. Editing the row clears its error.</summary>
-    [Parameter, EditorRequired] public Dictionary<string, string> Errors { get; set; } = default!;
+    /// <summary>Why rows of the day can't be saved, by row id (DayChanges.Errors).</summary>
+    [Parameter, EditorRequired] public IReadOnlyDictionary<string, string> Errors { get; set; } = default!;
     /// <summary>The row's issue was just picked: its dot pops.</summary>
     [Parameter] public bool Picked { get; set; }
     /// <summary>Raised after the row's issue was picked (and the change made).</summary>
@@ -82,14 +82,13 @@
 
     private Task PickIssue(JiraIssue issue)
     {
-        Errors.Remove(Work.PickIssue(E, Row.Saved, issue).Id);
+        Work.PickIssue(E, Row.Saved, issue);
         return OnPicked.InvokeAsync(issue);
     }
 
     private Task SetHours(ChangeEventArgs ev)
     {
         Work.SetHours(E, Row.Saved, ev.Value?.ToString());
-        Errors.Remove(E.Id);
         return OnChanged.InvokeAsync();
     }
 
@@ -104,7 +103,6 @@
     {
         if (Row.IsDraft) await Animations.CollapseAsync($"[data-row-id='{E.Id}']");
         Work.Remove(E, Row.Saved);
-        Errors.Remove(E.Id);
         await OnChanged.InvokeAsync();
     }
 

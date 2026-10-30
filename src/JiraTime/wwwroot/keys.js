@@ -1,5 +1,5 @@
 // Keyboard shortcuts for the timesheet, off while a modal is open. The page attaches itself and gets called back:
-//   Ctrl/Cmd+S  save the open day (also while typing; the field is committed first)
+//   Ctrl/Cmd+S  Save all (also while typing; the field is committed first)
 //   ← / →       previous / next day (outside fields)
 //   N           add a row (outside fields)
 //   Enter       in an hours or comment field: next row's hours
@@ -31,7 +31,7 @@
       e.preventDefault();
       // Blur first so the field's change reaches the server before the save does.
       if (typing) target.blur();
-      page.invokeMethodAsync('SaveDayFromKeyboard');
+      page.invokeMethodAsync('SaveFromKeyboard');
       return;
     }
 

@@ -4,7 +4,7 @@
 @implements IAsyncDisposable
 
 @code {
-    /// <summary>Ctrl/Cmd+S: save the day.</summary>
+    /// <summary>Ctrl/Cmd+S: Save all.</summary>
     [Parameter] public EventCallback OnSave { get; set; }
     /// <summary>← or →: -1 for the previous day, 1 for the next.</summary>
     [Parameter] public EventCallback<int> OnMove { get; set; }
@@ -40,7 +40,7 @@
     }
 
     [JSInvokable]
-    public Task SaveDayFromKeyboard() => InvokeAsync(() => OnSave.InvokeAsync());
+    public Task SaveFromKeyboard() => InvokeAsync(() => OnSave.InvokeAsync());
 
     [JSInvokable]
     public Task MoveDay(int delta) => InvokeAsync(() => OnMove.InvokeAsync(delta));

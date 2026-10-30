@@ -123,14 +123,12 @@
     [Parameter] public DateOnly Selected { get; set; }
     /// <summary>Links on issue keys go here.</summary>
     [Parameter] public string? JiraBaseUrl { get; set; }
-    /// <summary>Days saved by the last Save day or Save all; their cells settle from draft to saved.</summary>
+    /// <summary>Days saved by the last Save all; their cells settle from draft to saved.</summary>
     [Parameter] public IReadOnlySet<DateOnly> JustSaved { get; set; } = new HashSet<DateOnly>();
     /// <summary>Days of <see cref="JustSaved"/> that Jira got completely; a tick flies from their cells.</summary>
     [Parameter] public IReadOnlySet<DateOnly> SentToJira { get; set; } = new HashSet<DateOnly>();
     /// <summary>New suggestion cells drop in one day after another (right after Fill period).</summary>
     [Parameter] public bool Cascade { get; set; }
-    /// <summary>The day Save day is saving; its column shows as pending.</summary>
-    [Parameter] public DateOnly? PendingDay { get; set; }
     [Parameter] public EventCallback<DateOnly> OnSelectDay { get; set; }
     [Parameter] public EventCallback<(DateOnly Day, PeriodRow Row)> OnCellClicked { get; set; }
 
@@ -172,7 +170,6 @@
         if (!footer && info is { Kind: DayKind.Weekend or DayKind.Holiday }) classes.Add("bg-slate-50 dark:bg-slate-800/60");
         if (!footer && info is { Kind: DayKind.Holiday }) classes.Add("text-slate-400 dark:text-slate-500");
         classes.Add(DayOffLook.Classes(info)); // the reason's tint down the whole column, striped for a whole day
-        if (day == PendingDay) classes.Add("waiting-pending");
         return string.Join(' ', classes);
     }
 }

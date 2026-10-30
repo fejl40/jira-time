@@ -20,7 +20,7 @@
 
 @if (_sheet is { } sheet)
 {
-<DayKeys @ref="_keys" OnSave="SaveDayFromKeyboardAsync" OnMove="d => SelectDay(_selectedDay.AddDays(d))" OnAddRow="AddRowFromKeyboardAsync" />
+<DayKeys @ref="_keys" OnSave="SaveAllAsync" OnMove="d => SelectDay(_selectedDay.AddDays(d))" OnAddRow="AddRowFromKeyboardAsync" />
 <div class="mx-auto max-w-7xl space-y-6 overflow-x-clip">
     <PeriodHeader Sheet="sheet" Unsynced="_unsynced" Waits="_waits"
                   OnSync="SyncPeriodAsync" OnFillPeriod="FillPeriod" OnSaveAll="SaveAllAsync" OnDiscardAll="DiscardAll" />
@@ -29,15 +29,15 @@
 
     @* A new period slides in from the side it comes from. While Jira is read the period shows as pending. *@
     <div @key="sheet.Period" class="waiting-dim space-y-6 @Motion.Slide(_slide)" aria-busy="@JiraWaits.Aria(_waits.PeriodPending)" data-period-pending>
-        <DayList Sheet="sheet" Selected="_selectedDay" PendingDay="_waits.SavingDay" OnSelect="d => SelectDay(d)" />
+        <DayList Sheet="sheet" Selected="_selectedDay" OnSelect="d => SelectDay(d)" />
 
         <PeriodGrid Sheet="sheet" Selected="_selectedDay" JiraBaseUrl="@User.Connection?.BaseUrl"
-                    Cascade="_cascade" PendingDay="_waits.SavingDay" JustSaved="_saveMotion.JustSaved" SentToJira="_saveMotion.SentToJira"
+                    Cascade="_cascade" JustSaved="_saveMotion.JustSaved" SentToJira="_saveMotion.SentToJira"
                     OnSelectDay="d => SelectDay(d, focus: true)" OnCellClicked="CellClicked" />
     </div>
 
     <DayPanel @ref="_panel" Sheet="sheet" Day="_selectedDay" Notice="@_notice" Extras="_extras" Statuses="Statuses" Waits="_waits"
-              OnChanged="StateHasChanged" OnSaved="DaySavedAsync" OnReload="ReloadAsync" />
+              OnChanged="StateHasChanged" OnReload="ReloadAsync" />
 </div>
 }
 else
@@ -128,14 +128,6 @@ else
         _saveMotion.Saved(day, sentToJira: result.SyncFailures == 0);
     }
 
-    private async Task DaySavedAsync(WorklogSync.DayResult result)
-    {
-        _saveMotion.Start();
-        Saved(_selectedDay, result);
-        await ReloadAsync();
-        _saveMotion.Finish();
-    }
-
     /// <summary>True for the render right after Fill period, so its suggestions drop in day by day.</summary>
     private bool _cascade;
 
@@ -151,10 +143,17 @@ else
         _notice = null;
     }
 
-    /// <summary>Saves every day with unsaved changes. Days that couldn't be saved are left for the user to finish.</summary>
+    /// <summary>Save all (and Ctrl+S): lists the changes in SaveAllModal and saves once the user confirms.</summary>
     private async Task SaveAllAsync()
     {
-        if (User.Connection is not { } c || !_waits.CanStart) return;
+        if (User.Connection is not { } c || !_waits.CanStart || Sheet.UnsavedDays.Count == 0) return;
+        var changes = new Dictionary<string, object?> { [nameof(SaveAllModal.Changes)] = UnsavedChanges.Of(Sheet) };
+        if (await Modals.ShowAsync<SaveAllModal, bool>(changes) && _waits.CanStart) await SaveDaysAsync(c);
+    }
+
+    /// <summary>Saves every day with unsaved changes. Days that couldn't be saved are left for the user to finish.</summary>
+    private async Task SaveDaysAsync(JiraConnection c)
+    {
         using var action = JiraAction.Start("Save all");
         _notice = null; _saveMotion.Start();
         WorklogSync.SaveAllResult? result = null;
@@ -239,9 +238,6 @@ else
         if (_keys is not null) await _keys.PageRenderedAsync();
         if (_saveMotion.TakeFlyTicks()) await Animations.FlyTicksAsync();
     }
-
-    // Keyboard events re-render the page, which shows the editor's errors when the day wasn't saved.
-    private Task SaveDayFromKeyboardAsync() => _panel?.SaveAsync() ?? Task.CompletedTask;
 
     private async Task AddRowFromKeyboardAsync()
     {

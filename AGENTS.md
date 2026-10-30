@@ -61,6 +61,7 @@ Domain/IssueChoices.cs             what the issue picker offers, in which group,
 Domain/WorklogMatching.cs          worklogs as entries, waiting work laid over them, comparing the two, the day save plan
 Domain/RecentWork.cs               recent issues and comments for quick picks
 Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work hours
+Domain/UnsavedChanges.cs           what Save all will change: rows added, changed and removed per day, totals, days that can't be saved
 Domain/Milestones.cs               things reached while the user watches (a day becoming complete), to celebrate once
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount, IOwnedDocument
 Domain/MonthExport.cs              the month export: rows per day and issue, tab-separated text
@@ -96,7 +97,7 @@ Components/Pages/Timesheet.razor   shows a period: wires PeriodLoader, WorklogSy
 Components/Format.cs               how hours, days and counts are written for the user
 Components/DayOffLook.cs           how time off looks: icon, tint and label per reason (vacation, sick, other)
 Components/Links.cs                builds and reads timesheet links (period, selected day), export links and log links
-Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, DayKeys (keyboard shortcuts), TimeOffModal
+Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, DayKeys (keyboard shortcuts), TimeOffModal, SaveAllModal
 Components/Modals/                 the modal system: Modals (service), ModalQueue and ModalContext, ModalHost (in MainLayout), the Modal frame, ConfirmModal (wwwroot/modal.js)
 Components/JiraWaits.cs            the timesheet's running Jira requests: what shows pending, which buttons wait, the status text
 Components/Motion.cs               animation classes (Styles/motion.css), MotionScript (calls wwwroot/motion.js), SaveMotion
@@ -163,14 +164,13 @@ They are read when a period opens, reused for a minute, and read again with **Sy
 Jira's search can take a while to find a new worklog, so for 15 minutes after a save the issues you
 saved on are read directly.
 
-Saving a day creates, updates and deletes its worklogs in Jira, then reads the day back. Moving a row
+Saving (with **Save all**) creates, updates and deletes each changed day's worklogs in Jira, then reads the period back. Moving a row
 to another issue moves its worklog; removing a row deletes it. Before changing or deleting worklogs,
 the app checks that Jira still has them as they were read. If someone changed one meanwhile nothing is
 saved: the day shows Jira's version with your changes on top, to check and save again.
 
 If Jira can't take a change, it waits in a local retry queue: it shows as **Not in Jira** with the
-reason, counts in totals (a waiting removal hides the work), and is sent by **Sync now** or the next
-save of that day. Once Jira has it, it leaves the queue.
+reason, counts in totals (a waiting removal hides the work), and is sent by **Sync now**. Once Jira has it, it leaves the queue.
 
 Older versions kept every entry locally as well. The first time you sign in after updating, a copy
 of your entries is stored in `data/documents/time-entry-backups/`, the entries Jira already has are
@@ -206,11 +206,18 @@ for the missing hours. An empty day copies the previous day with work (up to two
 issues and split, scaled to the missing hours in quarter hours, without comments. A partly logged day,
 or one with nothing to copy, gets the rest on a best-guess issue: the one you last logged that day,
 then your In Progress sprint issue, then any sprint issue. **Copy Mon 19 Oct** in the day view does
-the copy on demand. Change the issue, hours or comment, **+ Add issue** for more rows, remove rows, then **Save day**. A removed row stays visible,
-struck through, with **Undo** until you save; saving deletes its worklog in Jira. Saving creates,
-updates and removes the day's worklogs in Jira to match. An added row left without hours or comment
-is ignored. **Discard changes** drops what you haven't saved; a discarded or saved day isn't
-suggested again until you reload.
+the copy on demand. Change the issue, hours or comment, **+ Add issue** for more rows and remove rows.
+A removed row stays visible, struck through, with **Undo** until you save; saving deletes its worklog in
+Jira. An added row left without hours or comment is ignored. A row that can't be saved (no issue, hours
+that can't be read) says why right away. **Discard changes** drops a day's unsaved changes; a discarded
+or saved day isn't suggested again until you reload.
+
+**Save all** in the period header is the only way to save (there is no Save day). It opens a modal
+(`SaveAllModal`, rules in `Domain/UnsavedChanges.cs`) listing every unsaved day with its rows added,
+changed (hours or issue, before → after) and removed (worklog deleted in Jira), the day's hours before
+and after, and the totals; a day that can't be saved yet says why and is left out. **Save** creates,
+updates and deletes the worklogs in Jira to match, day by day; **Cancel** saves nothing. **Ctrl+S** opens
+the same modal. Days that couldn't be saved stay unsaved and the first of them opens with the reason.
 
 Unsaved changes are kept per day while the period is open, so you can move between days and come
 back to them. Days with unsaved changes get a blue dot in the grid, and changed hours show dashed.
@@ -218,8 +225,8 @@ Changing period, going to Settings, reloading or closing the tab asks first when
 something (untouched suggestions don't count).
 
 **Fill period** in the period header adds suggestions to every short workday so far (never future
-days), in order, so each empty day copies the day before it as filled. **Save all** asks for confirmation (days, hours and worklogs deleted), then saves every day
-with unsaved changes at once; or open a day to adjust it first.
+days), in order, so each empty day copies the day before it as filled; check the suggestions in the
+Save all modal, or open a day to adjust it first.
 
 #### Period header, grid and reminders
 
@@ -236,7 +243,7 @@ days replaces the grid.
 
 Outside a field, **←** and **→** move to the previous and next day and **N** adds a row (focused on
 its issue). **Enter** in an hours or comment field jumps to the next row's hours, **Esc** leaves a
-field, and **Ctrl+S** (**Cmd+S**) saves the day, also while typing. Picking a day in the grid header
+field, and **Ctrl+S** (**Cmd+S**) opens Save all, also while typing. Picking a day in the grid header
 focuses its first hours field; clicking a cell opens that issue's row on that day, or adds an empty
 row for the issue (ignored if you leave it empty).
 
@@ -250,14 +257,14 @@ Monday to Friday need 8 hours by default; set your own hours per weekday under *
 hours** (a day with 0 hours is not a workday). Danish public holidays are skipped automatically.
 **Time off…** in the day view opens a modal that marks a whole day or part of it off (vacation, sick, other); part of a
 day lowers the hours that day needs. Marking a whole day off marks the time saved on it as removed, so
-**Save day** deletes those worklogs in Jira; the day stays editable, and **Undo** brings the rows back before saving. The grid shows the hours still missing on each workday up to today.
+**Save all** deletes those worklogs in Jira; the day stays editable, and **Undo** brings the rows back before saving. The grid shows the hours still missing on each workday up to today.
 
 Time off stands out without opening the day (`DayOffLook`, styles `.day-off-*` in `Styles/app.css`): each reason has
 an icon and a tint (☀️ amber for vacation, 🤒 rose for sick, 🗓️ violet for other time off). A whole day off stripes
 its column in the grid and its entry in the phone list, with the icon under the date; part of a day off tints them and
 puts the icon next to the weekday. The phone list says "Vacation" or "Time off 3 h", the day header's badge "Vacation ·
 whole day" or "Sick · 4 h off", and the grid header's tooltip the same. A whole day off keeps its saved hours readable,
-struck through next to the 0 they become, until Save day removes them from Jira.
+struck through next to the 0 they become, until Save all removes them from Jira.
 
 ### Month export
 
@@ -276,9 +283,9 @@ Every wait on Jira shows where the user is looking, with one shared indicator, `
 (a small spinner, with text where it helps). It stays hidden for the first 200 ms (`--waiting-delay` in
 `Styles/motion.css`), so a fast answer doesn't flicker, and stands still with reduced motion. While a period opens,
 the old one stays on screen dimmed, and the header says **Opening 1 Oct – 15 Oct…**; Sync and Save all dim the
-grid, Save day dims its day's column and rows (`aria-busy`, `.waiting-dim` / `.waiting-pending`). The first load,
+grid and the day's rows (`aria-busy`, `.waiting-dim` / `.waiting-pending`). The first load,
 signing in and the export show a waiting line instead of empty content. The button that started a request gets the
-spinner, and on the timesheet every button that sends a request to Jira (Sync, Save all, Save day, Try again, time
+spinner, and on the timesheet every button that sends a request to Jira (Sync, Save all, Try again, time
 off) is off until the running one ends, so saves and reads never cross. `JiraWaits` decides this and is tested;
 a period left before it was read is never shown. Settings (Save hours), Connect, the issue picker's search and
 the export's values per epic show the same spinner.
@@ -293,7 +300,7 @@ files older than 30 days are deleted. The owner comes from the verified connecti
 `JiraConnection.Owner`).
 
 Each request names the user action it was for (`JiraAction`, an AsyncLocal scope): the UI starts one
-around Open period, Save day, Save all, Sync now, issue search, picking an issue, time off, the export and
+around Open period, Save all, Sync now, issue search, picking an issue, time off, the export and
 signing in; a start inside a running action joins it, so the reload after a save belongs to the save.
 Requests outside any action are **Background**. Requests made while signing in wait until Jira says whose
 token it is and are logged under that user, or under `signed-out` when Jira refuses the token.
@@ -360,5 +367,5 @@ interfaces and replace the `IDocumentStore` registration in `Program.cs`.
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, loading a period, saving days to Jira and the retry queue, links, Jira queries, issue lookups and the picker, fill suggestions, and the waits on Jira (what shows pending and which buttons wait).
+xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, loading a period, saving days to Jira and the retry queue, links, Jira queries, issue lookups and the picker, fill suggestions, the Save all change list, modals (queue, results, defaults), and the waits on Jira (what shows pending and which buttons wait).
 
