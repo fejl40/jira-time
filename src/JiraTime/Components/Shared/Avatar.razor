@@ -1,0 +1,25 @@
+@inject ProfilePictures Pictures
+
+@* The picture lies over the initials, so they show while it loads and if it can't be loaded. *@
+<span class="avatar relative overflow-hidden bg-slate-600 text-white" title="@Profile.DisplayName" data-avatar>
+    @Profile.Initials
+    @if (_url is not null)
+    {
+        <img src="@_url" alt="" class="absolute inset-0 size-full object-cover" data-profile-picture />
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public JiraProfile Profile { get; set; } = default!;
+
+    private string? _url;
+    private JiraProfile? _readFor;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // The header renders again on every navigation; the picture is looked up once per profile.
+        if (ReferenceEquals(Profile, _readFor)) return;
+        _readFor = Profile;
+        _url = await Pictures.GetUrlAsync();
+    }
+}

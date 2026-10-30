@@ -47,7 +47,8 @@ public record JiraConnection(string BaseUrl, JiraAuthType AuthType, string Token
 
 /// <param name="Id">accountId on Cloud, user key on Server/DC.</param>
 /// <param name="Username">Login name on Server/DC; null on Cloud.</param>
-public record JiraProfile(string Id, string? Username, string DisplayName, string? Email)
+/// <param name="AvatarUrl">The 48 px profile picture Jira gave in /myself; null when it gave none.</param>
+public record JiraProfile(string Id, string? Username, string DisplayName, string? Email, string? AvatarUrl = null)
 {
     [JsonIgnore]
     public string Initials => string.Concat(

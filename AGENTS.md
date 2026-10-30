@@ -77,6 +77,7 @@ Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work ho
 Domain/UnsavedChanges.cs           what Save all will change: rows added, changed and removed per day, totals, days that can't be saved
 Domain/Milestones.cs               things reached while the user watches (a day becoming complete), to celebrate once
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount, IOwnedDocument
+Domain/ProfilePicture.cs           the user's Jira profile picture as kept: which avatar URL to read (not Jira's default), fresh for two days, its app URL
 Domain/MonthExport.cs              the month export: rows per day and issue, tab-separated text
 Domain/JiraLog/                    one logged Jira request (JiraLogEntry: state, short path, outcome), the Logs page's day, groups and filters, JsonBody (a body as a foldable JSON tree or raw text), RequestToasts (order, how long they stay, bursts)
 Storage/IDocumentStore.cs          the document store interfaces
@@ -89,6 +90,7 @@ Services/PeriodLoader.cs           loads a period for the timesheet: time, days,
 Services/IssueStatuses.cs          current status of the issues a timesheet shows, and the issue picker's Jira search
 Services/EpicExportStore.cs        Fase, Forordning and Hovedleverance per epic for the export
 Services/MonthExportLoader.cs      loads a month for the export: time, epics, values per epic
+Services/ProfilePictures.cs        the header's profile picture: read through JiraHttp at most once per two days per user, and the profile-picture/{key} endpoint
 Services/ExpiringCache.cs          small cache whose values expire; expired values are dropped as new ones are stored
 Services/SignIn/                   SignInSession (restores, connects and signs out a tab; the encrypted connection in browser localStorage), JiraIdentity (signs a tab in as the user Jira says the token belongs to), CurrentUser (the verified user of this tab and its Jira connection, CurrentUser.Jira), LegacyDataMigration (data saved by older versions: owners, entries Jira has, entries with start and end times; their backups)
 Services/Worklogs/                 TimeLog (Jira worklogs plus the retry queue, cached briefly), RetryQueue (changes Jira couldn't take yet), WorklogSync (saves the Save all plans, sends the retry queue), WorklogWriter (writes or deletes one worklog, queues what fails), RecentWorklogIssues (issues just saved on, read directly while Jira's search catches up)
@@ -109,7 +111,7 @@ Components/Sheet/                  period header (with confetti), reminders, gri
 Components/Export/                 ExportPage (a month in the agency's format: Copy, Download .tsv), EpicValuesForm (values per epic), ExportTable
 Components/Modals/                 the modal system: ModalService (injected as Modals), ModalQueue and ModalContext, ModalHost (in MainLayout), the Modal frame, ConfirmModal (wwwroot/modal.js)
 Components/Logs/                   request toasts (in MainLayout), the log's action groups, a request's details and its status dot, the JSON tree
-Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow, Waiting (the waiting-for-Jira spinner)
+Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow, Avatar (the header's profile picture over the initials), Waiting (the waiting-for-Jira spinner)
 Styles/app.css, motion.css         Tailwind input and animations (compiled to wwwroot/app.css)
 wwwroot/files.js                   copy to the clipboard and file downloads (Export and Logs)
 wwwroot/timezone.js                the browser's time zone, read at sign-in
@@ -125,6 +127,7 @@ wwwroot/favicon.svg                the app icon (apple-touch-icon.png is it as a
 | Users Jira confirmed (profile, hashes of confirmed tokens) | `data/documents/users/<owner>.json` |
 | Days off (whole or partial) | `data/documents/days-off/<owner>-<date>.json` |
 | Work hours per weekday | `data/documents/user-settings/<owner>.json` |
+| Jira profile picture (as read from Jira, for two days) | `data/documents/profile-pictures/<owner>.json` |
 | Export values per epic (Fase, Forordning, Hovedleverance) | `data/documents/epic-export-values/<owner>-<epic>.json` |
 | Logged time | **Jira** (your worklogs) |
 | Changes Jira couldn't take yet (the retry queue) | `data/documents/time-entries/<id>.json`, one file per change, with its owner; removed once Jira has it |
@@ -148,6 +151,23 @@ Deleting `data/keys` makes the stored token unreadable and the app asks you to c
    - *Cloud*: Atlassian email + API token, sent as Basic auth.
    The token is checked against Jira (`/myself`) before it is saved, and the user it belongs to
    becomes your profile. To log hours as someone else, connect with their token.
+
+### Profile picture
+
+The header shows the user's Jira profile picture (the 48 px one from `avatarUrls` in `/myself`, shown at 32 px) over
+their initials. On Server/DC the picture needs the token, which the browser can't send, so the server reads it through
+`JiraHttp` (rate limits and request log; logged under the sign-in it follows, or as **Profile picture**) and keeps it in
+`data/documents/profile-pictures/<owner>.json`. The token is only sent when the picture is on the Jira host itself,
+never to another host such as Gravatar. The picture is read again after two days, or at once when Jira's avatar URL
+changes (`ProfilePictures`, rules in `Domain/ProfilePicture.cs`).
+
+The browser loads it from `profile-picture/{key}` with `Cache-Control: private, max-age=172800, immutable`. That
+request isn't part of a tab's circuit, so it has no signed-in user: the key is the permission. It is 128 random bits,
+new on every read from Jira (so it is also the version), and only ever written into its owner's own pages; any other
+key gets a 404. Jira's default avatar (no `ownerId` on Server/DC, Cloud's initials pictures, Gravatar without a picture,
+asked with `d=404`), a failed read, an answer that isn't a PNG, JPEG, GIF or WebP (no SVG, which could run script from
+the app's address) or no avatar keeps the initials. A failed read Jira answered is not retried for two days; when
+Jira can't be reached the picture read before still shows.
 
 ### Several users
 
@@ -346,7 +366,7 @@ Every Jira request goes through `JiraHttp`; each attempt is recorded by `JiraRec
 status and reason, duration, headers (without `Authorization`, `Proxy-Authorization` and cookies), content
 type, response size, request and response bodies (cut at 64 KB and flagged) and the error for failures,
 timeouts and unreachable Jira. Each request is one JSON line in `data/logs/jira/<owner>/yyyy-MM-dd.jsonl`;
-files older than 30 days are deleted. The owner comes from the verified connection (`CurrentUser` stamps
+files older than 30 days are deleted. A picture's bytes aren't logged as text, only its type and size. The owner comes from the verified connection (`CurrentUser` stamps
 `JiraConnection.Owner`).
 
 Each request names the user action it was for (`JiraAction`, an AsyncLocal scope): the UI starts one
@@ -430,10 +450,11 @@ period summary (unknown hours, work not in Jira), links, Jira queries, issue loo
 suggestions, the Save all change list, Settings work hours and the Jira URL from Connect, the expiring cache, modals
 (queue, results, defaults), the waits on Jira (what shows pending and which buttons wait), Jira rate limits (retries
 after 429, the pause across users and hosts, the queue), parallel reads (overlap, the cap of four, writes one at a
-time), and searches by key (batches, pages, POST, unknown keys).
+time), the profile picture (read once per two days, logged, the default avatar and failures keep the initials, each
+user only their own), and searches by key (batches, pages, POST, unknown keys).
 
 `TimeHarness` builds the app's own services from `AddJiraTime` with a `TestClock` (timers fire at once), a temp
-store and `FakeJira` (a fake Jira answering by URL; `Myself`, `Writes`, `WorklogReads`, `Searches` and
+store and `FakeJira` (a fake Jira answering by URL, `Pictures` included; `Myself`, `Writes`, `WorklogReads`, `Searches` and
 `WorklogSearches` count what was sent, faults are in `FakeJiraFaults.cs`). Entries and sheets are built with
 `TestEntries` and `TestSheets`, signed-in users with `TestUsers` (all in `Support/Entries.cs`).
 

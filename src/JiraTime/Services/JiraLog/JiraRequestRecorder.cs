@@ -104,7 +104,9 @@ public sealed class JiraCall
     public async Task ReadResponseAsync(HttpResponseMessage response, CancellationToken ct)
     {
         var bytes = await response.Content.ReadAsByteArrayAsync(ct);
-        var (body, truncated) = JiraRequestRecorder.Cap(EncodingOf(response).GetString(bytes));
+        // A picture (the profile picture) is logged by its type and size; its bytes aren't text.
+        var isImage = response.Content.Headers.ContentType?.MediaType?.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true;
+        var (body, truncated) = isImage ? (null, false) : JiraRequestRecorder.Cap(EncodingOf(response).GetString(bytes));
         _entry = _entry with
         {
             Status = (int)response.StatusCode,

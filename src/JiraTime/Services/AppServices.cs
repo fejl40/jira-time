@@ -45,6 +45,7 @@ public static class AppServices
         services.AddScoped<WorkCalendarService>();
         services.AddScoped<EpicExportStore>();
         services.AddScoped<MonthExportLoader>();
+        services.AddScoped<ProfilePictures>();
         services.AddSingleton<JiraIssueLookup>();
 
         // Every Jira request is logged per user and day (data/logs/jira) and told live to the user's open tabs.

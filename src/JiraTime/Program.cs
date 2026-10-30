@@ -28,6 +28,7 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseAntiforgery();
 app.MapStaticAssets();
+ProfilePictures.Map(app);
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 
 app.Run();

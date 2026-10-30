@@ -5,7 +5,8 @@ namespace JiraTime.Services.Jira;
 
 // Raw JSON shapes of Jira's REST answers, only the fields the app reads.
 
-internal record RawUser(string? AccountId, string? Key, string? Name, string? DisplayName, string? EmailAddress);
+internal record RawUser(string? AccountId, string? Key, string? Name, string? DisplayName, string? EmailAddress,
+    Dictionary<string, string>? AvatarUrls = null);
 internal record PickerResult(List<PickerSection> Sections);
 internal record PickerSection(List<PickerIssue> Issues);
 internal record PickerIssue(string Key, string? SummaryText);

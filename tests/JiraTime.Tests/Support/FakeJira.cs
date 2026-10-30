@@ -11,7 +11,9 @@ namespace JiraTime.Tests.Support;
 /// </summary>
 public sealed partial class FakeJira : HttpMessageHandler
 {
-    public record Request(HttpMethod Method, string Path, JsonNode? Body);
+    /// <param name="Host">The host it was sent to.</param>
+    /// <param name="Authorized">Whether it carried the token.</param>
+    public record Request(HttpMethod Method, string Path, JsonNode? Body, string Host = "", bool Authorized = false);
 
     /// <summary>issue key → worklog id → body.</summary>
     public Dictionary<string, Dictionary<string, JsonNode>> Worklogs { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -32,6 +34,9 @@ public sealed partial class FakeJira : HttpMessageHandler
 
     /// <summary>Extra GET handlers: path (without query) → JSON response.</summary>
     public Dictionary<string, Func<Uri, object>> Gets { get; } = new();
+
+    /// <summary>Pictures (such as avatars) by path without query: bytes and media type, on any host.</summary>
+    public Dictionary<string, (byte[] Bytes, string ContentType)> Pictures { get; } = new();
 
     /// <summary>Who Jira says the token belongs to (<c>/myself</c>): Carl unless a test needs someone else.</summary>
     public object Myself { get; set; } = new { key = "JIRAUSER1", name = "carl", displayName = "Carl Lilholm" };
@@ -59,7 +64,7 @@ public sealed partial class FakeJira : HttpMessageHandler
         if (Offline) throw new HttpRequestException("Connection refused");
 
         var body = req.Content is null ? null : JsonNode.Parse(await req.Content.ReadAsStringAsync(ct));
-        var request = new Request(req.Method, req.RequestUri!.PathAndQuery, body);
+        var request = new Request(req.Method, req.RequestUri!.PathAndQuery, body, req.RequestUri.Host, req.Headers.Authorization is not null);
         lock (_lock)
         {
             Requests.Add(request);
@@ -83,6 +88,9 @@ public sealed partial class FakeJira : HttpMessageHandler
         var path = req.RequestUri!.AbsolutePath;
         if (req.Method == HttpMethod.Get && Gets.TryGetValue(path, out var get))
             return Json(HttpStatusCode.OK, get(req.RequestUri));
+
+        if (req.Method == HttpMethod.Get && Pictures.TryGetValue(path, out var picture))
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(picture.Bytes) { Headers = { ContentType = new(picture.ContentType) } } };
 
         if (req.Method == HttpMethod.Get && path.EndsWith("/myself"))
             return Json(HttpStatusCode.OK, Myself);

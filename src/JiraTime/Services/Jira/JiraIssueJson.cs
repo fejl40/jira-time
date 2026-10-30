@@ -7,7 +7,8 @@ namespace JiraTime.Services.Jira;
 internal static class JiraIssueJson
 {
     public static JiraProfile ToProfile(RawUser u) =>
-        new(u.AccountId ?? u.Key ?? u.Name ?? "", u.Name, u.DisplayName ?? u.Name ?? "?", u.EmailAddress);
+        new(u.AccountId ?? u.Key ?? u.Name ?? "", u.Name, u.DisplayName ?? u.Name ?? "?", u.EmailAddress,
+            u.AvatarUrls?.GetValueOrDefault("48x48"));
 
     public static IssueWithStatus ToIssueWithStatus(SearchIssue i) =>
         new(i.Key, i.Fields?.Summary ?? "", i.Fields?.IssueType?.Name ?? "", i.Fields?.Status?.Name ?? "", i.Fields?.Status?.StatusCategory?.Key ?? "");
