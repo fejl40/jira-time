@@ -33,7 +33,7 @@ public sealed record UserKey(string Host, string JiraUserId)
 public interface IOwnedDocument : IDocument
 {
     /// <summary><see cref="UserKey.Id"/> of the user. Empty on data from before multi-user support.</summary>
-    string? Owner { get; }
+    string? Owner { get; set; }
 }
 
 /// <summary>A user Jira has confirmed at least once (id = <see cref="UserKey.Id"/>).</summary>
@@ -51,8 +51,8 @@ public class UserAccount : IDocument
     /// <summary>Hashes of tokens Jira confirmed for this user, newest first, so they still work while Jira can't be reached.</summary>
     public List<string> VerifiedTokens { get; set; } = [];
 
-    public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
-    public DateTime LastVerifiedUtc { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedUtc { get; set; }
+    public DateTime LastVerifiedUtc { get; set; }
 
     [JsonIgnore]
     public UserKey Key => new(Host, JiraUserId);

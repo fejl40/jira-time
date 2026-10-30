@@ -19,17 +19,6 @@ public class DataSeparationTests : IDisposable
         new() { IssueKey = key, Date = Day, Duration = TimeSpan.FromHours(hours), SyncPending = true };
 
     [Fact]
-    public async Task Reading_an_owned_document_by_id_gives_nothing_for_someone_elses()
-    {
-        var days = _h.Store.Collection<DayOff>();
-        await days.UpsertAsync(new DayOff { Id = "shared-id", Owner = TestUsers.Carl.Id, Date = Day });
-
-        Assert.NotNull(await CurrentUser.SignedIn(TestUsers.Carl).GetMineAsync(days, "shared-id"));
-        Assert.Null(await CurrentUser.SignedIn(TestUsers.Anna).GetMineAsync(days, "shared-id"));
-        Assert.Null(await CurrentUser.SignedIn(TestUsers.Carl).GetMineAsync(days, "missing"));
-    }
-
-    [Fact]
     public async Task Users_only_see_their_own_waiting_changes()
     {
         await Queue(TestUsers.Carl).AddAsync(Waiting("ABC-1", 8));

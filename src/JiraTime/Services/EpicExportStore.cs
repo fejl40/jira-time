@@ -6,15 +6,14 @@ namespace JiraTime.Services;
 /// <summary>The signed-in user's export values per epic (Fase, Forordning, Hovedleverance).</summary>
 public class EpicExportStore(IDocumentStore store, CurrentUser user)
 {
-    private readonly IDocumentCollection<EpicExportValues> _values = store.Collection<EpicExportValues>();
+    private readonly OwnedCollection<EpicExportValues> _values = new(store, user);
 
     /// <summary>The user's values for each epic that has any, by epic key.</summary>
     public async Task<IReadOnlyDictionary<string, EpicExportValues>> GetAsync(IEnumerable<string> epicKeys)
     {
-        var owner = user.Owner;
         var found = new Dictionary<string, EpicExportValues>(StringComparer.OrdinalIgnoreCase);
         foreach (var epic in epicKeys.Distinct(StringComparer.OrdinalIgnoreCase))
-            if (await user.GetMineAsync(_values, EpicExportValues.IdFor(owner, epic)) is { } v)
+            if (await _values.GetAsync(EpicExportValues.IdFor(_values.Owner, epic)) is { } v)
                 found[epic] = v;
         return found;
     }
@@ -24,8 +23,7 @@ public class EpicExportStore(IDocumentStore store, CurrentUser user)
     {
         var saved = new EpicExportValues
         {
-            Id = EpicExportValues.IdFor(user.Owner, values.EpicKey),
-            Owner = user.Owner,
+            Id = EpicExportValues.IdFor(_values.Owner, values.EpicKey),
             EpicKey = values.EpicKey.ToUpperInvariant(),
             Fase = Clean(values.Fase),
             Forordning = Clean(values.Forordning),

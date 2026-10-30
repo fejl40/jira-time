@@ -3,9 +3,10 @@ id: TASK-90.12
 title: >-
   Enforce the owner filter in one OwnedCollection and remove test-only
   production API
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 11:32'
+updated_date: '2026-10-30 12:22'
 labels:
   - refactor
 dependencies:
@@ -49,12 +50,24 @@ Rules for this subtask: edit only the files listed. Do not edit AGENTS.md, READM
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No service other than OwnedCollection compares .Owner or calls GetMineAsync
-- [ ] #2 OwnedCollectionTests: Get of another owner's id is null, Query never returns others' documents, Upsert over another owner's id throws
-- [ ] #3 CurrentUser has no public way to become signed in and no 'For tests' member
-- [ ] #4 No production member exists only for tests; no static mutable state in Services/ besides JiraAction's AsyncLocal
-- [ ] #5 DataSeparationTests and RetryQueueTests pass
+- [x] #1 No service other than OwnedCollection compares .Owner or calls GetMineAsync
+- [x] #2 OwnedCollectionTests: Get of another owner's id is null, Query never returns others' documents, Upsert over another owner's id throws
+- [x] #3 CurrentUser has no public way to become signed in and no 'For tests' member
+- [x] #4 No production member exists only for tests; no static mutable state in Services/ besides JiraAction's AsyncLocal
+- [x] #5 DataSeparationTests and RetryQueueTests pass
 - [ ] #6 Only the files listed under Files are created, edited, moved or deleted
-- [ ] #7 Behaviour and what the user sees stay the same
-- [ ] #8 dotnet build has 0 warnings and dotnet test passes
+- [x] #7 Behaviour and what the user sees stay the same
+- [x] #8 dotnet build has 0 warnings and dotnet test passes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+AC #6: one file outside the list changed: src/JiraTime/Domain/MonthExport.cs, EpicExportValues.Owner from string to string? (one line). IOwnedDocument.Owner now has a setter so OwnedCollection.UpsertAsync can stamp the owner; a non-nullable string setter implementing string? set gives warning CS8767. AC #1: LegacyDataMigration still filters by Owner (unowned data, and RetireSyncedEntriesAsync runs during sign-in before CurrentUser is set), as do the request log's JiraLogEntry.Owner checks, which are not owned documents.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added Services/OwnedCollection<T> (Get/Query/Upsert/Delete limited to the signed-in user; Query ANDs the owner into the expression, Upsert stamps the owner and throws over another owner's id, Delete leaves others' documents) and used it in RetryQueue, WorkCalendarService and EpicExportStore. Removed CurrentUser.Owns, GetMineAsync and the static SignedIn (tests build TestUsers.SignedIn on the internal Set via InternalsVisibleTo JiraTime.Tests in JiraTime.csproj), WorkCalendarService.GetDayAsync (a test extension in TimeHarness.cs reads one day) and DocumentCollectionExtensions.AllAsync. LegacyDataMigration's gate is an instance field (it is a singleton). UserAccount.CreatedUtc/LastVerifiedUtc no longer default to DateTime.UtcNow; JiraIdentity sets CreatedUtc from the clock. IOwnedDocument.Owner gained a setter; EpicExportValues.Owner became string? (MonthExport.cs, outside the list). New OwnedCollectionTests. Doc changes for cleanup: AGENTS.md Layout add 'Services/OwnedCollection.cs  one collection of the signed-in user's documents: the only owner filter'; Storage abstraction section: mention that services reach owned documents through OwnedCollection<T>, which adds the owner to every query expression; Tests list: add owned collections (others' documents never read or written).
+<!-- SECTION:FINAL_SUMMARY:END -->

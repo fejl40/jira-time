@@ -11,7 +11,7 @@ namespace JiraTime.Domain;
 public class EpicExportValues : IOwnedDocument
 {
     public string Id { get; set; } = "";
-    public string Owner { get; set; } = "";
+    public string? Owner { get; set; } = "";
     public string EpicKey { get; set; } = "";
 
     public string? Fase { get; set; }

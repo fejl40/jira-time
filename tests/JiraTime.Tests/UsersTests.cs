@@ -51,4 +51,12 @@ public class UsersTests
         Assert.Equal($"t{UserAccount.RememberedTokens + 1}", account.VerifiedTokens[0]);
         Assert.DoesNotContain("t0", account.VerifiedTokens);
     }
+
+    [Fact]
+    public void A_new_account_has_no_times_until_they_are_given()
+    {
+        var account = new UserAccount();
+
+        Assert.Equal((default(DateTime), default(DateTime)), (account.CreatedUtc, account.LastVerifiedUtc));
+    }
 }

@@ -37,7 +37,7 @@ public sealed class TimeHarness : IDisposable
 
     public TimeHarness(JiraConnection? connection = null)
     {
-        var user = User = CurrentUser.SignedIn(TestUsers.Carl, connection: connection ?? Server);
+        var user = User = TestUsers.SignedIn(TestUsers.Carl, connection ?? Server);
         Connection = user.RequireJira().Connection;
         RequestLog = new JiraRequestLog(System.IO.Path.Combine(Files.Path, "jira-logs"), Clock);
         Recorder = new JiraRequestRecorder(RequestLog, Feed, Clock, NullLogger<JiraRequestRecorder>.Instance);
@@ -57,7 +57,7 @@ public sealed class TimeHarness : IDisposable
     /// <summary>Another user's stored data, over the same store.</summary>
     public UserData For(UserKey key)
     {
-        var user = CurrentUser.SignedIn(key, connection: Connection);
+        var user = TestUsers.SignedIn(key, Connection);
         return new UserData(new RetryQueue(Store, user), new WorkCalendarService(Store, user), new EpicExportStore(Store, user));
     }
 
@@ -132,7 +132,22 @@ public static class TestUsers
     public static readonly UserKey Carl = UserKey.For(TimeHarness.Server.BaseUrl, "JIRAUSER1");
     public static readonly UserKey Anna = UserKey.For(TimeHarness.Server.BaseUrl, "JIRAUSER2");
 
-    public static CurrentUser SignedIn(UserKey? key = null) => CurrentUser.SignedIn(key ?? Carl);
+    /// <summary>A tab signed in as <paramref name="key"/> (Carl when not given) without asking Jira.</summary>
+    public static CurrentUser SignedIn(UserKey? key = null, JiraConnection? connection = null)
+    {
+        var user = new CurrentUser();
+        key ??= Carl;
+        user.Set(key, new JiraProfile(key.JiraUserId, null, key.JiraUserId, null),
+            connection ?? new JiraConnection($"https://{key.Host}", JiraAuthType.Pat, "token", null), offline: false);
+        return user;
+    }
+}
+
+/// <summary>Reading one day's kind and hours, which the app always reads as part of a range.</summary>
+public static class WorkCalendarReading
+{
+    public static async Task<DayInfo> GetDayAsync(this WorkCalendarService calendar, DateOnly day) =>
+        (await calendar.GetDaysAsync(day, day))[day];
 }
 
 /// <summary>

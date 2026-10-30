@@ -62,7 +62,7 @@ public class FileDocumentStoreTests : IDisposable
         var result = await docs.QueryAsync(e => e.Date >= from);
 
         Assert.Equal(["A-2", "A-3"], result.Select(e => e.IssueKey).Order());
-        Assert.Equal(3, (await docs.AllAsync()).Count);
+        Assert.Equal(3, (await docs.QueryAsync(_ => true)).Count);
     }
 
     [Fact]

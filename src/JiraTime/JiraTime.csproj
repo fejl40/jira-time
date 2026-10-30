@@ -19,6 +19,10 @@
     <!-- 8.5 or later: BrokenCircuitException.RetryAfter tells waiting requests how long the 429 pause lasts. -->
     <PackageReference Include="Polly.Core" Version="8.7.0" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Tests sign a user in through CurrentUser's internal Set, as JiraIdentity does. -->
+    <InternalsVisibleTo Include="JiraTime.Tests" />
+  </ItemGroup>
 
   <Target Name="FindNode" BeforeTargets="NpmInstall;TailwindBuild">
     <Exec Command="node --version" IgnoreExitCode="true" StandardOutputImportance="low" StandardErrorImportance="low" EchoOff="true">

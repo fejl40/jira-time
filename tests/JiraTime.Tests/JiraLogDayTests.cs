@@ -101,7 +101,7 @@ public class MyJiraLogTests : IDisposable
 
     public void Dispose() => _h.Dispose();
 
-    private MyJiraLog For(UserKey key) => new(_h.RequestLog, _h.Feed, CurrentUser.SignedIn(key), _h.Clock);
+    private MyJiraLog For(UserKey key) => new(_h.RequestLog, _h.Feed, TestUsers.SignedIn(key), _h.Clock);
 
     [Fact]
     public async Task Users_only_ever_see_their_own_requests()

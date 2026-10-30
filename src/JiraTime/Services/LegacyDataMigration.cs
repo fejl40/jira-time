@@ -12,7 +12,8 @@ namespace JiraTime.Services;
 /// </summary>
 public class LegacyDataMigration(IDocumentStore store, TimeProvider clock)
 {
-    private static readonly SemaphoreSlim Gate = new(1, 1);
+    /// <summary>One move at a time: the app registers this as a singleton, so all tabs share it.</summary>
+    private readonly SemaphoreSlim _gate = new(1, 1);
 
     private readonly IDocumentCollection<TimeEntry> _entries = store.Collection<TimeEntry>();
     private readonly IDocumentCollection<DayOff> _daysOff = store.Collection<DayOff>();
@@ -25,7 +26,7 @@ public class LegacyDataMigration(IDocumentStore store, TimeProvider clock)
     /// <returns>True when old data was given to <paramref name="user"/>.</returns>
     public async Task<bool> ClaimAsync(UserKey user)
     {
-        await Gate.WaitAsync();
+        await _gate.WaitAsync();
         try
         {
             await GiveStartEndTimesHoursAsync();
@@ -63,7 +64,7 @@ public class LegacyDataMigration(IDocumentStore store, TimeProvider clock)
         }
         finally
         {
-            Gate.Release();
+            _gate.Release();
         }
     }
 
@@ -90,7 +91,7 @@ public class LegacyDataMigration(IDocumentStore store, TimeProvider clock)
     /// <returns>How many entries were dropped.</returns>
     public async Task<int> RetireSyncedEntriesAsync(UserKey user)
     {
-        await Gate.WaitAsync();
+        await _gate.WaitAsync();
         try
         {
             var owner = user.Id;
@@ -110,7 +111,7 @@ public class LegacyDataMigration(IDocumentStore store, TimeProvider clock)
         }
         finally
         {
-            Gate.Release();
+            _gate.Release();
         }
     }
 }

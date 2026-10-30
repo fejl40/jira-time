@@ -40,8 +40,10 @@ public class JiraIdentity(JiraClient jira, IDocumentStore store, CurrentUser use
         }
 
         var key = UserKey.For(c.BaseUrl, me.Id);
-        var account = await _accounts.GetAsync(key.Id) ?? new UserAccount { Id = key.Id, Host = key.Host, JiraUserId = key.JiraUserId };
-        account.Confirm(me, UserAccount.TokenHash(c), clock.GetUtcNow().UtcDateTime);
+        var now = clock.GetUtcNow().UtcDateTime;
+        var account = await _accounts.GetAsync(key.Id)
+            ?? new UserAccount { Id = key.Id, Host = key.Host, JiraUserId = key.JiraUserId, CreatedUtc = now };
+        account.Confirm(me, UserAccount.TokenHash(c), now);
         await _accounts.UpsertAsync(account);
 
         await legacy.ClaimAsync(key);

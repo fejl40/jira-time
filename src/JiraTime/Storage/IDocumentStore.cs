@@ -41,9 +41,3 @@ public interface IDocumentCollection<T> where T : class, IDocument
     /// <returns>False if no document had that id.</returns>
     Task<bool> DeleteAsync(string id, CancellationToken ct = default);
 }
-
-public static class DocumentCollectionExtensions
-{
-    public static Task<IReadOnlyList<T>> AllAsync<T>(this IDocumentCollection<T> c, CancellationToken ct = default)
-        where T : class, IDocument => c.QueryAsync(_ => true, ct);
-}

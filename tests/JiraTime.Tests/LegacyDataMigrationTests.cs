@@ -40,7 +40,7 @@ public class LegacyDataMigrationTests : IDisposable
 
         Assert.True(await _h.Legacy.ClaimAsync(TestUsers.Carl));
 
-        var entries = await StoredAsync(_h.Store, CurrentUser.SignedIn(TestUsers.Carl));
+        var entries = await StoredAsync(_h.Store, TestUsers.SignedIn(TestUsers.Carl));
         Assert.Equal(["ABC-1", "ABC-2"], entries.Select(e => e.IssueKey));
         Assert.Equal(TimeSpan.FromHours(2), entries[1].Duration);       // old start/end kept as hours
         Assert.Equal("10", entries[0].JiraWorklogId);                    // still linked to its Jira worklog
@@ -64,7 +64,7 @@ public class LegacyDataMigrationTests : IDisposable
 
         Assert.False(await _h.Legacy.ClaimAsync(TestUsers.Anna));
 
-        Assert.Empty(await StoredAsync(_h.Store, CurrentUser.SignedIn(TestUsers.Anna)));
+        Assert.Empty(await StoredAsync(_h.Store, TestUsers.SignedIn(TestUsers.Anna)));
         Assert.Empty(await _h.Store.Collection<LegacyBackup>().QueryAsync(_ => true));
         Assert.True(await _h.Legacy.ClaimAsync(TestUsers.Carl)); // still there for Carl
     }
@@ -77,7 +77,7 @@ public class LegacyDataMigrationTests : IDisposable
 
         Assert.False(await _h.Legacy.ClaimAsync(TestUsers.Carl));
         Assert.Single(await _h.Store.Collection<LegacyBackup>().QueryAsync(_ => true));
-        Assert.Equal(2, (await StoredAsync(_h.Store, CurrentUser.SignedIn(TestUsers.Carl))).Count);
+        Assert.Equal(2, (await StoredAsync(_h.Store, TestUsers.SignedIn(TestUsers.Carl))).Count);
     }
 
     [Fact]
@@ -86,7 +86,7 @@ public class LegacyDataMigrationTests : IDisposable
         await WriteOldDataAsync(profileId: null);
 
         Assert.True(await _h.Legacy.ClaimAsync(TestUsers.Anna));
-        Assert.Equal(2, (await StoredAsync(_h.Store, CurrentUser.SignedIn(TestUsers.Anna))).Count);
+        Assert.Equal(2, (await StoredAsync(_h.Store, TestUsers.SignedIn(TestUsers.Anna))).Count);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class LegacyDataMigrationTests : IDisposable
         await _h.Legacy.ClaimAsync(TestUsers.Carl);
 
         var reopened = _h.Files.Reopen();
-        Assert.Equal(2, (await StoredAsync(reopened, CurrentUser.SignedIn(TestUsers.Carl))).Count);
+        Assert.Equal(2, (await StoredAsync(reopened, TestUsers.SignedIn(TestUsers.Carl))).Count);
         Assert.False(File.Exists(Path.Combine(_h.Files.Path, "days-off", "2026-10-20.json")));
     }
 
@@ -125,7 +125,7 @@ public class LegacyDataMigrationTests : IDisposable
 
         Assert.False(await _h.Legacy.ClaimAsync(TestUsers.Carl)); // nothing unowned to claim
 
-        var old = Assert.Single(await StoredAsync(_h.Store, CurrentUser.SignedIn(TestUsers.Carl)));
+        var old = Assert.Single(await StoredAsync(_h.Store, TestUsers.SignedIn(TestUsers.Carl)));
         Assert.Equal((TimeSpan.FromHours(2.5), "Review"), (old.Duration, old.Comment));
         var json = await File.ReadAllTextAsync(Path.Combine(folder, "old.json"));
         Assert.DoesNotContain("\"start\"", json);
@@ -143,6 +143,6 @@ public class LegacyDataMigrationTests : IDisposable
 
         await _h.Legacy.ClaimAsync(TestUsers.Carl);
 
-        Assert.Equal(TimeSpan.FromHours(1), Assert.Single(await StoredAsync(_h.Store, CurrentUser.SignedIn(TestUsers.Carl))).Duration);
+        Assert.Equal(TimeSpan.FromHours(1), Assert.Single(await StoredAsync(_h.Store, TestUsers.SignedIn(TestUsers.Carl))).Duration);
     }
 }
