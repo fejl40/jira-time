@@ -1,0 +1,24 @@
+@* Shows that the app is waiting for Jira: a small spinner, with text when given. It stays hidden for a
+   moment first, so a fast answer doesn't flicker, and stands still when the system asks for reduced
+   motion. Styles in Styles/motion.css (.waiting). *@
+
+<span class="waiting @(Block ? "flex justify-center" : "inline-flex") items-center gap-1.5 @Class" role="status" data-waiting @attributes="Attributes">
+    <span class="waiting-spinner" aria-hidden="true"></span>
+    @if (Label is not null)
+    {
+        <span>@Label</span>
+    }
+    else
+    {
+        <span class="sr-only">Waiting for Jira</span>
+    }
+</span>
+
+@code {
+    /// <summary>What is being waited for, e.g. "Reading Jira…"; only the spinner when null.</summary>
+    [Parameter] public string? Label { get; set; }
+    /// <summary>A block of its own, centred, e.g. a card in place of content still being read.</summary>
+    [Parameter] public bool Block { get; set; }
+    [Parameter] public string? Class { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? Attributes { get; set; }
+}

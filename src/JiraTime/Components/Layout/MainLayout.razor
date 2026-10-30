@@ -39,13 +39,17 @@
                 <ChildContent>Jira Time asks your Jira who your token belongs to before showing your hours, and that didn't work:</ChildContent>
                 <Actions>
                     <a href="setup/connect" class="btn-secondary">Connect again</a>
-                    <button class="btn-primary" disabled="@_verifying" @onclick="VerifyAsync">@(_verifying ? "Checking…" : "Try again")</button>
+                    <button class="btn-primary" disabled="@_verifying" @onclick="VerifyAsync">@if (_verifying) { <Waiting /> } Try again</button>
                 </Actions>
             </ErrorCard>
         }
         else if (_ready)
         {
             @Body
+        }
+        else if (_verifying)
+        {
+            <Waiting Block Label="Checking your Jira connection…" Class="py-10 text-sm text-muted" data-signing-in />
         }
     </main>
 </div>

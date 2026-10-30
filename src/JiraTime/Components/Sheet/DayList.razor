@@ -7,7 +7,7 @@
         var saved = Sheet.SavedOn(day);
         var logged = TimeEntry.Total(saved);
         <li>
-            <button type="button" class="motion-colors flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm @(day == Selected ? "bg-blue-50 dark:bg-blue-950/60" : info is { IsWorkday: false } ? "bg-slate-50 dark:bg-slate-800/60" : "")"
+            <button type="button" class="motion-colors flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm @(day == PendingDay ? "waiting-pending" : "") @(day == Selected ? "bg-blue-50 dark:bg-blue-950/60" : info is { IsWorkday: false } ? "bg-slate-50 dark:bg-slate-800/60" : "")"
                     @onclick="() => OnSelect.InvokeAsync(day)">
                 <span class="w-20 flex-none @(day == Sheet.Today ? "font-semibold text-blue-700 dark:text-blue-400" : "")">@Format.WeekdayAndNumber(day)</span>
                 <span class="flex-1 truncate text-xs text-muted">@Note(info)</span>
@@ -34,6 +34,8 @@
 @code {
     [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
     [Parameter] public DateOnly Selected { get; set; }
+    /// <summary>The day Save day is saving; it shows as pending.</summary>
+    [Parameter] public DateOnly? PendingDay { get; set; }
     [Parameter] public EventCallback<DateOnly> OnSelect { get; set; }
 
     private static string Note(DayInfo? info) => info switch

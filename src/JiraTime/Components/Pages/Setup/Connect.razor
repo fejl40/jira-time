@@ -51,7 +51,7 @@
         {
             <a href="settings" class="btn-secondary">Cancel</a>
         }
-        <button type="submit" class="btn-primary" disabled="@(!CanSubmit)">@(_busy ? "Checking…" : "Connect")</button>
+        <button type="submit" class="btn-primary" disabled="@(!CanSubmit)" data-connect>@if (_busy) { <Waiting /> } Connect</button>
     </div>
 </form>
 

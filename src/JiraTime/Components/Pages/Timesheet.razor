@@ -9,6 +9,7 @@
 @inject NavigationManager Nav
 @inject IJSRuntime JS
 @inject MotionScript Animations
+@implements IDisposable
 
 @* Loads a period into a PeriodSheet and wires its parts to the services. The rules live in
    PeriodSheet; the markup in Components/Sheet. *@
@@ -21,35 +22,27 @@
 {
 <DayKeys @ref="_keys" OnSave="SaveDayFromKeyboardAsync" OnMove="d => SelectDay(_selectedDay.AddDays(d))" OnAddRow="AddRowFromKeyboardAsync" />
 <div class="mx-auto max-w-7xl space-y-6 overflow-x-clip">
-    <PeriodHeader Sheet="sheet" Unsynced="_unsynced" Syncing="_syncing" Saving="_savingAll"
+    <PeriodHeader Sheet="sheet" Unsynced="_unsynced" Waits="_waits"
                   OnSync="SyncPeriodAsync" OnFillPeriod="FillPeriod" OnSaveAll="SaveAllAsync" OnDiscardAll="DiscardAll" />
 
-    <PeriodReminders Sheet="sheet" Unsynced="_unsynced" Previous="_extras.Previous" />
+    <PeriodReminders Sheet="sheet" Unsynced="_unsynced" Previous="_extras.Previous" JiraError="@_extras.JiraError" Waits="_waits" OnRetry="RetryJiraAsync" />
 
-    @if (_extras.JiraError is { } jiraError)
-    {
-        <div class="card flex flex-wrap items-center gap-3 border-amber-300 p-4 text-sm text-amber-800 dark:border-amber-700 dark:text-amber-300" role="alert" data-jira-error>
-            <span class="flex-1">Couldn't read your time from Jira: @jiraError. Only work waiting to be sent is shown, and days can't be edited until Jira can be read.</span>
-            <button type="button" class="btn-secondary" disabled="@_loading" @onclick="RetryJiraAsync">@(_loading ? "Trying…" : "Try again")</button>
-        </div>
-    }
-
-    @* A new period slides in from the side it comes from. *@
-    <div @key="sheet.Period" class="space-y-6 @Motion.Slide(_slide)">
-        <DayList Sheet="sheet" Selected="_selectedDay" OnSelect="d => SelectDay(d)" />
+    @* A new period slides in from the side it comes from. While Jira is read the period shows as pending. *@
+    <div @key="sheet.Period" class="waiting-dim space-y-6 @Motion.Slide(_slide)" aria-busy="@JiraWaits.Aria(_waits.PeriodPending)" data-period-pending>
+        <DayList Sheet="sheet" Selected="_selectedDay" PendingDay="_waits.SavingDay" OnSelect="d => SelectDay(d)" />
 
         <PeriodGrid Sheet="sheet" Selected="_selectedDay" JiraBaseUrl="@User.Connection?.BaseUrl"
-                    Cascade="_cascade" JustSaved="_saveMotion.JustSaved" SentToJira="_saveMotion.SentToJira"
+                    Cascade="_cascade" PendingDay="_waits.SavingDay" JustSaved="_saveMotion.JustSaved" SentToJira="_saveMotion.SentToJira"
                     OnSelectDay="d => SelectDay(d, focus: true)" OnCellClicked="CellClicked" />
     </div>
 
-    <DayPanel @ref="_panel" Sheet="sheet" Day="_selectedDay" Notice="@_notice" Extras="_extras" Statuses="Statuses"
+    <DayPanel @ref="_panel" Sheet="sheet" Day="_selectedDay" Notice="@_notice" Extras="_extras" Statuses="Statuses" Waits="_waits"
               OnChanged="StateHasChanged" OnSaved="DaySavedAsync" OnReload="ReloadAsync" />
 </div>
 }
 else
 {
-    <p class="mx-auto max-w-7xl text-sm text-muted" role="status" data-loading>Reading your time from Jira…</p>
+    <Waiting Block Label="Reading your time from Jira…" Class="mx-auto max-w-7xl py-10 text-sm text-muted" data-loading />
 }
 
 @code {
@@ -64,7 +57,8 @@ else
     private PeriodSheet? _sheet;
     private DateOnly _selectedDay;
     private int _unsynced;
-    private bool _syncing, _savingAll, _loading;
+    /// <summary>Requests to Jira that are running; parts of the page show them as pending.</summary>
+    private readonly JiraWaits _waits = new();
     /// <summary>News about the selected day, such as days Save all couldn't save.</summary>
     private string? _notice;
     private DayPanel? _panel;
@@ -81,6 +75,10 @@ else
     private PeriodSheet Sheet => _sheet!;
     private bool HasUnsaved => _sheet?.OwnChangeDays.Count > 0;
 
+    protected override void OnInitialized() => _waits.Changed += StateHasChanged;
+
+    public void Dispose() => _waits.Changed -= StateHasChanged;
+
     protected override async Task OnParametersSetAsync()
     {
         var link = Links.Read(Nav.ToBaseRelativePath(Nav.Uri), Today) ?? new TimesheetLink(Period.For(Today), null);
@@ -94,23 +92,22 @@ else
             return;
         }
 
-        // The old period stays on screen until the new one has loaded.
+        // The old period stays on screen, pending, until the new one has loaded; a period left meanwhile isn't shown.
         var sheet = new PeriodSheet(period, () => Today);
+        if (await _waits.OpenAsync(period, () => Loader.LoadAsync(sheet, Statuses)) is not { } loaded) return;
         _slide = _sheet is null ? 0 : period.Start.CompareTo(_sheet.Period.Start);
-        await ReloadAsync(sheet);
+        Show(sheet, loaded);
         (_sheet, _selectedDay, _notice) = (sheet, selected, null);
         sheet.Suggest(_selectedDay);
     }
 
     // ---- Loading ----
 
-    private Task ReloadAsync() => ReloadAsync(Sheet);
+    private Task ReloadAsync() =>
+        _waits.RunAsync(JiraWait.Period, async () => Show(Sheet, await Loader.LoadAsync(Sheet, Statuses)));
 
-    private async Task ReloadAsync(PeriodSheet sheet)
+    private void Show(PeriodSheet sheet, PeriodExtras loaded)
     {
-        _loading = true;
-        var loaded = await Loader.LoadAsync(sheet, Statuses);
-        _loading = false;
         _extras = loaded;
         _unsynced = sheet.Entries.Count(e => !e.IsSynced);
     }
@@ -158,17 +155,19 @@ else
     /// <summary>Saves every day with unsaved changes. Days that couldn't be saved are left for the user to finish.</summary>
     private async Task SaveAllAsync()
     {
-        if (User.Connection is not { } c) return;
-        _savingAll = true;
+        if (User.Connection is not { } c || !_waits.CanStart) return;
         _notice = null;
         _saveMotion.Start();
-        var result = await Sync.SaveDaysAsync(c, Sheet);
-        foreach (var (savedDay, dayResult) in result.Saved) Saved(savedDay, dayResult);
-        _savingAll = false;
-        if (_saveMotion.JustSaved.Contains(_selectedDay)) await Animations.CollapseAsync(MotionScript.RemovedRows);
-        await ReloadAsync();
+        WorklogSync.SaveAllResult? result = null;
+        await _waits.RunAsync(JiraWait.SaveAll, async () =>
+        {
+            result = await Sync.SaveDaysAsync(c, Sheet);
+            foreach (var (savedDay, dayResult) in result.Saved) Saved(savedDay, dayResult);
+            if (_saveMotion.JustSaved.Contains(_selectedDay)) await Animations.CollapseAsync(MotionScript.RemovedRows);
+            await ReloadAsync();
+        });
         _saveMotion.Finish();
-        if (result.FirstToFix is { } day)
+        if (result!.FirstToFix is { } day)
         {
             SelectDay(day);
             _notice = result.Notice;
@@ -177,12 +176,13 @@ else
 
     private async Task SyncPeriodAsync()
     {
-        if (User.Connection is not { } c) return;
-        _syncing = true;
-        await Sync.SyncRangeAsync(c, Sheet.Period.Start, Sheet.Period.End);
-        Log.Refresh(); // Sync now also picks up what was logged in Jira meanwhile
-        await ReloadAsync();
-        _syncing = false;
+        if (User.Connection is not { } c || !_waits.CanStart) return;
+        await _waits.RunAsync(JiraWait.Sync, async () =>
+        {
+            await Sync.SyncRangeAsync(c, Sheet.Period.Start, Sheet.Period.End);
+            Log.Refresh(); // Sync now also picks up what was logged in Jira meanwhile
+            await ReloadAsync();
+        });
     }
 
     // ---- Days and navigation ----

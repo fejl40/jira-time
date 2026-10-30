@@ -26,24 +26,28 @@
             {
                 <span> · <span class="text-warning" title="Saved here, but Jira doesn't have it yet">@Unsynced not in Jira</span></span>
             }
-            <button class="btn-ghost ml-1 px-1.5 py-0.5 text-xs" disabled="@Syncing" @onclick="OnSync"
-                    title="Send what Jira is missing and read worklogs logged in Jira">@(Syncing ? "Syncing…" : Unsynced > 0 ? "Sync now" : "↻ Sync")</button>
+            <button class="btn-ghost ml-1 px-1.5 py-0.5 text-xs" disabled="@(!Waits.CanStart)" @onclick="OnSync" data-sync
+                    title="Send what Jira is missing and read worklogs logged in Jira">@if (Waits.Has(JiraWait.Sync)) { <Waiting /> <span>Sync</span> } else { @(Unsynced > 0 ? "Sync now" : "↻ Sync") }</button>
             <a class="btn-ghost px-1.5 py-0.5 text-xs" href="@ExportLinks.To(Period.Start)" title="Export the month this period is in" data-export-link>Export month</a>
+            @if (Waits.Status(Period) is { } waiting)
+            {
+                <Waiting Label="@waiting" Class="ml-1 text-xs text-blue-700 dark:text-blue-300" data-period-waiting />
+            }
         </p>
     </div>
     <div class="ml-auto flex items-center gap-2">
         @if (Unsaved.Count > 0)
         {
-            <button class="btn-ghost" disabled="@Saving" @onclick="DiscardAllAsync">Discard all</button>
-            <button class="btn-primary" disabled="@Saving" @onclick="() => _confirming = true">@(Saving ? "Saving…" : $"Save all ({Format.Days(Unsaved.Count)})")</button>
+            <button class="btn-ghost" disabled="@(!Waits.CanStart)" @onclick="DiscardAllAsync">Discard all</button>
+            <button class="btn-primary" disabled="@(!Waits.CanStart)" @onclick="() => _confirming = true" data-save-all>@if (Waits.Has(JiraWait.SaveAll)) { <Waiting /> } Save all (@Format.Days(Unsaved.Count))</button>
         }
         else if (CanFillAny)
         {
-            <button class="btn-primary" title="@FillTitle" @onclick="OnFillPeriod">Fill period</button>
+            <button class="btn-primary" title="@FillTitle" disabled="@(!Waits.CanStart)" @onclick="OnFillPeriod">Fill period</button>
         }
         @if (Unsaved.Count > 0 && CanFillMore)
         {
-            <button class="btn-secondary order-first" title="@FillTitle" @onclick="OnFillPeriod">Fill period</button>
+            <button class="btn-secondary order-first" title="@FillTitle" disabled="@(!Waits.CanStart)" @onclick="OnFillPeriod">Fill period</button>
         }
     </div>
 </div>
@@ -58,7 +62,7 @@
             }
         </span>
         <button class="btn-secondary ml-auto" @onclick="() => _confirming = false">Cancel</button>
-        <button class="btn-primary" @onclick="SaveAllAsync">Save @Format.Days(Unsaved.Count)</button>
+        <button class="btn-primary" disabled="@(!Waits.CanStart)" @onclick="SaveAllAsync">Save @Format.Days(Unsaved.Count)</button>
     </div>
 }
 
@@ -66,8 +70,8 @@
     [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
     /// <summary>Saved entries in the period that Jira doesn't have yet.</summary>
     [Parameter] public int Unsynced { get; set; }
-    [Parameter] public bool Syncing { get; set; }
-    [Parameter] public bool Saving { get; set; }
+    /// <summary>Requests to Jira that are running: the status line says so and the buttons wait.</summary>
+    [Parameter, EditorRequired] public JiraWaits Waits { get; set; } = default!;
     [Parameter] public EventCallback OnSync { get; set; }
     [Parameter] public EventCallback OnFillPeriod { get; set; }
     [Parameter] public EventCallback OnSaveAll { get; set; }

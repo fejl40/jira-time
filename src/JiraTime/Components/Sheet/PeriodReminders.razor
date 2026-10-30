@@ -1,4 +1,12 @@
-@* Reminders: the end of this period, and a previous period that isn't done. *@
+@* Reminders: Jira couldn't be read, the end of this period, and a previous period that isn't done. *@
+
+@if (JiraError is not null)
+{
+    <div class="card flex flex-wrap items-center gap-3 border-amber-300 p-4 text-sm text-amber-800 dark:border-amber-700 dark:text-amber-300" role="alert" data-jira-error>
+        <span class="flex-1">Couldn't read your time from Jira: @JiraError. Only work waiting to be sent is shown, and days can't be edited until Jira can be read.</span>
+        <button type="button" class="btn-secondary" disabled="@(!Waits.CanStart)" @onclick="OnRetry">@if (Waits.Has(JiraWait.Period)) { <Waiting /> } Try again</button>
+    </div>
+}
 
 @if (EndReminder is { } end)
 {
@@ -23,6 +31,11 @@
     [Parameter] public int Unsynced { get; set; }
     /// <summary>The previous period, when this is the current one and the previous isn't done.</summary>
     [Parameter] public OpenPeriod? Previous { get; set; }
+    /// <summary>Why Jira couldn't be read; the period then shows only work waiting for Jira.</summary>
+    [Parameter] public string? JiraError { get; set; }
+    [Parameter, EditorRequired] public JiraWaits Waits { get; set; } = default!;
+    /// <summary>Reads Jira again.</summary>
+    [Parameter] public EventCallback OnRetry { get; set; }
 
     private bool _previousHidden;
 

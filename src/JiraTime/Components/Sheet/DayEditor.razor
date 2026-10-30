@@ -5,7 +5,7 @@
 @inject MotionScript Animations
 
 <div>
-    <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+    <ul class="waiting-dim divide-y divide-slate-100 dark:divide-slate-800" aria-busy="@JiraWaits.Aria(Waits.DayPending)" data-day-rows>
         @foreach (var row in Rows)
         {
             <DayRow @key="row.Entry.Id" Row="row" Work="Work" Choices="Choices" Search="Search" Errors="_errors" Picked="row.Entry.Id == _picked"
@@ -65,10 +65,10 @@
         @if (HasChanges)
         {
             <span class="text-xs text-unsaved">Unsaved changes</span>
-            <button type="button" class="btn-secondary ml-auto" disabled="@_busy" @onclick="ResetAsync">Discard changes</button>
+            <button type="button" class="btn-secondary ml-auto" disabled="@(!Waits.CanStart)" @onclick="ResetAsync">Discard changes</button>
         }
-        <button type="button" class="btn-primary @(HasChanges ? "" : "ml-auto")" disabled="@(_busy || !CanSave)" @onclick="SaveAsync" data-save-day>
-            @(_busy ? "Saving…" : "Save day")
+        <button type="button" class="btn-primary @(HasChanges ? "" : "ml-auto")" disabled="@(!Waits.CanStart || !CanSave)" @onclick="SaveAsync" data-save-day>
+            @if (Waits.Has(JiraWait.SaveDay)) { <Waiting /> } Save day
         </button>
     </div>
 </div>
@@ -86,6 +86,8 @@
     /// <summary>Raised with the key when an issue is picked, so the page can look up its status.</summary>
     [Parameter] public EventCallback<string> OnIssuePicked { get; set; }
     [Parameter, EditorRequired] public JiraConnection Connection { get; set; } = default!;
+    /// <summary>Requests to Jira that are running: Save day waits for them, and its own save shows here.</summary>
+    [Parameter, EditorRequired] public JiraWaits Waits { get; set; } = default!;
     /// <summary>Hours the day should have (zero on weekends, holidays and days off).</summary>
     [Parameter] public TimeSpan Expected { get; set; }
     /// <summary>The latest earlier day with work, offered to copy.</summary>
@@ -102,7 +104,6 @@
     private DateOnly? _loadedDate;
     private Dictionary<string, string> _errors = [];
     private string? _notice;
-    private bool _busy;
 
     private IReadOnlyList<WorkRow> Rows => Work.Rows(Saved);
 
@@ -174,13 +175,16 @@
     /// <summary>Saves the day's rows and updates Jira. Public for the Ctrl+S shortcut.</summary>
     public async Task SaveAsync()
     {
-        if (_busy || !CanSave) return;
+        if (!Waits.CanStart || !CanSave) return;
         foreach (var (id, _) in Work.BadHours) _errors[id] = "Enter the hours, e.g. 1.5 or 1:30.";
         if (Work.BadHours.Count > 0) return;
+        await Waits.SaveDayAsync(Date, SaveToJiraAsync);
+    }
 
-        _busy = true;
+    /// <summary>Sends the day to Jira and, once saved, lets the page read the period again.</summary>
+    private async Task SaveToJiraAsync()
+    {
         var result = await Sync.SaveDayAsync(Connection, Date, Work.RowsToSave(Saved), Saved);
-        _busy = false;
         _errors = result.Errors.ToDictionary();
         if (result.ChangedInJira) await OnChangedInJira.InvokeAsync();
         if (!result.Saved) return;

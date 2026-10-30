@@ -4,7 +4,7 @@
 @inject WorkCalendarService Calendar
 
 <section class="card p-6">
-    <DayHeader Date="Day" Info="Sheet.Day(Day)" Logged="TimeEntry.Total(Saved)" Missing="Sheet.Missing(Day)"
+    <DayHeader Date="Day" Info="Sheet.Day(Day)" Logged="TimeEntry.Total(Saved)" Missing="Sheet.Missing(Day)" Busy="!Waits.CanStart"
                OnMarkOff="MarkDayOffAsync" OnUnmarkOff="UnmarkDayOffAsync" />
 
     @if (Notice is not null)
@@ -17,7 +17,7 @@
             <DayEditor @ref="_editor" Date="Day" Saved="Saved" Work="Sheet.WorkFor(Day)"
                        Choices="Choices" Comments="Extras.Comments"
                        OnIssuePicked="key => Statuses.LookUpAsync([key])" Connection="connection" Expected="@(Sheet.Day(Day)?.Expected ?? TimeSpan.Zero)"
-                       Previous="Sheet.PreviousWorkedDay(Day)"
+                       Previous="Sheet.PreviousWorkedDay(Day)" Waits="Waits"
                        OnChanged="OnChanged" OnSaved="OnSaved" OnChangedInJira="OnReload" OnDiscard="DiscardAsync" />
         </div>
         <p class="hint mt-4 hidden sm:block" data-shortcuts>
@@ -36,6 +36,8 @@
     [Parameter, EditorRequired] public PeriodExtras Extras { get; set; } = default!;
     /// <summary>The page's issue statuses; rows on Done issues get a note.</summary>
     [Parameter, EditorRequired] public IssueStatuses Statuses { get; set; } = default!;
+    /// <summary>Requests to Jira that are running; the day's rows are pending meanwhile.</summary>
+    [Parameter, EditorRequired] public JiraWaits Waits { get; set; } = default!;
     /// <summary>Raised after the day's unsaved changes changed, so the page shows them.</summary>
     [Parameter] public EventCallback OnChanged { get; set; }
     [Parameter] public EventCallback<WorklogSync.DayResult> OnSaved { get; set; }

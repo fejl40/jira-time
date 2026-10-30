@@ -125,6 +125,8 @@
     [Parameter] public IReadOnlySet<DateOnly> SentToJira { get; set; } = new HashSet<DateOnly>();
     /// <summary>New suggestion cells drop in one day after another (right after Fill period).</summary>
     [Parameter] public bool Cascade { get; set; }
+    /// <summary>The day Save day is saving; its column shows as pending.</summary>
+    [Parameter] public DateOnly? PendingDay { get; set; }
     [Parameter] public EventCallback<DateOnly> OnSelectDay { get; set; }
     [Parameter] public EventCallback<(DateOnly Day, PeriodRow Row)> OnCellClicked { get; set; }
 
@@ -167,6 +169,7 @@
         if (index > 0 && day.DayOfWeek == DayOfWeek.Monday) classes.Add("border-l-2 border-slate-300 dark:border-slate-600"); // week boundary
         if (!footer && info is { IsWorkday: false }) classes.Add("bg-slate-50 dark:bg-slate-800/60");
         if (!footer && info is { Kind: DayKind.Holiday or DayKind.DayOff }) classes.Add("text-slate-400 dark:text-slate-500");
+        if (day == PendingDay) classes.Add("waiting-pending");
         return string.Join(' ', classes);
     }
 }

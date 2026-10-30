@@ -92,11 +92,12 @@ Components/Pages/Timesheet.razor   shows a period: wires PeriodLoader, WorklogSy
 Components/Format.cs               how hours, days and counts are written for the user
 Components/Links.cs                builds and reads timesheet links (period, selected day) and export links
 Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, DayKeys (keyboard shortcuts)
+Components/JiraWaits.cs            the timesheet's running Jira requests: what shows pending, which buttons wait, the status text
 Components/Motion.cs               animation classes (Styles/motion.css), MotionScript (calls wwwroot/motion.js), SaveMotion
 Components/Pages/ExportPage.razor  a month in the agency's format: values per epic, Copy, Download .tsv (wwwroot/export.js)
 Components/Pages/SettingsPage.razor
 Components/Pages/Error.razor, NotFound.razor
-Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow
+Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow, Waiting (the waiting-for-Jira spinner)
 Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
 ```
 
@@ -252,6 +253,19 @@ is empty when there is none, epics included. Fase, Forordning and Hovedleverance
 user and stay empty for issues without an epic. `Beskrivelse` is the issue key. **Copy** puts header and rows
 on the clipboard; **Download .tsv** saves UTF-8 with a byte order mark so Excel reads æøå.
 
+### Waiting for Jira
+
+Every wait on Jira shows where the user is looking, with one shared indicator, `Components/Shared/Waiting.razor`
+(a small spinner, with text where it helps). It stays hidden for the first 200 ms (`--waiting-delay` in
+`Styles/motion.css`), so a fast answer doesn't flicker, and stands still with reduced motion. While a period opens,
+the old one stays on screen dimmed, and the header says **Opening 1 Oct – 15 Oct…**; Sync and Save all dim the
+grid, Save day dims its day's column and rows (`aria-busy`, `.waiting-dim` / `.waiting-pending`). The first load,
+signing in and the export show a waiting line instead of empty content. The button that started a request gets the
+spinner, and on the timesheet every button that sends a request to Jira (Sync, Save all, Save day, Try again, time
+off) is off until the running one ends, so saves and reads never cross. `JiraWaits` decides this and is tested;
+a period left before it was read is never shown. Settings (Save hours), Connect, the issue picker's search and
+the export's values per epic show the same spinner.
+
 ### Theme
 
 Light, dark or system (follows the OS). Switch with the icon in the header; the choice is kept in the browser.
@@ -282,5 +296,5 @@ interfaces and replace the `IDocumentStore` registration in `Program.cs`.
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, loading a period, saving days to Jira and the retry queue, links, Jira queries, issue lookups and the picker, and fill suggestions.
+xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, loading a period, saving days to Jira and the retry queue, links, Jira queries, issue lookups and the picker, fill suggestions, and the waits on Jira (what shows pending and which buttons wait).
 

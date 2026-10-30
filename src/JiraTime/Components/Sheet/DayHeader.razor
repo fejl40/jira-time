@@ -17,7 +17,7 @@
     else if (Info is { Kind: DayKind.DayOff })
     {
         <span class="@Badge" data-time-off>@Sun Day off · @Info.Name</span>
-        <button class="btn-ghost text-xs" @onclick="OnUnmarkOff">Undo</button>
+        <button class="btn-ghost text-xs" disabled="@Busy" @onclick="OnUnmarkOff">Undo</button>
     }
     else if (Info is { Kind: DayKind.Workday } work)
     {
@@ -28,7 +28,7 @@
         @if (work.HasPartialDayOff)
         {
             <span class="@Badge" data-time-off>@Sun @work.Name · @Format.Hours(work.Off) h off</span>
-            <button class="btn-ghost text-xs" @onclick="OnUnmarkOff">Undo</button>
+            <button class="btn-ghost text-xs" disabled="@Busy" @onclick="OnUnmarkOff">Undo</button>
         }
         else if (!_open)
         {
@@ -45,7 +45,7 @@
                 </select>
                 <input type="text" inputmode="decimal" class="field w-16 py-1 text-right text-xs" aria-label="Hours off" @bind="_hours" />
                 <span class="text-muted">h of @Format.Hours(work.Hours) h</span>
-                <button class="btn-secondary py-1 text-xs" @onclick="MarkOffAsync">Mark off</button>
+                <button class="btn-secondary py-1 text-xs" disabled="@Busy" @onclick="MarkOffAsync">Mark off</button>
                 <button class="btn-ghost text-xs" @onclick="() => _open = false">Cancel</button>
                 @if (_error is not null)
                 {
@@ -65,6 +65,8 @@
     [Parameter] public TimeSpan Logged { get; set; }
     /// <summary>Hours missing so far (zero after today).</summary>
     [Parameter] public TimeSpan Missing { get; set; }
+    /// <summary>A request to Jira is running: time off waits, as it reads the period again.</summary>
+    [Parameter] public bool Busy { get; set; }
     [Parameter] public EventCallback<TimeOff> OnMarkOff { get; set; }
     [Parameter] public EventCallback OnUnmarkOff { get; set; }
 

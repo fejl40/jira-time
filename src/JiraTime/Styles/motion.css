@@ -13,6 +13,8 @@
   --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   /* Delay between items of a staggered entrance; set the item's place with style="--motion-order: n". */
   --motion-stagger: 30ms;
+  /* How long a wait on Jira runs before it shows, so fast answers don't flicker. */
+  --waiting-delay: 200ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -22,6 +24,8 @@
     animation-delay: 0ms !important;
     transition-duration: 0ms !important;
   }
+  /* Waiting to show is no motion: keep the delay so fast answers still don't flicker. */
+  .waiting, .waiting-pending { animation-duration: var(--waiting-delay) !important; }
 }
 
 /* ---- Entrances ---- */
@@ -95,3 +99,26 @@
 .motion-tick, .motion-confetti { position: fixed; z-index: 60; pointer-events: none; }
 .motion-tick { font-size: 0.75rem; font-weight: 700; color: var(--color-emerald-600); }
 .motion-confetti { width: 6px; height: 10px; border-radius: 1px; }
+
+/* ---- Waiting for Jira (Components/Shared/Waiting.razor) ---- */
+
+/* Hidden until the wait has lasted --waiting-delay; then it shows at once. */
+.waiting { animation: waiting-appear var(--waiting-delay) steps(1, end) both; }
+@keyframes waiting-appear { from { opacity: 0; } }
+
+/* A ring with a gap that turns; with reduced motion it stands still. */
+.waiting-spinner {
+  width: 0.875em; height: 0.875em; flex: none; border-radius: 9999px;
+  border: 2px solid currentColor; border-right-color: transparent; opacity: 0.8;
+  animation: waiting-spin 700ms linear infinite;
+}
+@keyframes waiting-spin { to { transform: rotate(360deg); } }
+
+/* Content that is being read again or saved (aria-busy="true") dims after the same delay and
+   takes no clicks meanwhile. */
+.waiting-dim { transition: opacity var(--motion-fast) var(--motion-ease); }
+.waiting-dim[aria-busy="true"] { opacity: 0.5; pointer-events: none; transition-delay: var(--waiting-delay); }
+
+/* A part that appears pending at once, e.g. the grid column of the day being saved, dimmed after the delay. */
+.waiting-pending { opacity: 0.5; animation: waiting-hold var(--waiting-delay) steps(1, end) both; }
+@keyframes waiting-hold { from { opacity: 1; } }

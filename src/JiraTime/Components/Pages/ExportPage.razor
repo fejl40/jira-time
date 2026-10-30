@@ -14,11 +14,7 @@
         <div>
             <h1 class="text-xl font-semibold leading-tight">Export @Title</h1>
             <p class="text-sm text-muted" data-export-status>
-                @if (_loading)
-                {
-                    <span>Reading your worklogs…</span>
-                }
-                else if (_error is null)
+                @if (!_loading && _error is null)
                 {
                     <span><span class="font-semibold text-slate-800 dark:text-slate-100">@Format.Hours(MonthExport.Total(_rows)) h</span> on @Format.Count(MonthExport.IssueRowCount(_rows), "row")</span>
                     <span> · <a class="underline" href="@Links.To(Period.For(_month))">timesheet</a></span>
@@ -45,7 +41,11 @@
             <Actions><button class="btn-primary" @onclick="() => LoadAsync(refresh: true)">Try again</button></Actions>
         </ErrorCard>
     }
-    else if (!_loading)
+    else if (_loading)
+    {
+        <Waiting Block Label="@($"Reading your worklogs for {Title} from Jira…")" Class="card p-10 text-sm text-muted" data-export-loading />
+    }
+    else
     {
         @if (_notInJira > 0)
         {
@@ -57,7 +57,12 @@
         @if (_values.Count > 0 || _noEpic.Count > 0)
         {
             <section class="card p-6" data-epic-values>
-                <h2 class="font-semibold">Values per epic</h2>
+                <h2 class="flex items-center gap-3 font-semibold">Values per epic
+                    @if (_saving > 0)
+                    {
+                        <Waiting Label="Saving…" Class="text-xs font-normal text-muted" data-epic-saving />
+                    }
+                </h2>
                 <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Set once per epic and remembered for later months. Changes are saved as you leave a field.</p>
                 @if (_values.Count > 0)
                 {
@@ -136,6 +141,8 @@
     private IReadOnlyDictionary<string, EpicExportValues> _values = new Dictionary<string, EpicExportValues>();
     private IReadOnlyList<string> _noEpic = [];
     private int _notInJira;
+    /// <summary>Epic values being saved right now.</summary>
+    private int _saving;
 
     private string BaseUrl => User.Connection?.BaseUrl ?? "";
     private string Title => Format.Month(_month);
@@ -152,7 +159,9 @@
         _loading = true;
         _error = null;
         _copied = false;
-        var loaded = await Loader.LoadAsync(_month, refresh);
+        var month = _month;
+        var loaded = await Loader.LoadAsync(month, refresh);
+        if (month != _month) return; // another month was asked for meanwhile; its load shows it
         (_rows, _values, _noEpic, _notInJira, _error) = (loaded.Rows, loaded.Values, loaded.NoEpic, loaded.NotInJira, loaded.JiraError);
         _loading = false;
     }
@@ -163,6 +172,7 @@
     {
         change(values);
         _copied = false;
+        _saving++;
         try
         {
             await EpicValues.SaveAsync(values);
@@ -171,6 +181,10 @@
         catch (IOException ex)
         {
             _saveError = $"Couldn't save the values for {values.EpicKey}: {ex.Message}";
+        }
+        finally
+        {
+            _saving--;
         }
     }
 

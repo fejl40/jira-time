@@ -59,7 +59,7 @@
                 <span class="text-sm @(_hoursSaved ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400")" role="status">@_hoursMessage</span>
             }
             <button class="btn-ghost ml-auto" @onclick="StandardWeek">8 h Monday to Friday</button>
-            <button class="btn-primary" @onclick="SaveHoursAsync">Save hours</button>
+            <button class="btn-primary" disabled="@_savingHours" @onclick="SaveHoursAsync" data-save-hours>@if (_savingHours) { <Waiting /> } Save hours</button>
         </div>
     </section>
 
@@ -76,7 +76,7 @@
 
     private Dictionary<DayOfWeek, string> _hours = [];
     private string? _hoursMessage;
-    private bool _hoursSaved;
+    private bool _hoursSaved, _savingHours;
 
     protected override async Task OnInitializedAsync()
     {
@@ -115,7 +115,9 @@
             }
             parsed[day] = h;
         }
+        _savingHours = true;
         var error = await Calendar.SaveWorkHoursAsync(parsed);
+        _savingHours = false;
         (_hoursMessage, _hoursSaved) = (error ?? "Saved.", error is null);
         if (error is null) Show(parsed);
     }
