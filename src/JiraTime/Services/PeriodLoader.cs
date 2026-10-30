@@ -31,15 +31,20 @@ public class PeriodLoader(TimeLog log, WorkCalendarService calendar, JiraIssueLo
         var p = sheet.Period;
         using var action = JiraAction.Start($"Open period {p.Start.ToString("d MMM", CultureInfo.InvariantCulture)}–{p.End.ToString("d MMM yyyy", CultureInfo.InvariantCulture)}");
         var copyFrom = p.Start.AddDays(-DayFiller.LookBackDays);
-        var (time, recent) = await ReadTimeAsync(p, copyFrom, sheet.Today);
+        // The three reads don't depend on each other, so they go out together; the Jira client queues what is over its limit.
+        var reading = ReadTimeAsync(p, copyFrom, sheet.Today);
+        var sprint = OrEmptyAsync((c, profile) => issues.GetSprintAsync(c, profile));
+        var earlierInPeriod = OrEmptyAsync((c, profile) => issues.GetPeriodAsync(c, profile, p));
+        await Task.WhenAll(reading, sprint, earlierInPeriod);
+        var (time, recent) = await reading;
+        var earlier = await earlierInPeriod;
+
         sheet.Load(
             time.Between(p.Start, p.End),
             time.Between(copyFrom, p.Start.AddDays(-1)),
             await calendar.GetDaysAsync(p.Start, p.End),
             time.IsComplete);
-
-        sheet.Sprint = await OrEmptyAsync((c, profile) => issues.GetSprintAsync(c, profile));
-        var earlier = await OrEmptyAsync((c, profile) => issues.GetPeriodAsync(c, profile, p));
+        sheet.Sprint = await sprint;
         statuses.Add(sheet.Sprint.Concat(earlier));
         await statuses.LookUpAsync(sheet.Entries.Select(e => e.IssueKey));
 

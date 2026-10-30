@@ -33,6 +33,9 @@ public sealed class FakeJira : HttpMessageHandler
     /// <summary>When set, requests wait for it before Jira answers, so tests can see how many are out at once.</summary>
     public TaskCompletionSource? Hold { get; set; }
 
+    /// <summary>The requests <see cref="Hold"/> holds back; all of them when null.</summary>
+    public Func<Request, bool>? HoldWhen { get; set; }
+
     /// <summary>Released once for each request that reached Jira.</summary>
     public SemaphoreSlim Arrived { get; } = new(0);
 
@@ -97,15 +100,16 @@ public sealed class FakeJira : HttpMessageHandler
         if (Offline) throw new HttpRequestException("Connection refused");
 
         var body = req.Content is null ? null : JsonNode.Parse(await req.Content.ReadAsStringAsync(ct));
+        var request = new Request(req.Method, req.RequestUri!.PathAndQuery, body);
         lock (_lock)
         {
-            Requests.Add(new Request(req.Method, req.RequestUri!.PathAndQuery, body));
+            Requests.Add(request);
             MostInFlight = Math.Max(MostInFlight, ++_inFlight);
         }
         Arrived.Release();
         try
         {
-            if (Hold is { } hold) await hold.Task.WaitAsync(ct);
+            if (Hold is { } hold && HoldWhen?.Invoke(request) != false) await hold.Task.WaitAsync(ct);
             lock (_lock) return Answer(req, body);
         }
         finally

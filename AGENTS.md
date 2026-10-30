@@ -169,6 +169,10 @@ They are read when a period opens, reused for a minute, and read again with **Sy
 One search reads them (`fields=summary,worklog`), and Jira sends each issue's first worklogs (20 on most Jiras) with
 it; only an issue with more is read on its own. For a period near today that one search covers the period, the days
 to copy from, the period before and the last 60 days for recent picks; an old period and the recent days are read apart.
+Reads that don't depend on each other go out together: opening a period reads the worklogs, the sprint issues and the
+period's issues at the same time, and issues read on their own are read in parallel; the Jira client's limiter keeps
+at most 4 in flight per host (see Jira rate limits). Writes stay one at a time, so the changed-in-Jira check and
+Jira's per-issue write limits keep working. `JiraAction` is AsyncLocal, so parallel requests still log under their action.
 Jira's search can take a while to find a new worklog, so for 15 minutes after a save the issues you
 saved on are read directly.
 
@@ -397,5 +401,5 @@ interfaces and replace the `IDocumentStore` registration in `Program.cs`.
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, loading a period, saving days to Jira and the retry queue, links, Jira queries, issue lookups and the picker, fill suggestions, the Save all change list, modals (queue, results, defaults), the waits on Jira (what shows pending and which buttons wait), and Jira rate limits (retries after 429, the pause across users and hosts, the queue).
+xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, loading a period, saving days to Jira and the retry queue, links, Jira queries, issue lookups and the picker, fill suggestions, the Save all change list, modals (queue, results, defaults), the waits on Jira (what shows pending and which buttons wait), Jira rate limits (retries after 429, the pause across users and hosts, the queue), and parallel reads (overlap, the cap of four, writes one at a time).
 

@@ -22,28 +22,35 @@ public class JiraWorklogClient(JiraHttp jira)
         // The search sends each issue's first worklogs along; only an issue with more is read on its own.
         var found = await SearchAllAsync(c, jql, ct);
         var keys = found.Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var notFound = (alsoRead ?? []).Where(i => keys.Add(i.Key)).ToList();
         var range = new WorklogRange(profile, from, to);
 
-        var result = new List<JiraWorklog>();
-        foreach (var hit in found)
+        // The issues read on their own go out together; the Jira client keeps at most four in flight.
+        var perIssue = found.Select(hit => WorklogsOfAsync(c, hit, range, ct))
+            .Concat(notFound.Select(issue => ReadUnlessGoneAsync(c, issue, range, ct)));
+        return (await Task.WhenAll(perIssue)).SelectMany(w => w).ToList();
+    }
+
+    /// <summary>The issue's worklogs from the search answer when it sent them all, else read from Jira.</summary>
+    private async Task<IReadOnlyList<JiraWorklog>> WorklogsOfAsync(JiraConnection c, SearchIssue hit, WorklogRange range, CancellationToken ct)
+    {
+        var issue = new JiraIssue(hit.Key, hit.Fields?.Summary ?? "");
+        return hit.Fields?.Worklog is { IsComplete: true } embedded
+            ? range.Mine(embedded.Worklogs, issue).ToList()
+            : await ReadWorklogsAsync(c, issue, range, ct);
+    }
+
+    /// <summary>An issue Jira's search doesn't find yet; when it is gone, so are its worklogs.</summary>
+    private async Task<IReadOnlyList<JiraWorklog>> ReadUnlessGoneAsync(JiraConnection c, JiraIssue issue, WorklogRange range, CancellationToken ct)
+    {
+        try
         {
-            var issue = new JiraIssue(hit.Key, hit.Fields?.Summary ?? "");
-            result.AddRange(hit.Fields?.Worklog is { IsComplete: true } embedded
-                ? range.Mine(embedded.Worklogs, issue)
-                : await ReadWorklogsAsync(c, issue, range, ct));
+            return await ReadWorklogsAsync(c, issue, range, ct);
         }
-        foreach (var issue in (alsoRead ?? []).Where(i => keys.Add(i.Key)))
+        catch (JiraException ex) when (ex.Status == HttpStatusCode.NotFound)
         {
-            try
-            {
-                result.AddRange(await ReadWorklogsAsync(c, issue, range, ct));
-            }
-            catch (JiraException ex) when (ex.Status == HttpStatusCode.NotFound)
-            {
-                // The issue is gone, and its worklogs with it.
-            }
+            return [];
         }
-        return result;
     }
 
     /// <summary>The issue's worklogs by the range's user on its days, read page by page.</summary>
