@@ -71,4 +71,15 @@ public class FormatTests
     [InlineData(2, "entry", "2 entries")]
     [InlineData(2, "day", "2 days")]
     public void Counts_are_plural_unless_one(int n, string word, string expected) => Assert.Equal(expected, Format.Count(n, word));
+
+    [Theory]
+    [InlineData(85, "85 ms")]
+    [InlineData(1420, "1.4 s")]
+    public void Request_durations_read_in_ms_or_seconds(long ms, string expected) => Assert.Equal(expected, Format.Duration(ms));
+
+    [Theory]
+    [InlineData(512, "512 B")]
+    [InlineData(1536, "1.5 KB")]
+    [InlineData(2_411_724, "2.3 MB")]
+    public void Sizes_read_in_bytes_KB_or_MB(long bytes, string expected) => Assert.Equal(expected, Format.Bytes(bytes));
 }

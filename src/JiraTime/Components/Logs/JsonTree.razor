@@ -1,0 +1,96 @@
+@using System.Text.Json.Nodes
+@inject IJSRuntime JS
+
+@* A request or response body: a JSON tree whose objects and arrays fold, or the raw text with a note.
+   Only open nodes render their children, so a 100-issue search stays quick. *@
+
+<div class="space-y-2" data-json-body="@Title">
+    <div class="flex flex-wrap items-center gap-1">
+        <h4 class="mr-auto text-xs font-semibold uppercase tracking-wide text-muted">@Title</h4>
+        @if (Body.IsTree)
+        {
+            <button type="button" class="btn-ghost text-xs" @onclick="() => _open = Body.All()" data-expand-all>Expand all</button>
+            <button type="button" class="btn-ghost text-xs" @onclick="() => _open = []" data-collapse-all>Collapse all</button>
+        }
+        <button type="button" class="btn-ghost text-xs" @onclick="CopyAsync" data-copy>@(_copied ? "Copied" : "Copy")</button>
+    </div>
+    @if (Body.Note is { } note)
+    {
+        <p class="text-xs text-warning" data-body-note>@note</p>
+    }
+    <div class="max-h-[32rem] overflow-auto rounded-md bg-slate-50 p-3 font-mono text-xs leading-5 text-slate-800 ring-1 ring-slate-200 dark:bg-slate-950 dark:text-slate-200 dark:ring-slate-800">
+        @if (Body.IsTree)
+        {
+            <ul role="tree" aria-label="@Title" data-json-tree>@Node(null, Body.Root, 1)</ul>
+        }
+        else
+        {
+            <pre class="whitespace-pre-wrap break-all" data-raw-body>@Body.Text</pre>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public JsonBody Body { get; set; } = default!;
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+
+    private JsonBody? _shown;
+    private HashSet<string> _open = [];
+    private bool _copied;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_shown, Body)) return;
+        (_shown, _open, _copied) = (Body, Body.OpenAtStart(), false);
+    }
+
+    private void Toggle(string path)
+    {
+        if (!_open.Remove(path)) _open.Add(path);
+    }
+
+    private async Task CopyAsync() => _copied = await JS.InvokeAsync<bool>("jiraExport.copy", Body.Pretty);
+
+    private RenderFragment Node(string? label, JsonNode? node, int level) => node is JsonObject or JsonArray
+        ? Container(label, node, level)
+        : @<li role="treeitem" aria-level="@level" class="pl-5">@Label(label)<span class="@ValueClass(node)">@(node?.ToJsonString() ?? "null")</span></li>;
+
+    private RenderFragment Container(string? label, JsonNode node, int level)
+    {
+        var path = node.GetPath();
+        var open = _open.Contains(path);
+        var (start, end) = node is JsonObject ? ("{", "}") : ("[", "]");
+        return @<li role="treeitem" aria-level="@level" aria-expanded="@(open ? "true" : "false")">
+            <button type="button" class="flex items-center gap-1 rounded text-left hover:bg-slate-200/60 focus-visible:outline-2 focus-visible:outline-blue-600 dark:hover:bg-slate-800"
+                    aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(path)" data-json-toggle="@path">
+                <span class="inline-block w-4 text-center text-slate-400 transition-transform @(open ? "rotate-90" : "")" aria-hidden="true">▸</span>
+                @Label(label)<span class="text-slate-500">@start</span>
+                @if (!open)
+                {
+                    <span class="text-slate-400">@JsonBody.Summary(node)</span><span class="text-slate-500">@end</span>
+                }
+            </button>
+            @if (open)
+            {
+                <ul role="group" class="ml-2 border-l border-slate-200 pl-2 dark:border-slate-800">
+                    @foreach (var (childLabel, child) in JsonBody.Children(node))
+                    {
+                        @Node(childLabel, child, level + 1)
+                    }
+                </ul>
+                <span class="pl-5 text-slate-500">@end</span>
+            }
+        </li>;
+    }
+
+    private static RenderFragment Label(string? label) => label is null
+        ? @<text></text>
+        : @<span class="text-sky-700 dark:text-sky-300">@label: </span>;
+
+    private static string ValueClass(JsonNode? node) => node?.GetValueKind() switch
+    {
+        System.Text.Json.JsonValueKind.String => "break-all text-emerald-700 dark:text-emerald-400",
+        System.Text.Json.JsonValueKind.Number => "text-blue-700 dark:text-blue-300",
+        _ => "text-purple-700 dark:text-purple-300",
+    };
+}

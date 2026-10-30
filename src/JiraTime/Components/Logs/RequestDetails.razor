@@ -1,0 +1,84 @@
+@using System.Globalization
+@* Everything logged about one Jira request: where it went, what came back, and the bodies as JSON trees. *@
+
+<div class="space-y-4 text-sm" data-request-details="@Entry.Id">
+    <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-4 gap-y-1">
+        <dt class="text-muted">URL</dt>
+        <dd class="break-all font-mono text-xs leading-5" data-detail-url>@Entry.Url</dd>
+        <dt class="text-muted">Method</dt>
+        <dd class="font-mono text-xs leading-5">@Entry.Method</dd>
+        <dt class="text-muted">Status</dt>
+        <dd data-detail-status>@StatusText</dd>
+        <dt class="text-muted">Time</dt>
+        <dd>@Entry.Time.ToString("yyyy-MM-dd HH:mm:ss.fff zzz", CultureInfo.InvariantCulture)</dd>
+        <dt class="text-muted">Duration</dt>
+        <dd>@(Entry.DurationMs is { } ms ? Format.Duration(ms) : "Waiting for Jira…")</dd>
+        <dt class="text-muted">Action</dt>
+        <dd>@Entry.Action @if (Entry.ActionId is { } id) { <span class="text-xs text-muted">(@id)</span> }</dd>
+        <dt class="text-muted">Content type</dt>
+        <dd>@(Entry.ContentType ?? "—")</dd>
+        <dt class="text-muted">Size</dt>
+        <dd>@(Entry.ResponseSize is { } size ? Format.Bytes(size) : "—")</dd>
+        @if (Entry.Error is { } error)
+        {
+            <dt class="text-muted">Error</dt>
+            <dd class="text-red-700 dark:text-red-400" data-detail-error>@error</dd>
+        }
+    </dl>
+
+    @foreach (var (title, headers) in new[] { ("Request headers", Entry.RequestHeaders), ("Response headers", Entry.ResponseHeaders) })
+    {
+        <details class="group" data-headers="@title">
+            <summary class="cursor-pointer select-none text-xs font-semibold uppercase tracking-wide text-muted hover:text-slate-800 dark:hover:text-slate-100">
+                @title (@headers.Count)
+            </summary>
+            @if (headers.Count == 0)
+            {
+                <p class="mt-1 text-xs text-muted">None.</p>
+            }
+            <dl class="mt-1 grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)] gap-x-4 font-mono text-xs leading-5">
+                @foreach (var (name, value) in headers)
+                {
+                    <dt class="truncate text-muted" title="@name">@name</dt>
+                    <dd class="break-all">@value</dd>
+                }
+            </dl>
+        </details>
+    }
+    <p class="text-xs text-muted">The token and cookies are never logged.</p>
+
+    @foreach (var (title, body) in new[] { ("Request body", _request), ("Response body", _response) })
+    {
+        @if (body is not null)
+        {
+            <JsonTree Title="@title" Body="body" />
+        }
+        else
+        {
+            <p class="text-xs text-muted" data-no-body="@title">@title: none.</p>
+        }
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public JiraLogEntry Entry { get; set; } = default!;
+
+    private JiraLogEntry? _read;
+    private JsonBody? _request, _response;
+
+    private string StatusText => Entry switch
+    {
+        { Status: { } status } => $"{status} {Entry.Reason}",
+        { IsPending: true } => "Waiting for Jira…",
+        _ => "No answer",
+    };
+
+    protected override void OnParametersSet()
+    {
+        // Bodies are parsed once per entry, not on every render.
+        if (ReferenceEquals(_read, Entry)) return;
+        _read = Entry;
+        _request = JsonBody.Read(Entry.RequestBody, Entry.RequestBodyTruncated);
+        _response = JsonBody.Read(Entry.ResponseBody, Entry.ResponseBodyTruncated);
+    }
+}

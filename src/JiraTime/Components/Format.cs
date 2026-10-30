@@ -55,6 +55,18 @@ public static class Format
     /// <summary>A share from 0 to 1 as a CSS percentage: 0.625 → "62.5%".</summary>
     public static string Percent(double share) => (share * 100).ToString("0.#", CultureInfo.InvariantCulture) + "%";
 
+    /// <summary>How long a request took: "85 ms", "1.4 s".</summary>
+    public static string Duration(long milliseconds) =>
+        milliseconds < 1000 ? $"{milliseconds} ms" : (milliseconds / 1000.0).ToString("0.0", CultureInfo.InvariantCulture) + " s";
+
+    /// <summary>A size in bytes: "512 B", "1.5 KB", "2.3 MB".</summary>
+    public static string Bytes(long bytes) => bytes switch
+    {
+        < 1024 => $"{bytes} B",
+        < 1024 * 1024 => (bytes / 1024.0).ToString("0.#", CultureInfo.InvariantCulture) + " KB",
+        _ => (bytes / (1024.0 * 1024)).ToString("0.#", CultureInfo.InvariantCulture) + " MB",
+    };
+
     public static string Iso(DateOnly d) => d.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     /// <summary>A day written as <see cref="Iso"/>; null for anything else.</summary>
