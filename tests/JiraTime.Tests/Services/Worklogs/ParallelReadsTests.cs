@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using JiraTime.Domain;
 using JiraTime.Services.Jira;
 using JiraTime.Services.JiraLog;
@@ -94,6 +95,22 @@ public class ParallelReadsTests : IDisposable
         var time = await reading;
 
         Assert.Equal("NEW-1", Assert.Single(time.Entries).IssueKey);
+    }
+
+    [Fact]
+    public async Task The_export_reads_the_Epic_Link_field_while_the_worklogs_load()
+    {
+        _h.Jira.Gets["/rest/api/2/field"] = _ => new JsonArray();
+        _h.Jira.AddWorklog("ABC-1", "2026-10-26T09:00:00.000+0100", 3600);
+        var (loader, _) = _h.ExportLoading();
+
+        var loading = loader.LoadAsync(_h.Today);
+        await ArrivedAsync(2); // the worklog search and the fields, before Jira answered either
+        _h.Jira.Hold!.SetResult();
+        var export = await loading;
+
+        Assert.Null(export.JiraError);
+        Assert.Single(_h.Jira.Requests, r => r.Path.EndsWith("/field"));
     }
 
     [Fact]

@@ -1,9 +1,10 @@
 ---
 id: TASK-110
 title: Read the export's Epic Link field while its worklogs load
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 15:19'
+updated_date: '2026-10-30 15:27'
 labels:
   - jira
   - performance
@@ -20,7 +21,7 @@ The month export reads the month's worklogs, then the Epic Link field (once per 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Opening the export asks for the Epic Link field at the same time as the month's worklogs (when it isn't cached)
-- [ ] #2 Tests show the requests overlap and the export is unchanged
-- [ ] #3 Build has 0 warnings and all tests pass
+- [x] #1 Opening the export asks for the Epic Link field at the same time as the month's worklogs (when it isn't cached)
+- [x] #2 Tests show the requests overlap and the export is unchanged
+- [x] #3 Build has 0 warnings and all tests pass
 <!-- AC:END -->

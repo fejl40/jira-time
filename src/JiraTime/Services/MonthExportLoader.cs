@@ -36,7 +36,10 @@ public class MonthExportLoader(TimeLog log, JiraIssueLookup issues, EpicExportSt
         if (refresh) log.Refresh();
 
         var (from, to) = MonthExport.MonthOf(month);
+        // The Epic Link field doesn't depend on the worklogs, so it is read alongside them; the epics have to wait for the issues.
+        var preparing = issues.PrepareEpicsAsync(signedIn.Connection, signedIn.Profile);
         var logged = await log.GetRangeAsync(from, to);
+        await preparing;
         if (!logged.IsComplete) return LoadedExport.Failed(logged.JiraError!);
 
         var entries = logged.Between(from, to).Where(e => !e.DeletePending && e.Duration > TimeSpan.Zero).ToList();

@@ -44,11 +44,29 @@ public class JiraIssueLookup(JiraClient jira, TimeProvider clock)
         var user = UserOf(c, profile);
         var epics = await PerKeyAsync(_epics, user, keys, async missing =>
         {
-            var field = await _epicLinkFields.GetOrLoadAsync(user, () => jira.GetEpicLinkFieldAsync(c, ct));
+            var field = await EpicLinkFieldAsync(c, user, ct);
             return await jira.GetEpicsAsync(c, missing, field, ct);
         });
         return epics.ToDictionary(e => e.Key, e => e.Value, StringComparer.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Reads the Epic Link field ahead of an epic lookup, so it can go out alongside other reads. A failure is left
+    /// for the epic lookup to report.
+    /// </summary>
+    public async Task PrepareEpicsAsync(JiraConnection c, JiraProfile profile, CancellationToken ct = default)
+    {
+        try
+        {
+            await EpicLinkFieldAsync(c, UserOf(c, profile), ct);
+        }
+        catch (JiraException)
+        {
+        }
+    }
+
+    private Task<string?> EpicLinkFieldAsync(JiraConnection c, string user, CancellationToken ct) =>
+        _epicLinkFields.GetOrLoadAsync(user, () => jira.GetEpicLinkFieldAsync(c, ct));
 
     /// <summary>The start of every cache key: the user's owner id, which stands for host and Jira user id.</summary>
     private static string UserOf(JiraConnection c, JiraProfile profile) => UserKey.For(c.BaseUrl, profile.Id).Id;
