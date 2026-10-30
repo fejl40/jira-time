@@ -1,4 +1,5 @@
-@* The selected day's title, hours, kind of day and time off. *@
+@* The selected day's title, hours, kind of day and time off (asked for in TimeOffModal). *@
+@inject Modals Modals
 
 <div class="flex flex-wrap items-center gap-3">
     <h2 class="text-lg font-semibold">@Format.LongDay(Date)</h2>
@@ -30,36 +31,14 @@
             <span class="@DayOffLook.Badge(work.Reason!.Value)" data-time-off>@Icon @DayOffLook.Label(work)</span>
             <button class="btn-ghost text-xs" disabled="@Busy" @onclick="OnUnmarkOff">Undo</button>
         }
-        else if (!_open)
-        {
-            <button class="btn-ghost text-xs" @onclick="Open">Time off…</button>
-        }
         else
         {
-            <span class="flex flex-wrap items-center gap-1.5 text-xs" data-time-off-form>
-                <select class="field w-auto py-1 text-xs" aria-label="Reason" @bind="_reason">
-                    @foreach (var r in Enum.GetValues<DayOffReason>())
-                    {
-                        <option value="@r">@r</option>
-                    }
-                </select>
-                <input type="text" inputmode="decimal" class="field w-16 py-1 text-right text-xs" aria-label="Hours off" @bind="_hours" />
-                <span class="text-muted">h of @Format.Hours(work.Hours) h</span>
-                <button class="btn-secondary py-1 text-xs" disabled="@Busy" @onclick="MarkOffAsync">Mark off</button>
-                <button class="btn-ghost text-xs" @onclick="() => _open = false">Cancel</button>
-                @if (_error is not null)
-                {
-                    <span class="text-red-700 dark:text-red-400" role="alert">@_error</span>
-                }
-            </span>
+            <button class="btn-ghost text-xs" disabled="@Busy" @onclick="() => OpenTimeOffAsync(work)" data-time-off-open>Time off…</button>
         }
     }
 </div>
 
 @code {
-    /// <summary>Time off asked for: the reason and the hours (null for the whole day).</summary>
-    public record TimeOff(DayOffReason Reason, TimeSpan? Hours);
-
     [Parameter, EditorRequired] public DateOnly Date { get; set; }
     [Parameter] public DayInfo? Info { get; set; }
     [Parameter] public TimeSpan Logged { get; set; }
@@ -67,7 +46,7 @@
     [Parameter] public TimeSpan Missing { get; set; }
     /// <summary>A request to Jira is running: time off waits, as it reads the period again.</summary>
     [Parameter] public bool Busy { get; set; }
-    [Parameter] public EventCallback<TimeOff> OnMarkOff { get; set; }
+    [Parameter] public EventCallback<TimeOffModal.TimeOff> OnMarkOff { get; set; }
     [Parameter] public EventCallback OnUnmarkOff { get; set; }
 
     /// <summary>The reason's icon; the sun of a vacation rises in.</summary>
@@ -77,37 +56,10 @@
 
     private const string Badge = "rounded-full bg-slate-100 dark:bg-slate-800 px-2.5 py-0.5 text-xs text-slate-600 dark:text-slate-300";
 
-    private bool _open;
-    private DayOffReason _reason = DayOffReason.Vacation;
-    private string _hours = "";
-    private string? _error;
-    private DateOnly? _shown;
-
-    protected override void OnParametersSet()
-    {
-        // Another day closes the form.
-        if (_shown == Date) return;
-        _shown = Date;
-        _open = false;
-    }
-
-    private void Open()
-    {
-        _open = true;
-        _error = null;
-        _hours = Format.Hours(Info?.Hours ?? DayInfo.Target);
-    }
-
-    /// <summary>Hours equal to the whole day make it a day off.</summary>
-    private async Task MarkOffAsync()
-    {
-        if (Info is not { } day) return;
-        if (TypedHours.Parse(_hours) is not { } hours)
+    private Task OpenTimeOffAsync(DayInfo work) =>
+        Modals.ShowAsync<TimeOffModal, TimeOffModal.TimeOff>(new Dictionary<string, object?>
         {
-            _error = "Enter the hours off, e.g. 4.";
-            return;
-        }
-        _open = false;
-        await OnMarkOff.InvokeAsync(new TimeOff(_reason, hours >= day.Hours ? null : hours));
-    }
+            [nameof(TimeOffModal.Day)] = work,
+            [nameof(TimeOffModal.Save)] = (Func<TimeOffModal.TimeOff, Task>)(off => OnMarkOff.InvokeAsync(off)),
+        });
 }

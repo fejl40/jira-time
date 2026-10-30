@@ -1,0 +1,75 @@
+@attribute [Modal(Size = ModalSize.Small)]
+
+@* Time off… in the day header: the reason, and the whole day or some hours of it. Saving marks the day
+   off (the modal is busy meanwhile, as the period is read again) and returns the TimeOff asked for. *@
+
+<Modal Title="Time off">
+    <ChildContent>
+        <p class="text-muted">@Format.LongDay(Day.Date), @Format.HoursText(Day.Hours) of work.</p>
+
+        <label class="field-label" for="time-off-reason">Reason</label>
+        <select id="time-off-reason" class="field" @bind="_reason" data-modal-autofocus data-time-off-reason>
+            @foreach (var reason in Enum.GetValues<DayOffReason>())
+            {
+                <option value="@reason">@DayOffLook.Icon(reason) @reason</option>
+            }
+        </select>
+
+        <div class="mt-4 space-y-2" role="radiogroup" aria-label="How much">
+            <label class="flex items-center gap-2">
+                <input type="radio" name="time-off-span" class="size-4 accent-blue-600" checked="@_wholeDay" @onchange="() => _wholeDay = true" data-time-off-whole /> Whole day
+            </label>
+            <label class="flex flex-wrap items-center gap-2">
+                <input type="radio" name="time-off-span" class="size-4 accent-blue-600" checked="@(!_wholeDay)" @onchange="() => _wholeDay = false" data-time-off-part /> Part of the day:
+                <input type="text" inputmode="decimal" class="field w-20 py-1 text-right" aria-label="Hours off"
+                       @bind="_hours" @onfocus="() => _wholeDay = false" data-time-off-hours />
+                <span class="text-muted">h off</span>
+            </label>
+        </div>
+        @if (_error is not null)
+        {
+            <p class="mt-3 text-red-700 dark:text-red-400" role="alert">@_error</p>
+        }
+    </ChildContent>
+    <Footer>
+        <button type="button" class="btn-secondary" data-modal-close>Cancel</button>
+        <button type="button" class="btn-primary" @onclick="SaveAsync" data-time-off-save>Mark off</button>
+    </Footer>
+</Modal>
+
+@code {
+    /// <summary>Time off asked for: the reason and the hours (null for the whole day).</summary>
+    public record TimeOff(DayOffReason Reason, TimeSpan? Hours);
+
+    [CascadingParameter] public ModalContext Context { get; set; } = default!;
+    /// <summary>The workday to mark off.</summary>
+    [Parameter, EditorRequired] public DayInfo Day { get; set; } = default!;
+    /// <summary>Marks the day off and reads the period again.</summary>
+    [Parameter, EditorRequired] public Func<TimeOff, Task> Save { get; set; } = default!;
+
+    private DayOffReason _reason = DayOffReason.Vacation;
+    private bool _wholeDay = true;
+    private string _hours = "";
+    private string? _error;
+
+    /// <summary>Part of the day starts at half of it.</summary>
+    protected override void OnInitialized() => _hours = Format.Hours(Day.Hours / 2);
+
+    /// <summary>Hours equal to the whole day make it a day off.</summary>
+    private async Task SaveAsync()
+    {
+        TimeSpan? hours = null;
+        if (!_wholeDay)
+        {
+            if (TypedHours.Parse(_hours) is not { } typed || typed <= TimeSpan.Zero)
+            {
+                _error = "Enter the hours off, e.g. 4.";
+                return;
+            }
+            hours = typed >= Day.Hours ? null : typed;
+        }
+        var off = new TimeOff(_reason, hours);
+        await Context.WhileBusyAsync(() => Save(off));
+        Context.Close(off);
+    }
+}

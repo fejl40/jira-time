@@ -67,7 +67,7 @@
     /// deletes it from Jira. A suggestion made for the old hours no longer fits and is made again; changes
     /// the user made are kept.
     /// </summary>
-    private async Task MarkDayOffAsync(DayHeader.TimeOff off)
+    private async Task MarkDayOffAsync(TimeOffModal.TimeOff off)
     {
         var day = Day;
         var onlySuggested = Sheet.HasOnlySuggestions(day);
