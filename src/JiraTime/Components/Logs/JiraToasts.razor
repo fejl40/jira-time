@@ -23,7 +23,7 @@
             <div @key="entry.Id" role="status"
                  class="motion-rise flex items-start gap-1 rounded-lg bg-white text-xs shadow-lg ring-1 transition-opacity duration-(--motion) dark:bg-slate-800 @Ring(entry) @(toast.Leaving ? "opacity-0" : "") @(i < _toasts.Shown.Count - 2 ? "max-sm:hidden" : "")"
                  data-toast="@entry.Id" data-toast-state="@State(entry)">
-                <button type="button" class="flex min-w-0 flex-1 items-start gap-2 px-3 py-2 text-left" @onclick="() => Open(entry)"
+                <button type="button" class="flex min-w-0 flex-1 items-start gap-2 px-3 py-1.5 text-left" @onclick="() => Open(entry)"
                         title="Open in Logs: @entry.Method @entry.Path">
                     <span class="mt-0.5 flex-none" aria-hidden="true">
                         @if (entry.IsPending)
@@ -37,8 +37,7 @@
                     </span>
                     <span class="min-w-0 flex-1">
                         <span class="block truncate font-medium text-slate-800 dark:text-slate-100">@entry.Action</span>
-                        <span class="block truncate font-mono text-[11px] text-muted">@entry.Method @ShortPath(entry)</span>
-                        <span class="block text-[11px] @(entry.Failed ? "text-red-700 dark:text-red-400" : "text-muted")">@Outcome(entry)</span>
+                        <span class="block truncate text-[11px] text-muted"><span class="font-mono">@entry.Method @ShortPath(entry)</span> · <span class="@(entry.Failed ? "text-red-700 dark:text-red-400" : "")">@Outcome(entry)</span></span>
                     </span>
                 </button>
                 @if (entry.Failed)
@@ -111,7 +110,8 @@
     private static string Outcome(JiraLogEntry e) => e switch
     {
         { IsPending: true } => "Waiting for Jira…",
-        { Status: { } status } => $"{status} {e.Reason} · {Format.Duration(e.DurationMs ?? 0)}",
+        { Status: { } status, Error: null } => $"{status} · {Format.Duration(e.DurationMs ?? 0)}",
+        { Status: { } status } => $"{status} {e.Error} · {Format.Duration(e.DurationMs ?? 0)}",
         _ => $"{e.Error} · {Format.Duration(e.DurationMs ?? 0)}",
     };
 

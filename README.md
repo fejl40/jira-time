@@ -37,6 +37,7 @@ Some other things you can do:
 - **Hours** are kept in Jira.
 - **Days off, work hours and export values** are kept on this computer in `src/JiraTime/data/`. Back that folder up.
 - **Your token** is encrypted and kept in your browser.
+- **A log of every Jira request** (under **Logs**) is kept on this computer in `src/JiraTime/data/logs/` for 30 days. It holds what was sent and received, such as worklog comments and issue titles, but never your token. **Clear logs** deletes yours.
 
 If Jira is down, your changes wait and are sent when you press **Sync now**.
 

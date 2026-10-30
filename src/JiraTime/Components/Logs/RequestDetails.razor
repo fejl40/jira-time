@@ -14,7 +14,13 @@
         <dt class="text-muted">Duration</dt>
         <dd>@(Entry.DurationMs is { } ms ? Format.Duration(ms) : "Waiting for Jira…")</dd>
         <dt class="text-muted">Action</dt>
-        <dd>@Entry.Action @if (Entry.ActionId is { } id) { <span class="text-xs text-muted">(@id)</span> }</dd>
+        <dd>
+            @Entry.Action
+            @if (Entry.ActionId is { } id)
+            {
+                <span class="ml-1 text-xs text-muted" title="Shared by every request of this action">@id</span>
+            }
+        </dd>
         <dt class="text-muted">Content type</dt>
         <dd>@(Entry.ContentType ?? "—")</dd>
         <dt class="text-muted">Size</dt>

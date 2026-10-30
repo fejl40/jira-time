@@ -31,7 +31,7 @@ public sealed class JiraRequestRecorder(JiraRequestLog log, JiraRequestFeed feed
             Action = action?.Name ?? JiraLogEntry.Background,
             ActionId = action?.Id,
             Method = request.Method.Method,
-            Url = request.RequestUri?.ToString() ?? "",
+            Url = request.RequestUri?.AbsoluteUri ?? "",
             RequestHeaders = Headers(request.Headers, request.Content?.Headers),
             RequestBody = requestBody,
             RequestBodyTruncated = truncated,

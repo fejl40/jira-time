@@ -42,6 +42,7 @@ builder.Services.AddSingleton<JiraIssueLookup>();
 builder.Services.AddSingleton(sp => new JiraRequestLog(Path.Combine(dataDir, "logs", "jira"), sp.GetRequiredService<TimeProvider>()));
 builder.Services.AddSingleton<JiraRequestFeed>();
 builder.Services.AddSingleton<JiraRequestRecorder>();
+builder.Services.AddScoped<MyJiraLog>();
 builder.Services.AddHttpClient<JiraClient>(c => c.Timeout = TimeSpan.FromSeconds(30));
 builder.Services.AddHttpClient<JiraWorklogClient>(c => c.Timeout = TimeSpan.FromSeconds(30));
 

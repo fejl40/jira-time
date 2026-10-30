@@ -4,7 +4,7 @@ title: Show Jira requests as toasts in the bottom left
 status: Done
 assignee: []
 created_date: '2026-10-30 07:56'
-updated_date: '2026-10-30 08:21'
+updated_date: '2026-10-30 08:33'
 labels:
   - feature
 dependencies:
@@ -24,9 +24,9 @@ Carl (2026-10-30): every Jira request shows as a toast in the bottom left corner
 <!-- AC:BEGIN -->
 - [x] #1 Every Jira request shows a toast: newest at the bottom, oldest on top, spinner while waiting, then status and time taken
 - [x] #2 Toasts fade after about 5 s, errors after about 15 s or when closed; hover pauses the fade; reduced motion removes them without animation
-- [ ] #3 Clicking a toast opens the Logs tab with that request expanded
+- [x] #3 Clicking a toast opens the Logs tab with that request expanded
 - [x] #4 Bursts show at most about 5 toasts plus a '+N more' line; other users' requests never show
-- [ ] #5 Toasts don't cover the day editor's buttons on narrow screens; light and dark mode; checked in the browser
+- [x] #5 Toasts don't cover the day editor's buttons on narrow screens; light and dark mode; checked in the browser
 <!-- AC:END -->
 
 ## Final Summary

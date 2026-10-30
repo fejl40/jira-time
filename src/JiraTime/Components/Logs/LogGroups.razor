@@ -1,0 +1,73 @@
+@using System.Globalization
+
+@* The Logs page's list: one card per user action, one row per request that expands in place into its details. *@
+
+<div class="space-y-4">
+    @foreach (var group in Groups)
+    {
+        <section @key="group.Key" class="panel overflow-hidden" data-log-group="@group.Action">
+            <header class="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 border-b border-slate-100 px-4 py-2.5 dark:border-slate-800">
+                <h3 class="font-medium">@group.Action</h3>
+                <span class="text-xs text-muted">@Time(group.Time) · @Format.Count(group.Requests.Count, "request")</span>
+                @if (group.Failed > 0)
+                {
+                    <span class="text-xs text-red-700 dark:text-red-400">@Format.Count(group.Failed, "error")</span>
+                }
+            </header>
+            <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                @foreach (var entry in group.Requests)
+                {
+                    var open = Expanded.Contains(entry.Id);
+                    <li @key="entry.Id" data-log-request="@entry.Id" data-log-state="@State(entry)">
+                        <button type="button" class="grid w-full grid-cols-[4.5rem_3.5rem_minmax(0,1fr)] items-center gap-x-3 px-4 py-2 text-left text-sm hover:bg-slate-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-600 sm:grid-cols-[4.5rem_3.5rem_minmax(0,1fr)_4.5rem_5rem] dark:hover:bg-slate-800/60"
+                                aria-expanded="@(open ? "true" : "false")" @onclick="() => Toggle(entry.Id)">
+                            <span class="justify-self-start rounded-full px-2 py-0.5 text-xs font-medium tabular-nums @StatusClass(entry)">
+                                @if (entry.IsPending)
+                                {
+                                    <span class="inline-block size-2.5 animate-spin rounded-full border-2 border-current border-t-transparent align-middle" aria-label="Waiting for Jira"></span>
+                                }
+                                else
+                                {
+                                    @(entry.Status?.ToString() ?? "Failed")
+                                }
+                            </span>
+                            <span class="font-mono text-xs">@entry.Method</span>
+                            <span class="truncate font-mono text-xs" title="@entry.Path">@entry.Path</span>
+                            <span class="hidden text-right text-xs tabular-nums text-muted sm:block">@(entry.DurationMs is { } ms ? Format.Duration(ms) : "…")</span>
+                            <span class="hidden text-right text-xs tabular-nums text-muted sm:block">@Time(entry.Time)</span>
+                        </button>
+                        @if (open)
+                        {
+                            <div class="border-t border-slate-100 bg-slate-50/50 px-4 py-4 dark:border-slate-800 dark:bg-slate-950/30">
+                                <RequestDetails Entry="entry" />
+                            </div>
+                        }
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<JiraLogGroup> Groups { get; set; } = [];
+    /// <summary>Ids of the requests shown expanded; owned by the page, so a toast link can open one.</summary>
+    [Parameter, EditorRequired] public HashSet<string> Expanded { get; set; } = [];
+
+    private void Toggle(string id)
+    {
+        if (!Expanded.Remove(id)) Expanded.Add(id);
+    }
+
+    private static string Time(DateTimeOffset time) => time.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+
+    private static string State(JiraLogEntry e) => e.IsPending ? "pending" : e.Failed ? "error" : "ok";
+
+    private static string StatusClass(JiraLogEntry e) => e switch
+    {
+        { IsPending: true } => "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+        { Failed: true } => "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
+        { Status: >= 300 } => "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+        _ => "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+    };
+}

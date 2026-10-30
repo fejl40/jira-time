@@ -1,0 +1,121 @@
+@page "/logs"
+@implements IDisposable
+@using System.Text
+@using JiraTime.Components.Logs
+@inject MyJiraLog Log
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+@* The signed-in user's Jira requests for a day, grouped by the action that made them, updated live.
+   The rules (grouping, filters, live updates) are in Domain/JiraLog.cs. *@
+
+<PageTitle>Logs · Jira Time</PageTitle>
+
+<div class="mx-auto max-w-5xl space-y-4">
+    <div>
+        <h1 class="text-xl font-semibold tracking-tight">Jira requests</h1>
+        <p class="hint">Every request Jira Time sends to Jira for you, with what came back. Kept on this server for 30 days; the token is never logged.</p>
+    </div>
+
+    <div class="panel flex flex-wrap items-center gap-3 p-3">
+        <select class="field w-auto" aria-label="Day" value="@Format.Iso(_shownDay)" @onchange="e => Nav.NavigateTo(LogLinks.To(Format.ParseIso(e.Value?.ToString()) ?? _shownDay))" data-log-day>
+            @foreach (var day in _days)
+            {
+                <option value="@Format.Iso(day)">@Format.ShortDay(day)@(day == Log.Today ? " (today)" : "")</option>
+            }
+        </select>
+        <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" class="size-4 accent-blue-600" @bind="_errorsOnly" @bind:after="Regroup" data-log-errors-only /> Errors only
+        </label>
+        <input type="search" class="field min-w-40 flex-1" placeholder="Find text, e.g. an issue key" aria-label="Find text"
+               @bind="_text" @bind:event="oninput" @bind:after="Regroup" data-log-search />
+        <button type="button" class="btn-secondary" @onclick="DownloadAsync" data-log-download>Download .jsonl</button>
+        <button type="button" class="btn-danger" @onclick="ClearAsync" data-log-clear>Clear logs</button>
+    </div>
+
+    @if (_log is null)
+    {
+        <p class="text-sm text-muted" role="status">Reading the log…</p>
+    }
+    else if (_groups.Count == 0)
+    {
+        <p class="text-sm text-muted" data-log-empty>@(_log.Count == 0 ? "No Jira requests on this day yet." : "No requests match the filters.")</p>
+    }
+    else
+    {
+        <p class="text-xs text-muted" aria-live="polite">@Format.Count(_groups.Sum(g => g.Requests.Count), "request") in @Format.Count(_groups.Count, "action")</p>
+        <LogGroups Groups="_groups.Take(_limit).ToList()" Expanded="_expanded" />
+        @if (_groups.Count > _limit)
+        {
+            <button type="button" class="btn-secondary w-full" @onclick="() => _limit += PageSize" data-log-more>Show more (@(_groups.Count - _limit) more actions)</button>
+        }
+    }
+</div>
+
+@code {
+    /// <summary>Actions shown at first and added by Show more, so a busy day stays quick.</summary>
+    private const int PageSize = 40;
+
+    [SupplyParameterFromQuery(Name = "day")] public string? DayText { get; set; }
+    [SupplyParameterFromQuery(Name = "request")] public string? RequestId { get; set; }
+
+    private DateOnly _shownDay;
+    private IReadOnlyList<DateOnly> _days = [];
+    private JiraLogDay? _log;
+    private IReadOnlyList<JiraLogGroup> _groups = [];
+    private readonly HashSet<string> _expanded = [];
+    private bool _errorsOnly;
+    private string _text = "";
+    private int _limit = PageSize;
+    private string? _reveal;
+    private IDisposable? _live;
+
+    protected override void OnInitialized() => _live = Log.Subscribe(OnRequest);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        (_shownDay, _days, _limit) = (Format.ParseIso(DayText) ?? Log.Today, Log.Days(), PageSize);
+        _log = await Log.ReadDayAsync(_shownDay);
+        Regroup();
+        if (RequestId is not { } id) return;
+        // Opened from a toast: that request expanded, its action within the first page, and scrolled to.
+        _expanded.Add(id);
+        _limit = Math.Max(_limit, _groups.ToList().FindIndex(g => g.Requests.Any(r => r.Id == id)) + 1);
+        _reveal = id;
+    }
+
+    private void Regroup() => _groups = _log?.Groups(new JiraLogFilter(_errorsOnly, _text)) ?? [];
+
+    /// <summary>A live request: shown at once when it belongs to the day on screen.</summary>
+    private Task OnRequest(JiraRequestEvent e) => InvokeAsync(() =>
+    {
+        if (_log is null || Log.DayOf(e.Entry) != _log.Day) return;
+        _log.Update(e.Entry);
+        Regroup();
+        StateHasChanged();
+    });
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_reveal is not { } id) return;
+        _reveal = null;
+        await JS.InvokeVoidAsync("jiraLogs.reveal", $"[data-log-request=\"{id}\"]");
+    }
+
+    private async Task DownloadAsync()
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(await Log.ReadDayTextAsync(_shownDay)));
+        using var file = new DotNetStreamReference(stream);
+        await JS.InvokeVoidAsync("jiraLogs.download", $"jira-log-{Format.Iso(_shownDay)}.jsonl", file);
+    }
+
+    private async Task ClearAsync()
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", "Delete all of your Jira request logs, for every day?")) return;
+        await Log.ClearAsync();
+        (_days, _log) = (Log.Days(), new JiraLogDay(_shownDay, []));
+        Regroup();
+    }
+
+    public void Dispose() => _live?.Dispose();
+}

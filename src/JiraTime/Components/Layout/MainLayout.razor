@@ -6,12 +6,13 @@
 @using JiraTime.Components.Logs
 
 <div class="flex min-h-full flex-col">
-    <header class="flex h-14 flex-none items-center gap-6 bg-slate-800 dark:bg-slate-950 px-5 text-white">
-        <a href="" class="font-semibold tracking-tight">Jira Time</a>
+    <header class="flex h-14 flex-none items-center gap-3 bg-slate-800 px-3 text-white sm:gap-6 sm:px-5 dark:bg-slate-950">
+        <a href="" class="flex-none font-semibold tracking-tight">Jira Time</a>
 
         @if (User.IsSignedIn)
         {
-            <nav class="flex gap-1 text-sm">
+            @* On phones the links scroll sideways instead of widening the page. *@
+            <nav class="flex min-w-0 gap-1 overflow-x-auto whitespace-nowrap text-sm">
                 <a href="" class="rounded-md px-3 py-1.5 hover:bg-white/10 hover:text-white @(OnTimesheet ? "bg-white/15 text-white" : "text-slate-300")">Timesheet</a>
                 <NavLink href="export" class="rounded-md px-3 py-1.5 text-slate-300 hover:bg-white/10 hover:text-white" ActiveClass="!bg-white/15 !text-white">Export</NavLink>
                 <NavLink href="logs" class="rounded-md px-3 py-1.5 text-slate-300 hover:bg-white/10 hover:text-white" ActiveClass="!bg-white/15 !text-white" data-nav-logs>Logs</NavLink>
@@ -19,7 +20,7 @@
             </nav>
         }
 
-        <div class="ml-auto flex items-center gap-3 text-sm">
+        <div class="ml-auto flex flex-none items-center gap-3 text-sm">
             <ThemeToggle />
             @if (User is { IsSignedIn: true, Connection: { } c, Profile: { } p })
             {

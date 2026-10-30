@@ -64,7 +64,9 @@ Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work ho
 Domain/Milestones.cs               things reached while the user watches (a day becoming complete), to celebrate once
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount, IOwnedDocument
 Domain/MonthExport.cs              the month export: rows per day and issue, tab-separated text
-Domain/JiraLog.cs                  one logged Jira request (JiraLogEntry)
+Domain/JiraLog.cs                  one logged Jira request (JiraLogEntry), the Logs page's day, groups and filters
+Domain/JsonBody.cs                 a logged body as a foldable JSON tree or raw text
+Domain/RequestToasts.cs            the live request toasts: order, how long they stay, bursts
 Storage/IDocumentStore.cs          the document store interfaces
 Storage/FileDocumentStore.cs       the file store: one JSON file per document
 Storage/FileDocumentCollection.cs  one collection of the file store, cached in memory
@@ -87,18 +89,20 @@ Services/JiraIssueLookup.cs        sprint and period issues and issue statuses, 
 Services/EpicExportStore.cs        Fase, Forordning and Hovedleverance per epic for the export
 Services/MonthExportLoader.cs      loads a month for the export: time, epics, values per epic
 Services/ExpiringCache.cs          small cache whose values expire
-Services/JiraLog/                  the Jira request log: user action (JiraAction), recorder (called by JiraHttp), JSONL files, live feed per user
+Services/JiraLog/                  the Jira request log: user action (JiraAction), recorder (called by JiraHttp), JSONL files, live feed per user, MyJiraLog (the signed-in user's log)
 Components/Layout/MainLayout.razor header + redirect to setup when not signed in
 Components/Pages/Setup/            Connect
 Components/Pages/Timesheet.razor   shows a period: wires PeriodLoader, WorklogSync and the parts below
 Components/Format.cs               how hours, days and counts are written for the user
 Components/DayOffLook.cs           how time off looks: icon, tint and label per reason (vacation, sick, other)
-Components/Links.cs                builds and reads timesheet links (period, selected day) and export links
+Components/Links.cs                builds and reads timesheet links (period, selected day), export links and log links
 Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, DayKeys (keyboard shortcuts)
 Components/JiraWaits.cs            the timesheet's running Jira requests: what shows pending, which buttons wait, the status text
 Components/Motion.cs               animation classes (Styles/motion.css), MotionScript (calls wwwroot/motion.js), SaveMotion
 Components/Pages/ExportPage.razor  a month in the agency's format: values per epic, Copy, Download .tsv (wwwroot/export.js)
 Components/Pages/SettingsPage.razor
+Components/Pages/LogsPage.razor    the Jira request log of a day: filters, download, clear, live (wwwroot/logs.js)
+Components/Logs/                   request toasts (in MainLayout), the log's action groups, a request's details, the JSON tree
 Components/Pages/Error.razor, NotFound.razor
 Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow, Waiting (the waiting-for-Jira spinner)
 Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
@@ -276,6 +280,28 @@ spinner, and on the timesheet every button that sends a request to Jira (Sync, S
 off) is off until the running one ends, so saves and reads never cross. `JiraWaits` decides this and is tested;
 a period left before it was read is never shown. Settings (Save hours), Connect, the issue picker's search and
 the export's values per epic show the same spinner.
+
+### Jira request log
+
+Every Jira request goes through `JiraHttp`, which records it with `JiraRequestRecorder`: method, full URL,
+status and reason, duration, headers (without `Authorization`, `Proxy-Authorization` and cookies), content
+type, response size, request and response bodies (cut at 64 KB and flagged) and the error for failures,
+timeouts and unreachable Jira. Each request is one JSON line in `data/logs/jira/<owner>/yyyy-MM-dd.jsonl`;
+files older than 30 days are deleted. The owner comes from the verified connection (`CurrentUser` stamps
+`JiraConnection.Owner`).
+
+Each request names the user action it was for (`JiraAction`, an AsyncLocal scope): the UI starts one
+around Open period, Save day, Save all, Sync now, issue search, picking an issue, time off, the export and
+signing in; a start inside a running action joins it, so the reload after a save belongs to the save.
+Requests outside any action are **Background**. Requests made while signing in wait until Jira says whose
+token it is and are logged under that user, or under `signed-out` when Jira refuses the token.
+
+`JiraRequestFeed` tells each user's open tabs about their requests as they start and finish. Every
+subscriber has its own queue read on a background task, so a slow or failing one never holds up a request.
+The toasts in the bottom left (`JiraToasts`, rules in `RequestToasts`) and the **Logs** page use it. Logs
+shows a day newest first, grouped by action, with filters (day, errors only, text), Download .jsonl and
+Clear logs; a row expands into its details with the bodies as JSON trees. Clicking a toast opens
+`logs?day=…&request=…` with that request expanded.
 
 ### Theme
 

@@ -4,7 +4,7 @@ title: Show each Jira request's details with expandable JSON
 status: Done
 assignee: []
 created_date: '2026-10-30 07:53'
-updated_date: '2026-10-30 08:17'
+updated_date: '2026-10-30 08:33'
 labels:
   - feature
 dependencies:
@@ -26,7 +26,7 @@ Carl (2026-10-30): each request in the Logs tab expands to show more about it, a
 - [x] #2 Request and response bodies show as JSON trees whose objects and arrays expand and collapse, with Expand all, Collapse all and Copy
 - [x] #3 Bodies that are not JSON or were truncated show as raw text with a note
 - [x] #4 Large responses (e.g. a 100-issue search) stay responsive: deep nodes render only when opened
-- [ ] #5 Keyboard accessible, light and dark mode, checked in the browser
+- [x] #5 Keyboard accessible, light and dark mode, checked in the browser
 <!-- AC:END -->
 
 ## Final Summary
