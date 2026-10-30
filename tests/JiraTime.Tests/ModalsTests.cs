@@ -1,4 +1,6 @@
 using JiraTime.Components;
+using JiraTime.Domain;
+using Microsoft.AspNetCore.Components;
 
 namespace JiraTime.Tests;
 
@@ -127,5 +129,46 @@ public class ModalsTests
         modal.Cancel();
 
         Assert.Null(_modals.Find(modal.Id));
+    }
+
+    [Modal(Size = ModalSize.Small, Dismiss = false)]
+    private sealed class MustAnswer : ComponentBase;
+
+    [Fact]
+    public void A_modal_without_the_attribute_is_medium_and_can_be_dismissed()
+    {
+        _ = Show();
+
+        Assert.Equal(ModalSize.Medium, _modals.Open[0].Size);
+        Assert.True(_modals.Open[0].CanDismiss);
+    }
+
+    [Fact]
+    public void The_attribute_sets_the_size_and_whether_esc_and_the_backdrop_close_it()
+    {
+        _ = _modals.ShowAsync<MustAnswer, bool>();
+
+        Assert.Equal(ModalSize.Small, _modals.Open[0].Size);
+        Assert.False(_modals.Open[0].CanDismiss);
+    }
+
+    [Fact]
+    public async Task A_result_button_s_text_is_read_as_the_type_asked_for()
+    {
+        var confirmed = _modals.ShowAsync<MustAnswer, bool>();
+        _modals.Open[0].Close("true");
+        Assert.True(await confirmed);
+
+        Assert.Equal(4, ModalResult.As<int?>("4"));
+        Assert.Equal(DayOffReason.Sick, ModalResult.As<DayOffReason>("sick"));
+        Assert.Equal("x", ModalResult.As<string>("x"));
+    }
+
+    [Fact]
+    public void A_result_that_can_not_be_read_or_a_cancel_gives_the_default()
+    {
+        Assert.False(ModalResult.As<bool>(null));
+        Assert.Null(ModalResult.As<int?>("lots"));
+        Assert.Null(ModalResult.As<string>(42));
     }
 }

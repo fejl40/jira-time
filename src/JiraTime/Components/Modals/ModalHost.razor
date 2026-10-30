@@ -10,7 +10,7 @@
 
 @foreach (var modal in Modals.Open.Concat(_leaving))
 {
-    <dialog @key="modal" id="modal-@modal.Id" class="modal" aria-labelledby="modal-@modal.Id-title"
+    <dialog @key="modal" id="modal-@modal.Id" class="modal @SizeClass(modal.Size)" aria-labelledby="modal-@modal.Id-title"
             data-modal="@modal.Id" data-modal-dismiss="@modal.CanDismiss" data-modal-busy="@modal.Busy">
         <CascadingValue Value="modal">
             <DynamicComponent Type="modal.Component" Parameters="modal.Parameters" />
@@ -50,6 +50,13 @@
         _path = path;
         InvokeAsync(Modals.CloseAll);
     }
+
+    private static string SizeClass(ModalSize size) => size switch
+    {
+        ModalSize.Small => "modal-small",
+        ModalSize.Large => "modal-large",
+        _ => "",
+    };
 
     private static string PathOf(string uri) => new Uri(uri).AbsolutePath;
 

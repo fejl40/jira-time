@@ -14,6 +14,9 @@ public sealed class ModalContext(int id, Type component, IDictionary<string, obj
     public Type Component { get; } = component;
     public IDictionary<string, object?> Parameters { get; } = parameters;
 
+    /// <summary>How wide the dialog is (full width on phones).</summary>
+    public ModalSize Size { get; init; } = ModalSize.Medium;
+
     /// <summary>Esc and a click on the backdrop cancel the modal; false for a modal that must be answered.</summary>
     public bool Dismiss { get; init; } = true;
 
