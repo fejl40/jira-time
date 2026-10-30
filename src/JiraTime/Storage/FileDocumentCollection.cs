@@ -72,7 +72,7 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
             var path = PathFor(document.Id);
             var tmp = path + ".tmp";
             await File.WriteAllTextAsync(tmp, json, ct);
-            File.Move(tmp, path, overwrite: true);
+            await SharedFile.ReplaceAsync(tmp, path, ct);
             Remember(cache => cache[document.Id] = json);
         }
         finally
@@ -89,7 +89,7 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
         {
             var path = PathFor(id);
             if (!File.Exists(path)) return false;
-            File.Delete(path);
+            await SharedFile.DeleteAsync(path, ct);
             Remember(cache => cache.Remove(id));
             return true;
         }
@@ -111,7 +111,7 @@ internal sealed partial class FileDocumentCollection<T> : IDocumentCollection<T>
             var changesBefore = Volatile.Read(ref _changesOnDisk);
             var docs = new Dictionary<string, string>();
             foreach (var file in Directory.EnumerateFiles(_dir, "*.json"))
-                docs[Path.GetFileNameWithoutExtension(file)] = await File.ReadAllTextAsync(file, ct);
+                docs[Path.GetFileNameWithoutExtension(file)] = await SharedFile.ReadAllTextAsync(file, ct);
             // A file that changed while we read may be missing or old here: use it once, don't keep it.
             if (Volatile.Read(ref _changesOnDisk) == changesBefore) Interlocked.CompareExchange(ref _cache, docs, null);
             return docs;

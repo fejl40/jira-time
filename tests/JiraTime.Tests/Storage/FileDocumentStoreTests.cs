@@ -1,4 +1,5 @@
 using JiraTime.Domain;
+using JiraTime.Storage;
 using static JiraTime.Tests.Support.TestEntries;
 using JiraTime.Tests.Support;
 
@@ -89,12 +90,13 @@ public class FileDocumentStoreTests : IDisposable
         // Each write and each hand edit makes the file watcher drop the cache on another thread.
         var writers = Enumerable.Range(0, 300).Select(i => Task.Run(() => docs.UpsertAsync(Draft($"A-{i}", 1, day.AddDays(i % 10)))));
         var readers = Enumerable.Range(0, 300).Select(_ => Task.Run(() => docs.QueryAsync(e => e.Date >= day)));
-        var handEdits = Task.Run(() =>
+        // An editor saves the way the store does; on Windows it waits a moment while the file is in use.
+        var handEdits = Task.Run(async () =>
         {
             for (var i = 0; i < 100; i++)
             {
-                File.WriteAllText(editedFile + ".edit", editedJson);
-                File.Move(editedFile + ".edit", editedFile, overwrite: true);
+                await File.WriteAllTextAsync(editedFile + ".edit", editedJson);
+                await SharedFile.ReplaceAsync(editedFile + ".edit", editedFile);
             }
         });
         await Task.WhenAll(writers.Cast<Task>().Concat(readers).Append(handEdits));
