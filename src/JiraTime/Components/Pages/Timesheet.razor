@@ -30,7 +30,7 @@
     <div @key="sheet.Period" class="waiting-dim space-y-6 @Motion.Slide(Shown.Slide)" aria-busy="@JiraWaits.Aria(Shown.Waits.PeriodPending)" data-period-pending>
         <DayList Sheet="sheet" Selected="Shown.Day" OnSelect="d => SelectDay(d)" />
 
-        <PeriodGrid Sheet="sheet" Selected="Shown.Day" JiraBaseUrl="@User.Connection?.BaseUrl"
+        <PeriodGrid Sheet="sheet" Selected="Shown.Day" JiraBaseUrl="@User.Jira?.Connection.BaseUrl"
                     Cascade="_cascade" JustSaved="Shown.SaveMotion.JustSaved" SentToJira="Shown.SaveMotion.SentToJira"
                     OnSelectDay="d => SelectDay(d, focus: true)" OnCellClicked="CellClicked" />
     </div>

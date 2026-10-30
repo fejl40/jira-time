@@ -89,7 +89,6 @@ public sealed record JiraLogGroup(string Key, string Action, IReadOnlyList<JiraL
 {
     public DateTimeOffset Time => Requests[0].Time;
     public int Failed => Requests.Count(r => r.Failed);
-    public bool Pending => Requests.Any(r => r.IsPending);
 }
 
 /// <summary>

@@ -56,7 +56,7 @@ public class JiraLogDayTests
         var started = Entry("r", 0, "Save all", status: null);
 
         day.Update(started);
-        Assert.True(day.Groups(new()).Single().Pending);
+        Assert.True(day.Groups(new()).Single().Requests.Single().IsPending);
         day.Update(started with { Status = 201, DurationMs = 80 });
         day.Update(started); // a late start changes nothing
 

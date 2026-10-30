@@ -62,6 +62,8 @@ The app has four layers, each in its own folder under `src/JiraTime/`:
 - Every feature and every bug fix comes with tests. Build and tests pass before every push.
 - Test Domain classes directly. Test Services through `TimeHarness` and `FakeJira`; tests never touch the network.
 - Test names are sentences: `Time_on_the_same_issue_and_day_is_added_up`.
+- Build entries and sheets with `TestEntries` and `TestSheets` (`Entries.cs`). A class tested in more than one file says why in its summary (the partial `DayWorkTests`, the `JiraIssueLookup*Tests`).
+- Documents that belong to a user are read and written through `OwnedCollection<T>`, never by filtering on `Owner` by hand.
 
 ## UI
 

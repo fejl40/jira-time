@@ -22,7 +22,7 @@
 
         <div class="ml-auto flex flex-none items-center gap-3 text-sm">
             <ThemeToggle />
-            @if (User is { IsSignedIn: true, Connection: { } c, Profile: { } p })
+            @if (User.Jira is { Connection: var c, Profile: var p })
             {
                 @if (User.VerifiedOffline)
                 {

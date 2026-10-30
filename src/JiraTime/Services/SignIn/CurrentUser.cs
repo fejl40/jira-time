@@ -19,9 +19,6 @@ public sealed class CurrentUser
     /// </summary>
     public SignedInJira? Jira { get; private set; }
 
-    public JiraProfile? Profile => Jira?.Profile;
-    public JiraConnection? Connection => Jira?.Connection;
-
     /// <summary>True when Jira could not be reached and a token verified earlier was accepted.</summary>
     public bool VerifiedOffline { get; private set; }
 

@@ -1,10 +1,10 @@
 ---
 id: TASK-90
 title: Project-wide refactor
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-30 11:24'
-updated_date: '2026-10-30 11:33'
+updated_date: '2026-10-30 12:56'
 labels:
   - refactor
 dependencies: []
@@ -49,3 +49,25 @@ Every subtask owns its files; subtasks that share files are ordered by dependenc
 - Wave 1 (parallel): 90.1, 90.2, 90.3, 90.4, 90.5
 - Then: 90.6 and 90.7 (after 90.1) → 90.8 → 90.9 → 90.10 → 90.11 → 90.12 → 90.13 → 90.14 → 90.15 → 90.16
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All 16 subtasks are Done and on main; behaviour is unchanged (browser checks against the mock Jira matched before and after) and the suite grew from 513 to 566 tests.
+
+What changed:
+- Day editing (90.1): one SheetDay per day reads and edits saved rows and unsaved changes together; DaySave is the single save plan Save all sends; days off go through PeriodSheet.
+- Jira (90.6): Jira's JSON format lives in JiraWorklogJson and JiraIssueJson; the REST clients only make calls; the start time uses TimeProvider's zone.
+- Timesheet (90.7): the period workflow moved out of Timesheet.razor into ShownPeriod.
+- TimeEntry (90.8): sync fields change only through named transitions; one rule for same work and comments (no comment = empty); Description became Comment (JSON name kept); start/end entries are converted by the legacy migration.
+- Looks (90.9): DayLook owns weekend, holiday and time-off looks; IssueColors moved out of Format.
+- Connection (90.10): CurrentUser.Jira is the only source of the connection; issue search moved out of components into IssueStatuses.
+- Summary (90.11): PeriodSummary owns unknown hours and work not in Jira; components no longer combine those rules.
+- Data (90.12): OwnedCollection is the one owner filter; test-only production API removed.
+- Tests (90.13, 90.14): the harness is built from the app's DI (AddJiraTime); shared builders (TestEntries, TestSheets, TestUsers); test files named after what they test.
+- Smaller (90.2–90.5): request log models grouped; Export page split with one browser file script (files.js); Settings and Connect rules in Domain; ExpiringCache drops expired values.
+- Layout (90.15): Services grouped into Jira, JiraLog, SignIn and Worklogs.
+- Cleanup (90.16): shims and dead code removed, docs and app.css updated.
+
+Old bugs found and kept as they were (not part of a behaviour-preserving refactor): the Save all notice is wiped when the first unsaved day isn't the one on screen; a period reached through Leave without saving has no slide animation; typing only https:// in Connect becomes https://https:.
+<!-- SECTION:FINAL_SUMMARY:END -->

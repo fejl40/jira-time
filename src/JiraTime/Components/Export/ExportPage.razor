@@ -70,7 +70,7 @@
     private IReadOnlyList<string> _noEpic = [];
     private int _notInJira;
 
-    private string BaseUrl => User.Connection?.BaseUrl ?? "";
+    private string BaseUrl => User.Jira?.Connection.BaseUrl ?? "";
     private string Title => Format.Month(_month);
 
     protected override async Task OnParametersSetAsync()
@@ -81,7 +81,7 @@
 
     private async Task LoadAsync(bool refresh = false)
     {
-        if (!User.IsSignedIn || User.Connection is null) return;
+        if (User.Jira is null) return;
         _loading = true;
         _error = null;
         _copied = false;

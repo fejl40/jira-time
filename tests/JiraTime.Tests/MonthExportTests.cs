@@ -1,5 +1,4 @@
 using JiraTime.Domain;
-using JiraTime.Services;
 using static JiraTime.Tests.TestEntries;
 
 namespace JiraTime.Tests;

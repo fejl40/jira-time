@@ -61,7 +61,7 @@ public class JiraWaitsTests
     }
 
     [Fact]
-    public async Task Opening_a_period_shows_the_old_one_as_stale_until_the_new_one_is_read()
+    public async Task Opening_a_period_shows_the_old_one_pending_until_the_new_one_is_read()
     {
         var waits = new JiraWaits();
         var november = October.Next;
@@ -69,13 +69,12 @@ public class JiraWaitsTests
 
         var open = waits.OpenAsync(november, () => jira.Task);
 
-        Assert.True(waits.IsStale(October));
         Assert.True(waits.PeriodPending);
         Assert.Equal($"Opening {Format.Range(november.Start, november.End)}…", waits.Status(October));
 
         jira.SetResult("read");
         Assert.Equal("read", await open);
-        Assert.False(waits.IsStale(October));
+        Assert.False(waits.PeriodPending);
     }
 
     [Fact]

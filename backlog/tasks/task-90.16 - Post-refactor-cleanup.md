@@ -1,9 +1,10 @@
 ---
 id: TASK-90.16
 title: Post-refactor cleanup
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 11:32'
+updated_date: '2026-10-30 12:56'
 labels:
   - refactor
 dependencies:
@@ -44,12 +45,18 @@ Rules for this subtask: edit only the files listed. Do not edit AGENTS.md, READM
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No leftover shims, unused members or stale usings (checked with grep and the compiler)
-- [ ] #2 AGENTS.md Layout lists every file and folder under src/JiraTime and How it works matches the code
-- [ ] #3 No folder under src/JiraTime has fewer than three files without a reason, and no file is over 250 lines
-- [ ] #4 wwwroot/app.css is rebuilt and committed
-- [ ] #5 Browser check of timesheet, Save all, time off, export and logs passes against the mock Jira
-- [ ] #6 Only the files listed under Files are created, edited, moved or deleted
-- [ ] #7 Behaviour and what the user sees stay the same
-- [ ] #8 dotnet build has 0 warnings and dotnet test passes
+- [x] #1 No leftover shims, unused members or stale usings (checked with grep and the compiler)
+- [x] #2 AGENTS.md Layout lists every file and folder under src/JiraTime and How it works matches the code
+- [x] #3 No folder under src/JiraTime has fewer than three files without a reason, and no file is over 250 lines
+- [x] #4 wwwroot/app.css is rebuilt and committed
+- [x] #5 Browser check of timesheet, Save all, time off, export and logs passes against the mock Jira
+- [x] #6 Only the files listed under Files are created, edited, moved or deleted
+- [x] #7 Behaviour and what the user sees stay the same
+- [x] #8 dotnet build has 0 warnings and dotnet test passes
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Removed the CurrentUser.Connection/Profile shims (MainLayout, Settings, Export and Timesheet read CurrentUser.Jira, finishing 90.10 AC #3), and two members only tests used (JiraWaits.IsStale, JiraLogGroup.Pending). Removed stale usings, found with IDE0005 in a one-off build. Split PeriodSheetTests (days off into PeriodSheetTests.DaysOff.cs, the only file over 250 lines) and moved the TypedHours tests out of FormatTests into TypedHoursTests. Folders: Properties (launchSettings) and Styles (Tailwind input and motion) have fewer than three files by convention; every other folder has three or more. AGENTS.md: Layout rewritten to list every file and folder (Services grouped into SignIn, Worklogs, Jira, JiraLog), How it works updated (DaySave plans, day off methods, DayLook, JiraWaits path, the 09:00 offset, OwnedCollection, AddJiraTime), Tests paragraph and the harness described. doc-1: test builders and OwnedCollection rules. README needed no change. wwwroot/app.css rebuilt (drops .waiting-pending). Browser check against the mock: the timesheet script (fill, Save all, time off and Undo, leave confirm, cell click, Jira down and Try again, Sync) gives the same output as before 90.7; period header states match 90.11's run; sign-in, picker, export (87 h on 11 rows), Logs and Settings work. Build 0 warnings, 566 tests pass.
+<!-- SECTION:FINAL_SUMMARY:END -->

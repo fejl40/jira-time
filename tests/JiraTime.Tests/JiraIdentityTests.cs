@@ -24,7 +24,7 @@ public class JiraIdentityTests : IDisposable
 
         Assert.True(result.SignedIn);
         Assert.Equal(TestUsers.Carl, _user.Key);
-        Assert.Equal("Carl Lilholm", _user.Profile!.DisplayName);
+        Assert.Equal("Carl Lilholm", _user.Jira!.Profile.DisplayName);
         Assert.False(_user.VerifiedOffline);
         var account = await _h.Store.Collection<UserAccount>().GetAsync(TestUsers.Carl.Id);
         Assert.NotNull(account);

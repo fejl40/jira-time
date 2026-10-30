@@ -56,66 +56,60 @@ The `backlog/` folder is committed with the code.
 Paths below are relative to `src/JiraTime/`.
 
 ```
-Program.cs                         DI: storage, data protection, the Jira client (AddJiraHttp)
-Domain/TimeEntry.cs                one block of work on an issue on a day
+Program.cs                         AddJiraTime plus the UI's own services (modals, motion, the shown period)
+Domain/TimeEntry.cs                one block of work on an issue on a day, and its named sync transitions
+Domain/Hours.cs                    adding up hours (TimeSpanSum)
 Domain/Period.cs                   semi-monthly periods, today from the clock
-Domain/Jira.cs                     connection, profile, issues and worklogs as Jira has them
-Domain/PeriodSheet.cs              a period being worked on: saved data, unsaved changes per day, rules
-Domain/DayWork.cs                  one day's unsaved changes and the row edits that make them
+Domain/Jira.cs                     connection (and the typed Jira URL), profile, issues and worklogs as Jira has them
+Domain/PeriodSheet.cs              a period being worked on: saved data, each day's unsaved work (Day(date) gives a SheetDay), suggestions, days off, the Save all plans
+Domain/SheetDay.cs                 one day of a period: saved rows and unsaved changes read and edited together, row states
+Domain/DayWork.cs                  one day's unsaved changes, single entries only
+Domain/DaySave.cs                  the day save plan: whether a day can be saved, what is removed, sent and checked; works on copies
 Domain/TypedHours.cs               reading hours as the user types them (1.5, 1,5, 1:30)
 Domain/DayFiller.cs                suggestions for a day's missing hours
-Domain/PeriodSummary.cs            logged, missing and weekly hours of a period
+Domain/PeriodSummary.cs            logged, missing (per day too), weekly hours and work not in Jira of a period; nothing missing when Jira can't be read
 Domain/IssueChoices.cs             what the issue picker offers, in which group, and filtering it as the user types
-Domain/WorklogMatching.cs          worklogs as entries, waiting work laid over them, comparing the two, the day save plan
+Domain/WorklogMatching.cs          worklogs as entries, waiting work laid over them, comparing the two
 Domain/RecentWork.cs               recent issues and comments for quick picks
-Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work hours
+Domain/WorkCalendar.cs             day kinds, Danish holidays, days off, work hours (and as typed on Settings)
 Domain/UnsavedChanges.cs           what Save all will change: rows added, changed and removed per day, totals, days that can't be saved
 Domain/Milestones.cs               things reached while the user watches (a day becoming complete), to celebrate once
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount, IOwnedDocument
 Domain/MonthExport.cs              the month export: rows per day and issue, tab-separated text
-Domain/JiraLog.cs                  one logged Jira request (JiraLogEntry), the Logs page's day, groups and filters
-Domain/JsonBody.cs                 a logged body as a foldable JSON tree or raw text
-Domain/RequestToasts.cs            the live request toasts: order, how long they stay, bursts
+Domain/JiraLog/                    one logged Jira request (JiraLogEntry: state, short path, outcome), the Logs page's day, groups and filters, JsonBody (a body as a foldable JSON tree or raw text), RequestToasts (order, how long they stay, bursts)
 Storage/IDocumentStore.cs          the document store interfaces
 Storage/FileDocumentStore.cs       the file store: one JSON file per document
 Storage/FileDocumentCollection.cs  one collection of the file store, cached in memory
-Services/SignInSession.cs          restores, connects and signs out a tab; the encrypted connection in browser localStorage
-Services/JiraIdentity.cs           signs a tab in as the user Jira says the token belongs to
-Services/CurrentUser.cs            the verified user of this tab; data services filter by it
-Services/LegacyDataMigration.cs    moves data saved by older versions (owners, entries Jira has); their documents and backups
-Services/TimeLog.cs                logged time: Jira worklogs plus the retry queue, cached briefly
-Services/RecentWorklogIssues.cs    issues just saved on, read directly while Jira's search catches up
-Services/RetryQueue.cs             the retry queue: changes Jira couldn't take yet
+Services/AppServices.cs            AddJiraTime: registers the app's services, for Program.cs and the tests
+Services/OwnedCollection.cs        one collection of the signed-in user's documents: the only owner filter
 Services/WorkCalendarService.cs    days and work hours of the signed-in user
-Services/JiraClient.cs             Jira REST calls about issues (myself, issue picker, searches)
-Services/JiraWorklogClient.cs      Jira REST calls that read and write worklogs
-Services/Jira/                     JiraHttp (the one typed HttpClient for Jira), JiraResilience (429 retries, pause, queue), JiraSearch (pages, batches of keys, POST), JQL quoting, comment format, raw JSON shapes
-Services/WorklogSync.cs            saves a day or every unsaved day to Jira, sends the retry queue
-Services/WorklogWriter.cs          writes or deletes one worklog in Jira, queues what fails
 Services/PeriodLoader.cs           loads a period for the timesheet: time, days, picks, previous period
-Services/IssueStatuses.cs          current status of the issues a timesheet shows
-Services/JiraIssueLookup.cs        sprint and period issues and issue statuses, cached briefly
+Services/IssueStatuses.cs          current status of the issues a timesheet shows, and the issue picker's Jira search
 Services/EpicExportStore.cs        Fase, Forordning and Hovedleverance per epic for the export
 Services/MonthExportLoader.cs      loads a month for the export: time, epics, values per epic
-Services/ExpiringCache.cs          small cache whose values expire
-Services/JiraLog/                  the Jira request log: user action (JiraAction), recorder (called by JiraHttp), JSONL files, live feed per user, MyJiraLog (the signed-in user's log)
+Services/ExpiringCache.cs          small cache whose values expire; expired values are dropped as new ones are stored
+Services/SignIn/                   SignInSession (restores, connects and signs out a tab; the encrypted connection in browser localStorage), JiraIdentity (signs a tab in as the user Jira says the token belongs to), CurrentUser (the verified user of this tab and its Jira connection, CurrentUser.Jira), LegacyDataMigration (data saved by older versions: owners, entries Jira has, entries with start and end times; their backups)
+Services/Worklogs/                 TimeLog (Jira worklogs plus the retry queue, cached briefly), RetryQueue (changes Jira couldn't take yet), WorklogSync (saves the Save all plans, sends the retry queue), WorklogWriter (writes or deletes one worklog, queues what fails), RecentWorklogIssues (issues just saved on, read directly while Jira's search catches up)
+Services/Jira/                     JiraHttp (the one typed HttpClient for Jira), JiraResilience (429 retries, pause, queue), JiraSearch (pages, batches of keys, POST), JiraClient (issues: myself, picker, searches, epics), JiraWorklogClient (reads and writes worklogs), JiraIssueLookup (sprint and period issues and statuses, cached briefly), JiraWorklogJson and JiraIssueJson (Jira's JSON mapped to the app's worklogs, issues, profile and epics), JQL quoting, comment format, raw JSON shapes
+Services/JiraLog/                  the Jira request log: user action (JiraAction), JiraRecordingHandler (records each attempt for JiraHttp) and the recorder, JSONL files, live feed per user, MyJiraLog (the signed-in user's log)
 Components/Layout/MainLayout.razor header + redirect to setup when not signed in
-Components/Pages/Setup/            Connect
-Components/Pages/Timesheet.razor   shows a period: wires PeriodLoader, WorklogSync and the parts below
-Components/Format.cs               how hours, days and counts are written for the user
-Components/DayOffLook.cs           how time off looks: icon, tint and label per reason (vacation, sick, other)
-Components/Links.cs                builds and reads timesheet links (period, selected day), export links and log links
-Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, DayKeys (keyboard shortcuts), TimeOffModal, SaveAllModal
-Components/Modals/                 the modal system: Modals (service), ModalQueue and ModalContext, ModalHost (in MainLayout), the Modal frame, ConfirmModal (wwwroot/modal.js)
-Components/JiraWaits.cs            the timesheet's running Jira requests: what shows pending, which buttons wait, the status text
-Components/Motion.cs               animation classes (Styles/motion.css), MotionScript (calls wwwroot/motion.js), SaveMotion
-Components/Pages/ExportPage.razor  a month in the agency's format: values per epic, Copy, Download .tsv (wwwroot/export.js)
+Components/Pages/Connect.razor     connecting to Jira (route /setup/connect)
+Components/Pages/Timesheet.razor   shows a period: URL and selected day, modals, focus and animations around ShownPeriod
 Components/Pages/SettingsPage.razor
 Components/Pages/LogsPage.razor    the Jira request log of a day: filters, download, clear, live (wwwroot/logs.js)
-Components/Logs/                   request toasts (in MainLayout), the log's action groups, a request's details, the JSON tree
 Components/Pages/Error.razor, NotFound.razor
+Components/Format.cs               how hours, days and counts are written for the user
+Components/DayLook.cs              how a day looks: weekend and holiday grey and name, the grid's tooltip, time off icon, tint and label per reason
+Components/Links.cs                builds and reads timesheet links (period, selected day), export links and log links
+Components/Motion.cs               animation classes (Styles/motion.css), MotionScript (calls wwwroot/motion.js)
+Components/Sheet/ShownPeriod.cs    the period on screen and its work with Jira: open, reload, Try again, Sync now, Save all, time off; SaveMotion
+Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, IssueColors (an issue's dot colour), DayKeys (keyboard shortcuts), JiraWaits (running Jira requests: what shows pending, which buttons wait, the status text), TimeOffModal, SaveAllModal
+Components/Export/                 ExportPage (a month in the agency's format: Copy, Download .tsv), EpicValuesForm (values per epic), ExportTable
+Components/Modals/                 the modal system: Modals (service), ModalQueue and ModalContext, ModalHost (in MainLayout), the Modal frame, ConfirmModal (wwwroot/modal.js)
+Components/Logs/                   request toasts (in MainLayout), the log's action groups, a request's details and its status dot, the JSON tree
 Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow, Waiting (the waiting-for-Jira spinner)
-Styles/app.css                     Tailwind input (compiled to wwwroot/app.css)
+Styles/app.css, motion.css         Tailwind input and animations (compiled to wwwroot/app.css)
+wwwroot/files.js                   copy to the clipboard and file downloads (Export and Logs)
 wwwroot/favicon.svg                the app icon (apple-touch-icon.png is it as a 180 px square PNG)
 ```
 
@@ -223,7 +217,7 @@ that is Done in Jira shows a note saying so; the day saves as usual.
 
 Time is logged per day: each row is an issue, a number of hours (`1.5`, `1,5` or `1:30`) and an
 optional comment. When during the day you did it doesn't matter. Jira needs a start time on each
-worklog, so the app uses 09:00 on the row's day.
+worklog, so the app uses 09:00 on the row's day, sent with the server time zone's offset (from `TimeProvider`).
 
 Pick a day in the grid to edit it; the day is kept in the URL (`?day=2026-10-21`), so reload and
 back/forward keep it. A workday up to today that is short of its hours opens with suggested rows
@@ -241,7 +235,8 @@ or saved day isn't suggested again until you reload.
 (`SaveAllModal`, rules in `Domain/UnsavedChanges.cs`) listing every unsaved day with its rows added,
 changed (hours or issue, before → after) and removed (worklog deleted in Jira), the day's hours before
 and after, and the totals; a day that can't be saved yet says why and is left out. **Save** creates,
-updates and deletes the worklogs in Jira to match, day by day; **Cancel** saves nothing. **Ctrl+S** opens
+updates and deletes the worklogs in Jira to match, day by day (`PeriodSheet.PlanSaveAll()` gives one `DaySave` plan per
+day and `WorklogSync.SaveDaysAsync` sends them, with one changed-in-Jira search); **Cancel** saves nothing. **Ctrl+S** opens
 the same modal. Days that couldn't be saved stay unsaved and the first of them opens with the reason.
 
 Unsaved changes are kept per day while the period is open, so you can move between days and come
@@ -282,9 +277,9 @@ Monday to Friday need 8 hours by default; set your own hours per weekday under *
 hours** (a day with 0 hours is not a workday). Danish public holidays are skipped automatically.
 **Time off…** in the day view opens a modal that marks a whole day or part of it off (vacation, sick, other); part of a
 day lowers the hours that day needs. Marking a whole day off marks the time saved on it as removed, so
-**Save all** deletes those worklogs in Jira; the day stays editable, and **Undo** brings the rows back before saving. The grid shows the hours still missing on each workday up to today.
+**Save all** deletes those worklogs in Jira (`PeriodSheet.MarkDayOffAsync` / `UnmarkDayOffAsync`); the day stays editable, and **Undo** brings the rows back before saving. The grid shows the hours still missing on each workday up to today.
 
-Time off stands out without opening the day (`DayOffLook`, styles `.day-off-*` in `Styles/app.css`): each reason has
+Time off stands out without opening the day (`DayLook`, styles `.day-off-*` in `Styles/app.css`): each reason has
 an icon and a tint (☀️ amber for vacation, 🤒 rose for sick, 🗓️ violet for other time off). A whole day off stripes
 its column in the grid and its entry in the phone list, with the icon under the date; part of a day off tints them and
 puts the icon next to the weekday. The phone list says "Vacation" or "Time off 3 h", the day header's badge "Vacation ·
@@ -308,10 +303,10 @@ Every wait on Jira shows where the user is looking, with one shared indicator, `
 (a small spinner, with text where it helps). It stays hidden for the first 200 ms (`--waiting-delay` in
 `Styles/motion.css`), so a fast answer doesn't flicker, and stands still with reduced motion. While a period opens,
 the old one stays on screen dimmed, and the header says **Opening 1 Oct – 15 Oct…**; Sync and Save all dim the
-grid and the day's rows (`aria-busy`, `.waiting-dim` / `.waiting-pending`). The first load,
+grid and the day's rows (`aria-busy`, `.waiting-dim`). The first load,
 signing in and the export show a waiting line instead of empty content. The button that started a request gets the
 spinner, and on the timesheet every button that sends a request to Jira (Sync, Save all, Try again, time
-off) is off until the running one ends, so saves and reads never cross. `JiraWaits` decides this and is tested;
+off) is off until the running one ends, so saves and reads never cross. `JiraWaits` (`Components/Sheet/JiraWaits.cs`) decides this and is tested;
 a period left before it was read is never shown. Settings (Save hours), Connect, the issue picker's search and
 the export's values per epic show the same spinner.
 
@@ -401,12 +396,14 @@ are quick (150–300 ms) and switch off when your system asks for reduced motion
 
 The app only uses `IDocumentStore` / `IDocumentCollection<T>` (`Storage/IDocumentStore.cs`):
 `GetAsync`, `QueryAsync(Expression<...>)`, `UpsertAsync`, `DeleteAsync`. Filters are
-expressions so a database implementation can translate them into server-side queries.
+expressions so a database implementation can translate them into server-side queries. Services reach the
+signed-in user's documents through `OwnedCollection<T>` (`Services/OwnedCollection.cs`), which adds the owner to
+every query expression, returns nothing of anyone else's and refuses to overwrite it.
 
 The current implementation, `Storage/FileDocumentStore`, writes one JSON file per
 document (atomic temp-file + move), caches each collection in memory, and reloads if files change
 on disk. To move to a document database (MongoDB, Cosmos DB, RavenDB, ...), implement the two
-interfaces and replace the `IDocumentStore` registration in `Program.cs`.
+interfaces and replace the `IDocumentStore` registration in `AddJiraTime` (`Services/AppServices.cs`).
 
 ### Tests
 
@@ -414,5 +411,18 @@ interfaces and replace the `IDocumentStore` registration in `Program.cs`.
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, loading a period, saving days to Jira and the retry queue, links, Jira queries, issue lookups and the picker, fill suggestions, the Save all change list, modals (queue, results, defaults), the waits on Jira (what shows pending and which buttons wait), Jira rate limits (retries after 429, the pause across users and hosts, the queue), parallel reads (overlap, the cap of four, writes one at a time), and searches by key (batches, pages, POST, unknown keys).
+xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet and its days (SheetDay, days off), the day
+save plan (DaySave), the file document store, owned collections (others' documents are never read or written), time
+entry rules and their sync transitions, workdays, reading hours as typed, reading and writing worklogs in Jira's
+format (embedded worklogs, pages, the worklog body), loading a period, saving days to Jira and the retry queue, the
+period summary (unknown hours, work not in Jira), links, Jira queries, issue lookups and the picker, fill
+suggestions, the Save all change list, Settings work hours and the Jira URL from Connect, the expiring cache, modals
+(queue, results, defaults), the waits on Jira (what shows pending and which buttons wait), Jira rate limits (retries
+after 429, the pause across users and hosts, the queue), parallel reads (overlap, the cap of four, writes one at a
+time), and searches by key (batches, pages, POST, unknown keys).
+
+`TimeHarness` builds the app's own services from `AddJiraTime` with a `TestClock` (timers fire at once), a temp
+store and `FakeJira` (a fake Jira answering by URL; `Myself`, `Writes`, `WorklogReads`, `Searches` and
+`WorklogSearches` count what was sent, faults are in `FakeJiraFaults.cs`). Entries and sheets are built with
+`TestEntries` and `TestSheets`, signed-in users with `TestUsers` (all in `Entries.cs`).
 

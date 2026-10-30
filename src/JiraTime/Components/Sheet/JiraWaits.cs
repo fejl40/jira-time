@@ -37,9 +37,6 @@ public sealed class JiraWaits
     /// <summary>Anything running may change the selected day's rows, so they are pending meanwhile.</summary>
     public bool DayPending => !CanStart;
 
-    /// <summary>The period on screen is not the one asked for: another one is still being read.</summary>
-    public bool IsStale(Period shown) => Opening is { } opening && opening != shown;
-
     /// <summary>What the period header says while waiting; null when nothing runs.</summary>
     public string? Status(Period shown)
     {

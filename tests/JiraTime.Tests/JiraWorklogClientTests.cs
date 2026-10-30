@@ -18,7 +18,7 @@ public class JiraWorklogClientTests : IDisposable
     public void Dispose() => _h.Dispose();
 
     private Task<IReadOnlyList<JiraWorklog>> MineAsync() =>
-        _client.GetMyWorklogsAsync(_h.Connection, _h.User.Profile!, new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31));
+        _client.GetMyWorklogsAsync(_h.Connection, _h.User.Jira!.Profile, new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31));
 
     private int WorklogReads(string key) => _h.Jira.WorklogReads.Count(r => r.Path.Contains($"/issue/{key}/worklog"));
 
