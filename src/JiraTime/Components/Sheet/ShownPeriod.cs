@@ -37,7 +37,7 @@ public sealed class ShownPeriod(
     /// <summary>The last save, for its animation.</summary>
     public SaveMotion SaveMotion { get; } = new();
 
-    /// <summary>The issue statuses of the period; rows on Done issues get a note.</summary>
+    /// <summary>The issue statuses of the period (rows on Done issues get a note) and the issue picker's search.</summary>
     public IssueStatuses Statuses => statuses;
 
     /// <summary>Which way the last period change went: 1 to a later period, -1 to an earlier one, 0 on first show.</summary>
@@ -109,11 +109,11 @@ public sealed class ShownPeriod(
     /// <summary>Sync now: sends the retry queue and reads what was logged in Jira meanwhile.</summary>
     public async Task SyncAsync()
     {
-        if (user.Connection is not { } c || !Waits.CanStart) return;
+        if (user.Jira is null || !Waits.CanStart) return;
         using var action = JiraAction.Start("Sync now");
         await Waits.RunAsync(JiraWait.Sync, async () =>
         {
-            await sync.SyncRangeAsync(c, Shown.Period.Start, Shown.Period.End);
+            await sync.SyncRangeAsync(Shown.Period.Start, Shown.Period.End);
             log.Refresh();
             await ReloadAsync();
         });
@@ -126,14 +126,14 @@ public sealed class ShownPeriod(
     /// </summary>
     public async Task<DateOnly?> SaveDaysAsync(Func<Task> beforeReload)
     {
-        if (user.Connection is not { } c) return null;
+        if (user.Jira is null) return null;
         using var action = JiraAction.Start("Save all");
         Notice = null;
         SaveMotion.Start();
         WorklogSync.SaveAllResult? result = null;
         await Waits.RunAsync(JiraWait.SaveAll, async () =>
         {
-            result = await sync.SaveDaysAsync(c, Shown.PlanSaveAll());
+            result = await sync.SaveDaysAsync(Shown.PlanSaveAll());
             foreach (var (day, dayResult) in result.Saved)
             {
                 Shown.Finish(day);

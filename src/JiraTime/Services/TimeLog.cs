@@ -27,12 +27,12 @@ public class TimeLog(JiraWorklogClient jira, RetryQueue pending, CurrentUser use
     public async Task<LoggedTime> GetRangeAsync(DateOnly from, DateOnly to, CancellationToken ct = default)
     {
         var waiting = await pending.GetPendingAsync(from, to);
-        if (user is not { Connection: { } c, Profile: { } profile })
+        if (user.Jira is not { } signedIn)
             return new LoggedTime(WorklogMatching.Merge([], waiting), "Not connected to Jira.");
         try
         {
             var worklogs = await _cache.GetOrLoadAsync($"{from:O}|{to:O}",
-                () => jira.GetMyWorklogsAsync(c, profile, from, to, recent.For(user.Owner), ct));
+                () => jira.GetMyWorklogsAsync(signedIn.Connection, signedIn.Profile, from, to, recent.For(user.Owner), ct));
             return new LoggedTime(WorklogMatching.Merge(worklogs, waiting), null);
         }
         catch (JiraException ex)

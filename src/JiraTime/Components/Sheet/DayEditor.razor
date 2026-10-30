@@ -1,13 +1,11 @@
 @* One day's work as editable rows. Nothing is written until Save all (in the period header), which
    updates Jira. The day (a SheetDay) keeps its unsaved changes in the page's PeriodSheet, so they survive
    picking another day. Rows that can't be saved say why as soon as the change is made. *@
-@inject JiraClient Jira
-
 <div>
     <ul class="waiting-dim divide-y divide-slate-100 dark:divide-slate-800" aria-busy="@JiraWaits.Aria(Waits.DayPending)" data-day-rows>
         @foreach (var row in Rows)
         {
-            <DayRow @key="row.Entry.Id" Row="row" Day="Day" Choices="Choices" Search="Search" Picked="row.Entry.Id == _picked"
+            <DayRow @key="row.Entry.Id" Row="row" Day="Day" Choices="Choices" Picked="row.Entry.Id == _picked"
                     OnPicked="issue => PickedAsync(row, issue)" OnChanged="Changed" />
         }
         @if (Rows.Count == 0)
@@ -72,15 +70,14 @@
     [Parameter, EditorRequired] public IssueChoices Choices { get; set; } = default!;
     /// <summary>Recent comments per issue key, newest first.</summary>
     [Parameter] public IReadOnlyDictionary<string, IReadOnlyList<string>> Comments { get; set; } = new Dictionary<string, IReadOnlyList<string>>();
-    /// <summary>Raised with the key when an issue is picked, so the page can look up its status.</summary>
-    [Parameter] public EventCallback<string> OnIssuePicked { get; set; }
-    [Parameter, EditorRequired] public JiraConnection Connection { get; set; } = default!;
     /// <summary>Requests to Jira that are running: the rows are pending and Discard changes waits for them.</summary>
     [Parameter, EditorRequired] public JiraWaits Waits { get; set; } = default!;
     /// <summary>Raised after rows were added, edited or removed.</summary>
     [Parameter] public EventCallback OnChanged { get; set; }
     /// <summary>Raised when the user discards the unsaved changes.</summary>
     [Parameter] public EventCallback OnDiscard { get; set; }
+    /// <summary>The page's issue statuses: a picked issue's status is looked up, for the note on Done issues.</summary>
+    [CascadingParameter] public IssueStatuses Statuses { get; set; } = default!;
 
     private DateOnly? _loadedDate;
 
@@ -88,12 +85,6 @@
 
     /// <summary>Issues on the day's rows, each once, for their recent comments.</summary>
     private IEnumerable<string> RowIssues => Rows.Select(r => r.Entry.IssueKey).Where(k => k != "").Distinct();
-
-    private async Task<IReadOnlyList<JiraIssue>> Search(string query, CancellationToken ct)
-    {
-        using var action = JiraAction.Start($"Search issues “{query}”");
-        return await Jira.SearchIssuesAsync(Connection, query, ct);
-    }
 
     private TimeSpan Total => Day.Total;
 
@@ -116,7 +107,7 @@
         await Changed();
         if (issue.Key == "") return;
         using var action = JiraAction.Start($"Pick issue {issue.Key}");
-        await OnIssuePicked.InvokeAsync(issue.Key);
+        await Statuses.LookUpAsync([issue.Key]);
     }
 
     /// <summary>Adds an empty row, optionally on an issue. Returns it so the caller can focus it.</summary>

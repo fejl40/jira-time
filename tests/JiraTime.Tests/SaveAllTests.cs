@@ -36,7 +36,7 @@ public class SaveAllTests : IDisposable
         sheet.Day(Wednesday).SetHours(sheet.SavedOn(Wednesday)[0], "2");
         _h.Jira.Worklogs["ABC-9"][id]!["timeSpentSeconds"] = 3 * 3600; // changed in Jira meanwhile
 
-        var result = await _h.Sync.SaveDaysAsync(_h.Connection, sheet.PlanSaveAll());
+        var result = await _h.Sync.SaveDaysAsync(sheet.PlanSaveAll());
 
         Assert.Equal([Monday], result.Saved.Keys);
         Assert.Equal([Tuesday], result.NeedsWork);
@@ -61,7 +61,7 @@ public class SaveAllTests : IDisposable
                 sheet.Day(day).SetComment(row, "Edited");
         _h.Jira.Requests.Clear();
 
-        var result = await _h.Sync.SaveDaysAsync(_h.Connection, sheet.PlanSaveAll());
+        var result = await _h.Sync.SaveDaysAsync(sheet.PlanSaveAll());
 
         Assert.Equal([Monday, Tuesday, Wednesday], result.Saved.Keys.Order());
         var check = Assert.Single(_h.Jira.Requests.TakeWhile(r => r.Method != HttpMethod.Put));
@@ -76,7 +76,7 @@ public class SaveAllTests : IDisposable
         var sheet = await SheetAsync();
         Add(sheet, Monday, "ABC-1", "8");
 
-        var result = await _h.Sync.SaveDaysAsync(_h.Connection, sheet.PlanSaveAll());
+        var result = await _h.Sync.SaveDaysAsync(sheet.PlanSaveAll());
 
         Assert.Null(result.FirstToFix);
         Assert.Null(result.Notice);
@@ -89,7 +89,7 @@ public class SaveAllTests : IDisposable
         var sheet = await SheetAsync();
         await sheet.MarkDayOffAsync(Monday, wholeDay: true, () => Task.CompletedTask);
 
-        var result = await _h.Sync.SaveDaysAsync(_h.Connection, sheet.PlanSaveAll());
+        var result = await _h.Sync.SaveDaysAsync(sheet.PlanSaveAll());
 
         Assert.Equal([Monday], result.Saved.Keys);
         Assert.Equal(0, _h.JiraSeconds("ABC-1") + _h.JiraSeconds("ABC-2"));

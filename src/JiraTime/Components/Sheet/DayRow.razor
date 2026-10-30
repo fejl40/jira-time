@@ -18,7 +18,7 @@
     else
     {
         <div class="min-w-56 flex-1 basis-64">
-            <IssuePicker Id="@($"issue-{E.Id}")" Value="new JiraIssue(E.IssueKey, E.IssueSummary)" Choices="Choices" Search="Search" OnSelected="PickIssue" />
+            <IssuePicker Id="@($"issue-{E.Id}")" Value="new JiraIssue(E.IssueKey, E.IssueSummary)" Choices="Choices" OnSelected="PickIssue" />
         </div>
         <div class="flex items-center gap-1">
             <input type="text" inputmode="decimal" class="field w-20 py-1.5 text-right" aria-label="Hours" placeholder="h"
@@ -65,7 +65,6 @@
     [Parameter, EditorRequired] public SheetDay Day { get; set; } = default!;
     /// <summary>What the issue picker offers; its statuses also mark rows on Done issues.</summary>
     [Parameter, EditorRequired] public IssueChoices Choices { get; set; } = default!;
-    [Parameter, EditorRequired] public Func<string, CancellationToken, Task<IReadOnlyList<JiraIssue>>> Search { get; set; } = default!;
     /// <summary>The row's issue was just picked: its dot pops.</summary>
     [Parameter] public bool Picked { get; set; }
     /// <summary>Raised after the row's issue was picked (and the change made).</summary>

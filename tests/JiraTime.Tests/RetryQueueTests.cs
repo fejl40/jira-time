@@ -38,7 +38,7 @@ public class RetryQueueTests : IDisposable
         await _h.SaveDayAsync(Day, [Row("ABC-1", 6)]);
         _h.Jira.Offline = false;
 
-        var stillWaiting = await _h.Sync.SyncRangeAsync(_h.Connection, From, To);
+        var stillWaiting = await _h.Sync.SyncRangeAsync(From, To);
 
         Assert.Equal(0, stillWaiting);
         Assert.Empty(await _h.QueuedAsync());
@@ -89,7 +89,7 @@ public class RetryQueueTests : IDisposable
         Assert.Equal(["ABC-1"], (await _h.DayAsync(Day)).Select(e => e.IssueKey)); // hidden here
 
         failDeletes = false;
-        Assert.Equal(0, await _h.Sync.SyncRangeAsync(_h.Connection, From, To));
+        Assert.Equal(0, await _h.Sync.SyncRangeAsync(From, To));
         Assert.Equal(0, _h.JiraSeconds("ABC-2"));
         Assert.Empty(await _h.QueuedAsync());
     }
@@ -106,7 +106,7 @@ public class RetryQueueTests : IDisposable
 
         Assert.Equal(TimeSpan.FromHours(7), Assert.Single(await _h.QueuedAsync()).Duration);
         _h.Jira.Offline = false;
-        await _h.Sync.SyncRangeAsync(_h.Connection, From, To);
+        await _h.Sync.SyncRangeAsync(From, To);
         Assert.Equal(7 * 3600, _h.JiraSeconds("ABC-1"));
         Assert.Single(_h.Jira.Worklogs["ABC-1"]);
     }
@@ -126,7 +126,7 @@ public class RetryQueueTests : IDisposable
         Assert.Equal(TimeSpan.FromHours(2), Assert.Single(await _h.DayAsync(Day)).Duration); // laid over Jira's
 
         _h.Jira.FailWhen = null;
-        await _h.Sync.SyncRangeAsync(_h.Connection, From, To);
+        await _h.Sync.SyncRangeAsync(From, To);
         Assert.Equal(2 * 3600, _h.JiraSeconds("ABC-1"));
         Assert.Single(_h.Jira.Worklogs["ABC-1"]);
     }
@@ -141,7 +141,7 @@ public class RetryQueueTests : IDisposable
         });
         _h.Jira.Worklogs["ABC-1"].Remove(id);
 
-        await _h.Sync.SyncRangeAsync(_h.Connection, From, To);
+        await _h.Sync.SyncRangeAsync(From, To);
 
         Assert.Equal(2 * 3600, _h.JiraSeconds("ABC-1"));
     }

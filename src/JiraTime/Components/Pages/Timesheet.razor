@@ -16,6 +16,8 @@
 
 @if (Shown.Sheet is { } sheet)
 {
+@* The day's rows look up statuses and search Jira through the page's IssueStatuses. *@
+<CascadingValue Value="Shown.Statuses" IsFixed="true">
 <DayKeys @ref="_keys" OnSave="SaveAllAsync" OnMove="d => SelectDay(Shown.Day.AddDays(d))" OnAddRow="AddRowFromKeyboardAsync" />
 <div class="mx-auto max-w-7xl space-y-6 overflow-x-clip">
     <PeriodHeader Sheet="sheet" Unsynced="Shown.Unsynced" Waits="Shown.Waits"
@@ -35,6 +37,7 @@
 
     <DayPanel @ref="_panel" Shown="Shown" Day="Shown.Day" OnChanged="StateHasChanged" />
 </div>
+</CascadingValue>
 }
 else
 {
@@ -71,7 +74,7 @@ else
     /// <summary>Save all (and Ctrl+S): lists the changes in SaveAllModal and saves once the user confirms.</summary>
     private async Task SaveAllAsync()
     {
-        if (User.Connection is null || !Shown.Waits.CanStart || Sheet.UnsavedDays.Count == 0) return;
+        if (User.Jira is null || !Shown.Waits.CanStart || Sheet.UnsavedDays.Count == 0) return;
         var changes = new Dictionary<string, object?> { [nameof(SaveAllModal.Changes)] = UnsavedChanges.Of(Sheet) };
         if (!await Modals.ShowAsync<SaveAllModal, bool>(changes) || !Shown.Waits.CanStart) return;
         // Removed rows of the shown day shrink away once it is saved, before the period is read again.

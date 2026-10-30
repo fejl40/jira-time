@@ -7,7 +7,7 @@ namespace JiraTime.Services;
 /// worklogs directly. When Jira can't be reached the change is kept in the local retry queue
 /// (<see cref="RetryQueue"/>), shown as not in Jira with the reason, and sent by <see cref="SyncRangeAsync"/>.
 /// </summary>
-public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log, TimeProvider clock)
+public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log, CurrentUser user, TimeProvider clock)
 {
     private readonly WorklogWriter _writer = new(jira, queue, log);
 
@@ -54,8 +54,10 @@ public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log, 
     /// updated and removed work deleted. A day whose plan has errors is left for the user to finish. One search first
     /// checks the worklogs of every day; a day with a worklog changed in Jira since it was read writes nothing.
     /// </summary>
-    public async Task<SaveAllResult> SaveDaysAsync(JiraConnection c, IReadOnlyList<DaySave> plans, CancellationToken ct = default)
+    /// <exception cref="JiraException">Nobody is signed in to Jira.</exception>
+    public async Task<SaveAllResult> SaveDaysAsync(IReadOnlyList<DaySave> plans, CancellationToken ct = default)
     {
+        var c = user.RequireJira().Connection;
         // Plans with errors have nothing to check.
         var inJira = await ReadWorklogsAsync(c, plans.SelectMany(p => p.ToCheck).ToList(), ct);
         var results = new Dictionary<DateOnly, DayResult>();
@@ -115,8 +117,10 @@ public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log, 
 
     /// <summary>Sends every change in the range that waits in the retry queue.</summary>
     /// <returns>How many are still waiting afterwards.</returns>
-    public async Task<int> SyncRangeAsync(JiraConnection c, DateOnly from, DateOnly to, CancellationToken ct = default)
+    /// <exception cref="JiraException">Nobody is signed in to Jira.</exception>
+    public async Task<int> SyncRangeAsync(DateOnly from, DateOnly to, CancellationToken ct = default)
     {
+        var c = user.RequireJira().Connection;
         var failed = 0;
         foreach (var e in await queue.GetPendingAsync(from, to))
             if (await _writer.PushAsync(c, e, ct) is not null) failed++;

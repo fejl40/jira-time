@@ -3,9 +3,10 @@ id: TASK-90.10
 title: >-
   Make CurrentUser the only source of the Jira connection and take Jira search
   out of components
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 11:32'
+updated_date: '2026-10-30 12:17'
 labels:
   - refactor
 dependencies:
@@ -52,12 +53,24 @@ Rules for this subtask: edit only the files listed. Do not edit AGENTS.md, READM
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No .razor file injects JiraClient or JiraWorklogClient
-- [ ] #2 No public method on a scoped service takes JiraConnection
+- [x] #1 No .razor file injects JiraClient or JiraWorklogClient
+- [x] #2 No public method on a scoped service takes JiraConnection
 - [ ] #3 The Connection/Profile guard pattern appears only in CurrentUser
-- [ ] #4 DayEditor, DayRow and IssuePicker have no Connection or Search parameter and statuses are not a regular parameter
-- [ ] #5 Search requests are still logged under 'Search issues'
-- [ ] #6 Only the files listed under Files are created, edited, moved or deleted
-- [ ] #7 Behaviour and what the user sees stay the same
-- [ ] #8 dotnet build has 0 warnings and dotnet test passes
+- [x] #4 DayEditor, DayRow and IssuePicker have no Connection or Search parameter and statuses are not a regular parameter
+- [x] #5 Search requests are still logged under 'Search issues'
+- [x] #6 Only the files listed under Files are created, edited, moved or deleted
+- [x] #7 Behaviour and what the user sees stay the same
+- [x] #8 dotnet build has 0 warnings and dotnet test passes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+AC #3: the four service guards (TimeLog, PeriodLoader, IssueStatuses, MonthExportLoader) now read CurrentUser.Jira; the only Connection/Profile pattern left is in Components/Layout/MainLayout.razor (User is { IsSignedIn: true, Connection: { } c, Profile: { } p }), which is outside this subtask's files. Left for the cleanup: change it to User.Jira is { } jira. SettingsPage (User.Connection is { } c) and ExportPage (User.Connection is null) could read User.Jira the same way.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+CurrentUser.Jira (SignedInJira: connection + profile) is the one source of the Jira connection; Connection and Profile are read through it, and RequireJira() throws a JiraException when nobody is signed in. TimeLog, PeriodLoader, IssueStatuses and MonthExportLoader read CurrentUser.Jira instead of their own guards. WorklogSync takes CurrentUser: SaveDaysAsync(plans) and SyncRangeAsync(from, to) no longer take a JiraConnection. The issue search moved into IssueStatuses.SearchAsync (logged as Search issues “…”); Timesheet shares the page's IssueStatuses as a fixed cascading value, IssuePicker searches through it and DayEditor looks up a picked issue's status with it, so DayEditor and DayRow lost Connection, Search and OnIssuePicked and no razor file injects JiraClient. IssuePicker builds its groups once per render and the arrow keys move through the groups shown. Tests: search logged under its action, no Jira request without a signed-in user. Doc changes for cleanup: AGENTS.md layout line for Services/CurrentUser.cs -> 'the verified user of this tab and its Jira connection (CurrentUser.Jira); data services filter by it'; Services/IssueStatuses.cs -> 'current status of the issues a timesheet shows, and the issue picker's Jira search'; Services/JiraLog line unchanged. MainLayout.razor still has the Connection/Profile pattern (see notes).
+<!-- SECTION:FINAL_SUMMARY:END -->

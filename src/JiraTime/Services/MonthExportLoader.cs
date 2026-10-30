@@ -29,7 +29,7 @@ public class MonthExportLoader(TimeLog log, JiraIssueLookup issues, EpicExportSt
     /// <param name="refresh">Read Jira again instead of using worklogs read a moment ago.</param>
     public async Task<LoadedExport> LoadAsync(DateOnly month, bool refresh = false)
     {
-        if (user.Connection is not { } c) return LoadedExport.Failed("Not connected to Jira.");
+        if (user.Jira is not { } signedIn) return LoadedExport.Failed("Not connected to Jira.");
         if (refresh) log.Refresh();
 
         var (from, to) = MonthExport.MonthOf(month);
@@ -40,7 +40,7 @@ public class MonthExportLoader(TimeLog log, JiraIssueLookup issues, EpicExportSt
         IReadOnlyDictionary<string, string?> epics;
         try
         {
-            epics = await issues.GetEpicsAsync(c, entries.Select(e => e.IssueKey));
+            epics = await issues.GetEpicsAsync(signedIn.Connection, entries.Select(e => e.IssueKey));
         }
         catch (JiraException ex)
         {

@@ -45,6 +45,30 @@ public class JiraActionTests : IDisposable
     }
 
     [Fact]
+    public async Task An_issue_search_is_logged_as_its_own_action()
+    {
+        _h.Jira.Gets["/rest/api/2/issue/picker"] = _ => new { sections = new[] { new { issues = new[] { new { key = "ABC-7", summaryText = "Payroll" } } } } };
+        var (_, issues) = _h.PeriodLoading();
+
+        var found = await issues.SearchAsync("payroll");
+
+        Assert.Equal("ABC-7", Assert.Single(found).Key);
+        var entry = Assert.Single(await LogOfAsync(TestUsers.Carl));
+        Assert.Equal("Search issues “payroll”", entry.Action);
+    }
+
+    [Fact]
+    public async Task Searching_or_saving_without_a_signed_in_user_asks_nothing_of_Jira()
+    {
+        _h.User.Clear();
+        var (_, issues) = _h.PeriodLoading();
+
+        await Assert.ThrowsAsync<JiraException>(() => issues.SearchAsync("payroll"));
+        await Assert.ThrowsAsync<JiraException>(() => _h.Sync.SyncRangeAsync(_h.Today, _h.Today));
+        Assert.Empty(_h.Jira.Requests);
+    }
+
+    [Fact]
     public async Task Requests_outside_any_action_are_background()
     {
         using (JiraAction.Start("Sync now")) { }

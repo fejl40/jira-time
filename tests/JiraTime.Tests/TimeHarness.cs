@@ -38,7 +38,7 @@ public sealed class TimeHarness : IDisposable
     public TimeHarness(JiraConnection? connection = null)
     {
         var user = User = CurrentUser.SignedIn(TestUsers.Carl, connection: connection ?? Server);
-        Connection = user.Connection!;
+        Connection = user.RequireJira().Connection;
         RequestLog = new JiraRequestLog(System.IO.Path.Combine(Files.Path, "jira-logs"), Clock);
         Recorder = new JiraRequestRecorder(RequestLog, Feed, Clock, NullLogger<JiraRequestRecorder>.Instance);
         Http = HttpOver(Jira);
@@ -49,7 +49,7 @@ public sealed class TimeHarness : IDisposable
         Queue = new RetryQueue(Store, user);
         Recent = new RecentWorklogIssues(Clock);
         Log = new TimeLog(client, Queue, user, Recent, Clock);
-        Sync = new WorklogSync(client, Queue, Log, Clock);
+        Sync = new WorklogSync(client, Queue, Log, user, Clock);
     }
 
     public DateOnly Today => DateOnly.FromDateTime(Clock.Now.UtcDateTime);
@@ -82,7 +82,7 @@ public sealed class TimeHarness : IDisposable
 
     /// <summary>A period loader and status book over the same fake Jira and store.</summary>
     public (PeriodLoader Loader, IssueStatuses Statuses) PeriodLoading() =>
-        (new PeriodLoader(Log, Calendar, Issues, User), new IssueStatuses(Issues, User));
+        (new PeriodLoader(Log, Calendar, Issues, User), new IssueStatuses(Issues, new JiraClient(Http), User));
 
     /// <summary>A month export loader and the epic values store over the same fake Jira and store.</summary>
     public (MonthExportLoader Loader, EpicExportStore Values) ExportLoading()
@@ -101,7 +101,7 @@ public sealed class TimeHarness : IDisposable
     public async Task<WorklogSync.DayResult> SaveDayAsync(DateOnly day, IReadOnlyList<TimeEntry> rows, IReadOnlyList<TimeEntry>? saved = null)
     {
         var plan = DaySave.Plan(day, rows, saved ?? await DayAsync(day));
-        return (await Sync.SaveDaysAsync(Connection, [plan])).Days[day];
+        return (await Sync.SaveDaysAsync([plan])).Days[day];
     }
 
     /// <summary>Editable copies of the day's work.</summary>

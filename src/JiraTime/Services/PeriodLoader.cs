@@ -83,10 +83,10 @@ public class PeriodLoader(TimeLog log, WorkCalendarService calendar, JiraIssueLo
 
     private async Task<IReadOnlyList<IssueWithStatus>> OrEmptyAsync(Func<JiraConnection, JiraProfile, Task<IReadOnlyList<IssueWithStatus>>> load)
     {
-        if (user is not { Connection: { } c, Profile: { } profile }) return [];
+        if (user.Jira is not { } signedIn) return [];
         try
         {
-            return await load(c, profile);
+            return await load(signedIn.Connection, signedIn.Profile);
         }
         catch (JiraException)
         {
