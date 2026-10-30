@@ -22,7 +22,7 @@ public class TimeLog(JiraWorklogClient jira, RetryQueue pending, CurrentUser use
     /// <summary>How long worklogs read from Jira are reused before reading them again.</summary>
     public static readonly TimeSpan CacheLifetime = TimeSpan.FromMinutes(1);
 
-    private ExpiringCache<IReadOnlyList<JiraWorklog>> _cache = new(clock, CacheLifetime);
+    private readonly ExpiringCache<IReadOnlyList<JiraWorklog>> _cache = new(clock, CacheLifetime);
 
     public async Task<LoggedTime> GetRangeAsync(DateOnly from, DateOnly to, CancellationToken ct = default)
     {
@@ -56,5 +56,5 @@ public class TimeLog(JiraWorklogClient jira, RetryQueue pending, CurrentUser use
     }
 
     /// <summary>Forgets what was read, so the next read asks Jira again.</summary>
-    public void Refresh() => _cache = new(clock, CacheLifetime);
+    public void Refresh() => _cache.Clear();
 }
