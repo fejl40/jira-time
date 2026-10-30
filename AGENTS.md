@@ -19,6 +19,9 @@ dotnet run --project src/JiraTime   # http://localhost:5115
 - App: `src/JiraTime`. Tests: `tests/JiraTime.Tests` (xUnit). Solution: `JiraTime.slnx`.
 - New features come with tests. Build and tests must pass before every push.
 - Never commit `data/` (encryption keys and time entries).
+- Colleagues restore packages from a company NuGet mirror that lags behind nuget.org. Don't move a package to
+  its newest version: pick one that has been out a few months (Microsoft.Extensions.Http.Resilience 10.6.0 and
+  Polly.Core 8.7.0 are known to be there).
 - While editing styles, `npm run watch:css` alongside `dotnet watch` gives live CSS rebuilds.
 - `wwwroot/app.css` (compiled Tailwind) is committed so the app builds with only the .NET SDK. After changing
   styles or Tailwind classes in markup, build with Node.js and commit `wwwroot/app.css` with the change.
