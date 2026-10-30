@@ -1,9 +1,10 @@
 ---
 id: TASK-58
 title: Check whether WorklogPRO needs an account or attributes
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-27 14:02'
+updated_date: '2026-10-30 08:00'
 labels:
   - jira-source-of-truth
 dependencies: []
@@ -19,6 +20,12 @@ WorklogPRO reads standard Jira worklogs, and stores its extras (account, attribu
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Confirmed on the real Jira whether app worklogs show in WorklogPRO
-- [ ] #2 If WorklogPRO requires an account or attribute, the app lets the user set it and sends it in the worklogpro property, with tests
+- [x] #1 Confirmed on the real Jira whether app worklogs show in WorklogPRO
+- [x] #2 If WorklogPRO requires an account or attribute, the app lets the user set it and sends it in the worklogpro property, with tests
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Carl confirmed on the real Jira (2026-10-30) that worklogs saved by the app show in WorklogPRO and nothing extra is required, so no account or attribute support is needed.
+<!-- SECTION:FINAL_SUMMARY:END -->
