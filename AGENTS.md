@@ -96,7 +96,8 @@ Components/Pages/Timesheet.razor   shows a period: wires PeriodLoader, WorklogSy
 Components/Format.cs               how hours, days and counts are written for the user
 Components/DayOffLook.cs           how time off looks: icon, tint and label per reason (vacation, sick, other)
 Components/Links.cs                builds and reads timesheet links (period, selected day), export links and log links
-Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, DayKeys (keyboard shortcuts)
+Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, DayKeys (keyboard shortcuts), TimeOffModal
+Components/Modals/                 the modal system: Modals (service), ModalQueue and ModalContext, ModalHost (in MainLayout), the Modal frame, ConfirmModal (wwwroot/modal.js)
 Components/JiraWaits.cs            the timesheet's running Jira requests: what shows pending, which buttons wait, the status text
 Components/Motion.cs               animation classes (Styles/motion.css), MotionScript (calls wwwroot/motion.js), SaveMotion
 Components/Pages/ExportPage.razor  a month in the agency's format: values per epic, Copy, Download .tsv (wwwroot/export.js)
@@ -247,7 +248,7 @@ Periods are semi-monthly: the 1st to the 15th, and the 16th to the last day of t
 
 Monday to Friday need 8 hours by default; set your own hours per weekday under **Settings → Work
 hours** (a day with 0 hours is not a workday). Danish public holidays are skipped automatically.
-**Time off…** in the day view marks a whole day or part of it off (vacation, sick, other); part of a
+**Time off…** in the day view opens a modal that marks a whole day or part of it off (vacation, sick, other); part of a
 day lowers the hours that day needs. Marking a whole day off marks the time saved on it as removed, so
 **Save day** deletes those worklogs in Jira; the day stays editable, and **Undo** brings the rows back before saving. The grid shows the hours still missing on each workday up to today.
 
@@ -303,6 +304,31 @@ The toasts in the bottom left (`JiraToasts`, rules in `RequestToasts`) and the *
 shows a day newest first, grouped by action, with filters (day, errors only, text), Download .jsonl and
 Clear logs; a row expands into its details with the bodies as JSON trees. Clicking a toast opens
 `logs?day=…&request=…` with that request expanded.
+
+### Modals
+
+All modals go through `Components/Modals` (namespace `JiraTime.Components`). `Modals` (scoped, one per tab)
+shows a modal component and waits for its result: `ShowAsync<TModal, TResult>(parameters, onTop)` returns what
+the modal closed with, or null (the default) when it was cancelled; `ConfirmAsync(title, text, confirmLabel,
+danger)` asks a yes-or-no question (Clear logs, leaving the timesheet with unsaved changes; closing the tab keeps
+the browser's own warning). `ModalHost`, once in `MainLayout`, draws each open modal with `DynamicComponent` in a
+native `<dialog>` that `wwwroot/modal.js` opens with `showModal()`: top layer, focus kept inside, the page inert,
+the focus back on the opener when it closes. The backdrop is blurred and darkened (`.modal::backdrop` in
+`Styles/app.css`), modals rise in and out quickly (`Styles/motion.css`, off with reduced motion), and on phones
+they are a full-width sheet from the bottom.
+
+One modal shows at a time: one asked for while another is open waits, and they open in the order asked for.
+`onTop: true` puts a modal above the open one (for a modal opened from a modal); the one below comes back when it
+closes. Going to another page cancels every open and waiting modal; another day on the same page doesn't. These
+rules are `ModalQueue`, tested in `ModalsTests`. The server owns which modals are open: the script only reports.
+
+A custom modal wraps its content in `<Modal Title="…">` (body, and a `Footer` for buttons) and gets a cascading
+`ModalContext`: `Close(result)` (any value, such as a record), `Cancel()`, `Busy` and `WhileBusyAsync(work)`.
+While busy the frame's controls are off, the footer shows the Waiting spinner and the modal can't be closed. In
+markup: `data-modal-close` cancels, `data-modal-result="x"` closes with `x` (read as the result type: true, 4, an
+enum name), `data-modal-autofocus` gets the focus on open, and `data-modal-busy` (set on the dialog while busy)
+stops closing. `[Modal(Size = ModalSize.Small/Medium/Large, Dismiss = true)]` on the component sets its width and
+whether Esc and a click on the backdrop cancel it. The timesheet's keyboard shortcuts are off while a modal is open.
 
 ### Theme
 
