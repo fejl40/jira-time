@@ -71,7 +71,10 @@
             return;
         }
         foreach (var modal in Modals.Open.Where(_shown.Add).ToList())
+        {
+            modal.Shown();
             await JS.InvokeVoidAsync("jiraModals.open", modal.Id, _self);
+        }
     }
 
     /// <summary>Plays the closing animation, then takes the dialog out of the page.</summary>
@@ -85,6 +88,10 @@
         catch (JSDisconnectedException)
         {
             // The tab is gone.
+        }
+        finally
+        {
+            modal.Left(); // its caller goes on now, also when the script failed
         }
         _leaving.Remove(modal);
         StateHasChanged();
@@ -109,6 +116,7 @@
         Modals.Changed -= OnModalsChanged;
         Nav.LocationChanged -= OnLocationChanged;
         Modals.CloseAll();
+        foreach (var modal in _shown) modal.Left();
         _self?.Dispose();
         return ValueTask.CompletedTask;
     }

@@ -20,7 +20,8 @@ public sealed class Modals
     public IReadOnlyList<ModalContext> Open => _queue.Open;
 
     /// <summary>
-    /// Shows <typeparamref name="TModal"/> and waits until it closes. Returns its result, or null (the
+    /// Shows <typeparamref name="TModal"/> and waits until it closes and its dialog has left the page, so what the
+    /// caller does next isn't hidden behind the fading backdrop. Returns its result, or null (the
     /// default) when it was cancelled. A modal asked for while one is open waits its turn, unless
     /// <paramref name="onTop"/> puts it above the open one (for a modal opened from inside a modal).
     /// </summary>
@@ -36,7 +37,9 @@ public sealed class Modals
         };
         _queue.Add(modal, onTop);
         Changed?.Invoke();
-        return ModalResult.As<TResult>(await modal.Result);
+        var result = await modal.Result;
+        await modal.Gone;
+        return ModalResult.As<TResult>(result);
     }
 
     /// <summary>Asks a yes-or-no question; true when the user confirmed, false when they cancelled.</summary>

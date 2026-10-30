@@ -8,6 +8,8 @@ namespace JiraTime.Components;
 public sealed class ModalContext(int id, Type component, IDictionary<string, object?> parameters)
 {
     private readonly TaskCompletionSource<object?> _result = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource _gone = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private bool _shown;
     private bool _busy;
 
     public int Id { get; } = id;
@@ -61,7 +63,20 @@ public sealed class ModalContext(int id, Type component, IDictionary<string, obj
         }
     }
 
-    internal void Complete(object? result) => _result.TrySetResult(result);
+    /// <summary>Done once the dialog has left the page: at once for a modal the browser never showed.</summary>
+    internal Task Gone => _gone.Task;
+
+    internal void Complete(object? result)
+    {
+        _result.TrySetResult(result);
+        if (!_shown) _gone.TrySetResult();
+    }
+
+    /// <summary>The browser shows the dialog; its caller then waits for <see cref="Left"/> as well as the result.</summary>
+    internal void Shown() => _shown = true;
+
+    /// <summary>The dialog finished its closing animation and is out of the page.</summary>
+    internal void Left() => _gone.TrySetResult();
 }
 
 /// <summary>

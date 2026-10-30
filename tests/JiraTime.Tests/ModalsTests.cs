@@ -23,6 +23,33 @@ public class ModalsTests
     }
 
     [Fact]
+    public async Task A_shown_modal_returns_once_its_dialog_has_left_the_page()
+    {
+        var shown = Show();
+        var modal = _modals.Open[0];
+        modal.Shown(); // the host opened it in the browser
+
+        modal.Close("yes");
+        await Task.Delay(20);
+        Assert.False(shown.IsCompleted); // still playing its closing animation
+
+        modal.Left();
+        Assert.Equal("yes", await shown);
+    }
+
+    [Fact]
+    public async Task A_waiting_modal_that_is_cancelled_returns_at_once()
+    {
+        var first = Show();
+        var waiting = Show();
+
+        _modals.CloseAll();
+
+        Assert.Null(await waiting);
+        Assert.Null(await first);
+    }
+
+    [Fact]
     public async Task A_cancelled_modal_returns_null()
     {
         var shown = Show();

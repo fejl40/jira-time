@@ -358,7 +358,8 @@ Clear logs; a row expands into its details with the bodies as JSON trees. Clicki
 
 All modals go through `Components/Modals` (namespace `JiraTime.Components`). `Modals` (scoped, one per tab)
 shows a modal component and waits for its result: `ShowAsync<TModal, TResult>(parameters, onTop)` returns what
-the modal closed with, or null (the default) when it was cancelled; `ConfirmAsync(title, text, confirmLabel,
+the modal closed with, or null (the default) when it was cancelled, once its dialog has finished closing (so
+what comes next, such as a new period sliding in, isn't hidden behind the fading backdrop); `ConfirmAsync(title, text, confirmLabel,
 danger)` asks a yes-or-no question (Clear logs, leaving the timesheet with unsaved changes; closing the tab keeps
 the browser's own warning). `ModalHost`, once in `MainLayout`, draws each open modal with `DynamicComponent` in a
 native `<dialog>` that `wwwroot/modal.js` opens with `showModal()`: top layer, focus kept inside, the page inert,
