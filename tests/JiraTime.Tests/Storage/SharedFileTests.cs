@@ -17,18 +17,32 @@ public class SharedFileTests : IDisposable
     }
 
     [Fact]
-    public async Task A_file_being_read_can_be_replaced_and_deleted()
+    public async Task A_file_open_for_a_moment_is_replaced_once_it_is_closed()
     {
         var path = Write("doc.json", "old");
-        await using var reading = new FileStream(path, new FileStreamOptions
+        var tmp = Write("doc.json.tmp", "new");
+        var reading = new FileStream(path, new FileStreamOptions
         {
             Access = FileAccess.Read,
             Share = FileShare.ReadWrite | FileShare.Delete,
         });
 
-        await SharedFile.ReplaceAsync(Write("doc.json.tmp", "new"), path);
+        // Windows refuses to replace a file while it is open; the replace waits until the reader is done.
+        var replacing = SharedFile.ReplaceAsync(tmp, path);
+        await Task.Delay(30);
+        await reading.DisposeAsync();
+        await replacing;
+
         Assert.Equal("new", await SharedFile.ReadAllTextAsync(path, default));
-        await SharedFile.DeleteAsync(path);
+    }
+
+    [Fact]
+    public async Task A_file_being_read_can_be_deleted()
+    {
+        var path = Write("doc.json", "text");
+        await using (new FileStream(path, new FileStreamOptions { Access = FileAccess.Read, Share = FileShare.ReadWrite | FileShare.Delete }))
+            await SharedFile.DeleteAsync(path);
+
         Assert.False(File.Exists(path));
     }
 
