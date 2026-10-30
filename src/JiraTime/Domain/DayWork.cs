@@ -216,4 +216,15 @@ public sealed class DayWork(DateOnly date)
 
     /// <summary>Keeps a saved row that was marked removed.</summary>
     public void Restore(TimeEntry saved) => Removed.Remove(saved.Id);
+
+    /// <summary>
+    /// The whole day was taken off: every saved row is marked removed, so Save day deletes its worklogs,
+    /// and suggestions go. Rows the user added stay.
+    /// </summary>
+    public void TakeOff(IReadOnlyList<TimeEntry> saved)
+    {
+        Drafts.RemoveAll(d => Suggested.Contains(d.Id));
+        Suggested.Clear();
+        foreach (var s in saved) Removed.Add(s.Id);
+    }
 }

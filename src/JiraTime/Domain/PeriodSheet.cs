@@ -164,6 +164,20 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
         Suggest(day);
     }
 
+    /// <summary>The whole day was marked off: its saved work is marked removed, to delete from Jira on save.</summary>
+    public void TakeOff(DateOnly day)
+    {
+        _finished.Remove(day);
+        WorkFor(day).TakeOff(SavedOn(day));
+    }
+
+    /// <summary>The day off was undone: saved work marked removed comes back, and the day is suggested again if untouched.</summary>
+    public void UndoTakeOff(DateOnly day)
+    {
+        if (_work.TryGetValue(day, out var work)) work.Removed.Clear();
+        if (HasOnlySuggestions(day)) Restart(day);
+    }
+
     /// <summary>True when the day's only unsaved changes are untouched suggestions (or there are none).</summary>
     public bool HasOnlySuggestions(DateOnly day) => !_work.TryGetValue(day, out var work) || work.HasOnlySuggestions(SavedOn(day));
 

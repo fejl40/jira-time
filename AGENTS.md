@@ -238,7 +238,8 @@ Periods are semi-monthly: the 1st to the 15th, and the 16th to the last day of t
 Monday to Friday need 8 hours by default; set your own hours per weekday under **Settings → Work
 hours** (a day with 0 hours is not a workday). Danish public holidays are skipped automatically.
 **Time off…** in the day view marks a whole day or part of it off (vacation, sick, other); part of a
-day lowers the hours that day needs. The grid shows the hours still missing on each workday up to today.
+day lowers the hours that day needs. Marking a whole day off marks the time saved on it as removed, so
+**Save day** deletes those worklogs in Jira; the day stays editable, and **Undo** brings the rows back before saving. The grid shows the hours still missing on each workday up to today.
 
 ### Month export
 

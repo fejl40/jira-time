@@ -167,4 +167,33 @@ public class PeriodSheetTests
         Assert.Equal([monday], row.On(Monday));
         Assert.Empty(row.On(Monday.AddDays(2)));
     }
+
+    [Fact]
+    public void Taking_a_whole_day_off_marks_its_saved_work_removed_and_keeps_added_rows()
+    {
+        var sheet = Sheet(Saved("XYZ-1", 6, Monday), Saved("XYZ-2", 2, Monday));
+        var added = sheet.WorkFor(Monday).AddRow(new JiraIssue("XYZ-3", ""));
+
+        sheet.TakeOff(Monday);
+
+        var work = sheet.WorkFor(Monday);
+        Assert.Equal(2, work.Removed.Count);
+        Assert.Contains(added, work.Drafts);
+        Assert.Contains(Monday, sheet.UnsavedDays); // Save day deletes the worklogs
+    }
+
+    [Fact]
+    public void Taking_a_day_off_drops_suggestions_and_undoing_it_brings_the_work_back()
+    {
+        var sheet = Sheet(Saved("XYZ-1", 2, Monday));
+        sheet.Suggest(Monday);
+        Assert.NotEmpty(sheet.WorkFor(Monday).Drafts);
+
+        sheet.TakeOff(Monday);
+        Assert.Empty(sheet.WorkFor(Monday).Drafts);
+
+        sheet.UndoTakeOff(Monday);
+        Assert.Empty(sheet.WorkFor(Monday).Removed);
+        Assert.Equal("XYZ-1 6h", Show(sheet.WorkFor(Monday).Drafts)); // suggested again
+    }
 }

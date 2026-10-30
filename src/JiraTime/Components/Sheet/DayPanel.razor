@@ -61,17 +61,20 @@
     }
 
     /// <summary>
-    /// Marks the day, or part of it, off. A suggestion made for the old hours no longer fits and is made
-    /// again; changes the user made are kept.
+    /// Marks the day, or part of it, off. A whole day off marks the day's saved work removed, so Save day
+    /// deletes it from Jira. A suggestion made for the old hours no longer fits and is made again; changes
+    /// the user made are kept.
     /// </summary>
     private async Task MarkDayOffAsync(DayHeader.TimeOff off)
     {
         var day = Day;
         var onlySuggested = Sheet.HasOnlySuggestions(day);
-        if (off.Hours is null || onlySuggested) Sheet.Finish(day);
+        var partial = off.Hours is not null;
+        if (partial && onlySuggested) Sheet.Finish(day);
         await Calendar.MarkDayOffAsync(day, off.Reason, off.Hours);
         await OnReload.InvokeAsync();
-        if (off.Hours is not null && onlySuggested) Sheet.Restart(day);
+        if (!partial) Sheet.TakeOff(day);
+        else if (onlySuggested) Sheet.Restart(day);
         await OnChanged.InvokeAsync();
     }
 
@@ -80,7 +83,7 @@
         var day = Day;
         await Calendar.UnmarkDayOffAsync(day);
         await OnReload.InvokeAsync();
-        Sheet.Restart(day);
+        Sheet.UndoTakeOff(day);
         await OnChanged.InvokeAsync();
     }
 }

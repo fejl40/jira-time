@@ -196,4 +196,19 @@ public class SaveDayTests : IDisposable
         var zone = TimeZoneInfo.CreateCustomTimeZone("Plus2", TimeSpan.FromHours(2), "Plus2", "Plus2");
         Assert.Equal("2026-10-19T09:00:00.000+0200", JiraWorklogClient.FormatStarted(Day, new TimeOnly(9, 0), zone));
     }
+
+    [Fact]
+    public async Task A_day_taken_off_deletes_its_worklogs_in_Jira_on_save()
+    {
+        await _h.SaveDayAsync(Day, [Row("ABC-1", 6), Row("ABC-2", 2)]);
+        var saved = await _h.DayAsync(Day);
+        var work = new DayWork(Day);
+
+        work.TakeOff(saved);
+        var result = await _h.SaveDayAsync(Day, work.RowsToSave(saved), saved);
+
+        Assert.True(result.Saved);
+        Assert.Equal(0, _h.JiraSeconds("ABC-1") + _h.JiraSeconds("ABC-2"));
+        Assert.Empty(await _h.DayAsync(Day));
+    }
 }

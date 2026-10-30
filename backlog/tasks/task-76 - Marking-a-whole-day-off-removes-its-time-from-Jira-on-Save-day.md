@@ -1,9 +1,10 @@
 ---
 id: TASK-76
 title: Marking a whole day off removes its time from Jira on Save day
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 08:00'
+updated_date: '2026-10-30 08:02'
 labels:
   - feature
 dependencies: []
@@ -19,8 +20,14 @@ Carl (2026-10-30): when a day is marked off, the day stays savable in Jira like 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Marking a whole day off marks the day's saved rows as removed and keeps the user's other unsaved changes; nothing is written until Save day
-- [ ] #2 Save day (and Save all) on a day off deletes the removed worklogs in Jira; the day stays editable
-- [ ] #3 Undoing the day off before saving restores the rows; a partial day off leaves logged time alone
-- [ ] #4 Tests in Domain and through TimeHarness; checked in the browser
+- [x] #1 Marking a whole day off marks the day's saved rows as removed and keeps the user's other unsaved changes; nothing is written until Save day
+- [x] #2 Save day (and Save all) on a day off deletes the removed worklogs in Jira; the day stays editable
+- [x] #3 Undoing the day off before saving restores the rows; a partial day off leaves logged time alone
+- [x] #4 Tests in Domain and through TimeHarness; checked in the browser
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Marking a whole day off now marks the day's saved rows removed (PeriodSheet/DayWork.TakeOff) instead of discarding changes; Save day or Save all deletes the worklogs in Jira. Undoing the day off restores them. Tests in PeriodSheetTests and SaveDayTests; checked in the browser.
+<!-- SECTION:FINAL_SUMMARY:END -->
