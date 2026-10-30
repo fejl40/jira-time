@@ -58,10 +58,9 @@ public sealed class SheetDay
     /// <summary>Hours the day should have (zero on weekends, holidays and days off).</summary>
     public TimeSpan Expected => Info?.Expected ?? TimeSpan.Zero;
     /// <summary>Hours saved on the day.</summary>
-    public TimeSpan Logged => TimeEntry.Total(Saved);
-    /// <summary>Saved hours still missing; only counted up to today.</summary>
-    public TimeSpan Missing =>
-        !_sheet.HoursKnown || Date > _sheet.Today || Info is null ? TimeSpan.Zero : Info.MissingWith(Logged);
+    public TimeSpan Logged => _sheet.Summary.LoggedOn(Date);
+    /// <summary>Saved hours still missing; only counted up to today, and zero when Jira couldn't be read.</summary>
+    public TimeSpan Missing => _sheet.Summary.MissingOn(Date);
     /// <summary>Saved hours as a share of the hours the day needs, from 0 to 1; 0 on days that need none.</summary>
     public double Progress => Expected > TimeSpan.Zero ? Math.Min(1, Logged / Expected) : 0;
     /// <summary>A day that needs hours and has them all saved.</summary>

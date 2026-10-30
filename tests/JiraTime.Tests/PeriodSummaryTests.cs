@@ -12,7 +12,7 @@ public class PeriodSummaryTests
         p.Days.ToDictionary(d => d, d => DayInfo.For(d, new Dictionary<DateOnly, DayOff>()));
 
     private static TimeEntry E(string date, double hours) =>
-        new() { IssueKey = "ABC-1", Date = DateOnly.Parse(date), Duration = TimeSpan.FromHours(hours) };
+        new() { IssueKey = "ABC-1", Date = DateOnly.Parse(date), Duration = TimeSpan.FromHours(hours), JiraWorklogId = "1", SyncPending = false };
 
     [Fact]
     public void Weeks_are_split_on_mondays_and_cut_to_the_period()
@@ -38,22 +38,68 @@ public class PeriodSummaryTests
         Assert.Equal(TimeSpan.FromHours(7 * 8), summary.StillToLog);    // Thu 22 to Fri 30
     }
 
+    private static List<TimeEntry> FullDaysUpToToday() =>
+        new[] { "2026-10-16", "2026-10-19", "2026-10-20", "2026-10-21" }.Select(d => E(d, 8)).ToList();
+
     [Theory]
-    [InlineData(0, false, true)]
-    [InlineData(1, false, false)]
-    [InlineData(0, true, false)]
-    public void Complete_needs_no_missing_hours_nothing_unsaved_and_everything_in_Jira(int notInJira, bool unsaved, bool complete)
+    [InlineData(false, false, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    public void Complete_needs_no_missing_hours_nothing_unsaved_and_everything_in_Jira(bool waitingForJira, bool unsaved, bool complete)
     {
-        var entries = new[] { "2026-10-16", "2026-10-19", "2026-10-20", "2026-10-21" }.Select(d => E(d, 8)).ToList();
+        var entries = FullDaysUpToToday();
+        if (waitingForJira) entries[0].Failed("Jira was down");
 
         var summary = PeriodSummary.For(Second, Days(Second), entries, Today);
 
-        Assert.Equal(complete, summary.IsComplete(notInJira, unsaved));
+        Assert.Equal(complete, summary.IsComplete(unsaved));
     }
 
     [Fact]
     public void A_short_day_means_not_complete() =>
-        Assert.False(PeriodSummary.For(Second, Days(Second), [], Today).IsComplete(0, false));
+        Assert.False(PeriodSummary.For(Second, Days(Second), [], Today).IsComplete(false));
+
+    [Fact]
+    public void Work_not_in_Jira_is_counted_in_the_period_only()
+    {
+        var waiting = new[] { E("2026-10-19", 1), E("2026-10-20", 2), E("2026-10-15", 3) };
+        foreach (var e in waiting) e.Failed("Jira was down");
+
+        var summary = PeriodSummary.For(Second, Days(Second), [.. waiting, E("2026-10-21", 4)], Today);
+
+        Assert.Equal(2, summary.NotInJira);
+    }
+
+    [Fact]
+    public void Missing_and_logged_are_given_per_day()
+    {
+        var summary = PeriodSummary.For(Second, Days(Second), [E("2026-10-19", 6), E("2026-10-19", 1)], Today);
+
+        Assert.Equal(TimeSpan.FromHours(7), summary.LoggedOn(new DateOnly(2026, 10, 19)));
+        Assert.Equal(TimeSpan.FromHours(1), summary.MissingOn(new DateOnly(2026, 10, 19)));
+        Assert.Equal(TimeSpan.FromHours(8), summary.MissingOn(new DateOnly(2026, 10, 20)));
+        Assert.Equal(TimeSpan.Zero, summary.MissingOn(new DateOnly(2026, 10, 22))); // after today
+        Assert.Equal(TimeSpan.Zero, summary.MissingOn(new DateOnly(2026, 10, 17))); // Saturday
+    }
+
+    [Fact]
+    public void Unknown_hours_mean_nothing_is_missing_and_the_period_is_not_complete()
+    {
+        var waiting = E("2026-10-19", 2);
+        waiting.Failed("Jira was down");
+
+        var summary = PeriodSummary.For(Second, Days(Second), [waiting], Today, hoursKnown: false);
+
+        Assert.False(summary.HoursKnown);
+        Assert.Equal(TimeSpan.Zero, summary.Missing);
+        Assert.Equal(TimeSpan.Zero, summary.MissingOn(new DateOnly(2026, 10, 20)));
+        Assert.Equal(1, summary.NotInJira);
+        Assert.False(summary.IsComplete(false));
+    }
+
+    [Fact]
+    public void Unknown_hours_with_full_days_are_still_not_complete() =>
+        Assert.False(PeriodSummary.For(Second, Days(Second), FullDaysUpToToday(), Today, hoursKnown: false).IsComplete(false));
 
     [Theory]
     [InlineData("2026-10-28", false)]

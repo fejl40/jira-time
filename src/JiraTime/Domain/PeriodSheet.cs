@@ -32,10 +32,26 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
     public bool HoursKnown { get; private set; } = true;
 
     /// <summary>Takes freshly loaded saved data. Unsaved changes are kept.</summary>
-    public void Load(IReadOnlyList<TimeEntry> entries, IReadOnlyList<TimeEntry> before, IReadOnlyDictionary<DateOnly, DayInfo> days, bool hoursKnown = true) =>
+    public void Load(IReadOnlyList<TimeEntry> entries, IReadOnlyList<TimeEntry> before, IReadOnlyDictionary<DateOnly, DayInfo> days, bool hoursKnown = true)
+    {
         (Entries, Before, Days, HoursKnown) = (entries, before, days, hoursKnown);
+        _summary = null;
+    }
 
-    public PeriodSummary Summary => PeriodSummary.For(Period, Days, Entries, Today);
+    /// <summary>The saved data's summary, made again after a load or when the day changes.</summary>
+    private (DateOnly Today, PeriodSummary Summary)? _summary;
+
+    /// <summary>Where the saved data stands: logged, missing (per day too), not in Jira.</summary>
+    public PeriodSummary Summary
+    {
+        get
+        {
+            var today = Today;
+            if (_summary is not { } cached || cached.Today != today)
+                _summary = cached = (today, PeriodSummary.For(Period, Days, Entries, today, HoursKnown));
+            return cached.Summary;
+        }
+    }
     /// <summary>The day's kind and hours; null for a day that wasn't loaded.</summary>
     public DayInfo? Info(DateOnly day) => Days.GetValueOrDefault(day);
     public IReadOnlyList<TimeEntry> SavedOn(DateOnly day) => Entries.Where(e => e.Date == day).ToList();

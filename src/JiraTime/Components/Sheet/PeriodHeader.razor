@@ -9,12 +9,12 @@
         <h1 @key="Period" class="motion-fade text-xl font-semibold leading-tight outline-none">@Format.Range(Period.Start, Period.End)</h1>
         <p class="text-sm text-muted" data-period-status>
             <span><Count Value="Summary.Logged" Zero="0" Unit=" h" Class="font-semibold text-slate-800 dark:text-slate-100" /> logged</span>
-            @if (Sheet.HoursKnown && Summary.IsComplete(Unsynced, Unsaved.Count > 0))
+            @if (Summary.IsComplete(Unsaved.Count > 0))
             {
                 <span class="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" data-period-complete
                       title="No workday up to today is short, nothing is unsaved and everything is in Jira">✓ Complete so far</span>
             }
-            @if (Sheet.HoursKnown && Summary.Missing > TimeSpan.Zero)
+            @if (Summary.Missing > TimeSpan.Zero)
             {
                 <span> · <span class="text-warning" title="Hours missing on workdays up to today"><Count Value="Summary.Missing" Unit=" h" /> missing</span></span>
             }
@@ -22,12 +22,12 @@
             {
                 <span> · <span class="text-unsaved">unsaved on @Format.Days(Unsaved.Count)</span></span>
             }
-            @if (Unsynced > 0)
+            @if (Summary.NotInJira > 0)
             {
-                <span> · <span class="text-warning" title="Saved here, but Jira doesn't have it yet">@Unsynced not in Jira</span></span>
+                <span> · <span class="text-warning" title="Saved here, but Jira doesn't have it yet">@Summary.NotInJira not in Jira</span></span>
             }
             <button class="btn-ghost ml-1 px-1.5 py-0.5 text-xs" disabled="@(!Waits.CanStart)" @onclick="OnSync" data-sync
-                    title="Send what Jira is missing and read worklogs logged in Jira">@if (Waits.Has(JiraWait.Sync)) { <Waiting /> <span>Sync</span> } else { @(Unsynced > 0 ? "Sync now" : "↻ Sync") }</button>
+                    title="Send what Jira is missing and read worklogs logged in Jira">@if (Waits.Has(JiraWait.Sync)) { <Waiting /> <span>Sync</span> } else { @(Summary.NotInJira > 0 ? "Sync now" : "↻ Sync") }</button>
             <a class="btn-ghost px-1.5 py-0.5 text-xs" href="@ExportLinks.To(Period.Start)" title="Export the month this period is in" data-export-link>Export month</a>
             @if (Waits.Status(Period) is { } waiting)
             {
@@ -54,8 +54,6 @@
 
 @code {
     [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
-    /// <summary>Saved entries in the period that Jira doesn't have yet.</summary>
-    [Parameter] public int Unsynced { get; set; }
     /// <summary>Requests to Jira that are running: the status line says so and the buttons wait.</summary>
     [Parameter, EditorRequired] public JiraWaits Waits { get; set; } = default!;
     [Parameter] public EventCallback OnSync { get; set; }
@@ -88,7 +86,7 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (User.Key is not { } user) return;
-        var complete = Summary.IsComplete(Unsynced, Unsaved.Count > 0);
+        var complete = Summary.IsComplete(Unsaved.Count > 0);
         if (_completed.Update(complete ? [Period] : []).Count > 0)
             await Animations.CelebrateAsync(user, Period);
     }

@@ -72,13 +72,9 @@ public class PeriodLoader(TimeLog log, WorkCalendarService calendar, JiraIssueLo
     {
         if (!sheet.Period.Contains(sheet.Today)) return null;
         var prev = sheet.Period.Previous;
-        var entries = time.Between(prev.Start, prev.End);
-        var notInJira = entries.Count(e => !e.IsSynced);
-        // Without Jira the hours are unknown, so only work waiting for Jira is worth a reminder.
-        var missing = time.IsComplete
-            ? PeriodSummary.For(prev, await calendar.GetDaysAsync(prev.Start, prev.End), entries, sheet.Today).Missing
-            : TimeSpan.Zero;
-        return missing > TimeSpan.Zero || notInJira > 0 ? new(prev, missing, notInJira) : null;
+        var days = await calendar.GetDaysAsync(prev.Start, prev.End);
+        var summary = PeriodSummary.For(prev, days, time.Between(prev.Start, prev.End), sheet.Today, hoursKnown: time.IsComplete);
+        return summary.Missing > TimeSpan.Zero || summary.NotInJira > 0 ? new(prev, summary.Missing, summary.NotInJira) : null;
     }
 
     private async Task<IReadOnlyList<IssueWithStatus>> OrEmptyAsync(Func<JiraConnection, JiraProfile, Task<IReadOnlyList<IssueWithStatus>>> load)

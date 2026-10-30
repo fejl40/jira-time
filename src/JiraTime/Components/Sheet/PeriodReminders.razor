@@ -28,7 +28,6 @@
 
 @code {
     [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
-    [Parameter] public int Unsynced { get; set; }
     /// <summary>The previous period, when this is the current one and the previous isn't done.</summary>
     [Parameter] public OpenPeriod? Previous { get; set; }
     /// <summary>Why Jira couldn't be read; the period then shows only work waiting for Jira.</summary>
@@ -47,9 +46,9 @@
             if (!PeriodSummary.EndsSoon(Sheet.Period, Sheet.Today)) return null;
             var s = Sheet.Summary;
             var left = List(
-                Sheet.HoursKnown && s.Missing > TimeSpan.Zero ? $"{Format.Hours(s.Missing)} h missing so far" : null,
+                s.Missing > TimeSpan.Zero ? $"{Format.Hours(s.Missing)} h missing so far" : null,
                 s.StillToLog > TimeSpan.Zero ? $"{Format.Hours(s.StillToLog)} h for the days left" : null,
-                Unsynced > 0 ? $"{Unsynced} not in Jira" : null);
+                s.NotInJira > 0 ? $"{s.NotInJira} not in Jira" : null);
             return left == "" ? null : left;
         }
     }

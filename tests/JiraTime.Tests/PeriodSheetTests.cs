@@ -169,6 +169,32 @@ public class PeriodSheetTests
     }
 
     [Fact]
+    public void The_summary_follows_each_load_and_the_day_moving_on()
+    {
+        var today = Monday;
+        var sheet = new PeriodSheet(Period, () => today);
+        sheet.Load([Saved("XYZ-1", 8, Friday)], [], Days());
+        Assert.Equal((TimeSpan.FromHours(8), 0), (sheet.Summary.Missing, sheet.Summary.NotInJira));
+
+        sheet.Load([Saved("XYZ-1", 8, Friday), Saved("XYZ-2", 3, Monday, worklog: null)], [], Days());
+        Assert.Equal((TimeSpan.FromHours(5), 1), (sheet.Summary.Missing, sheet.Summary.NotInJira));
+
+        today = Tuesday;
+        Assert.Equal(TimeSpan.FromHours(5 + 8), sheet.Summary.Missing);
+        Assert.Equal(TimeSpan.FromHours(8), sheet.Day(Tuesday).Missing);
+    }
+
+    [Fact]
+    public void Without_Jira_the_period_shows_the_waiting_work_but_is_never_complete()
+    {
+        var sheet = new PeriodSheet(Period, () => Tuesday);
+        sheet.Load([Saved("XYZ-1", 8, Friday), Saved("XYZ-2", 8, Monday), Saved("XYZ-3", 8, Tuesday)], [], Days(), hoursKnown: false);
+
+        Assert.Equal(TimeSpan.Zero, sheet.Summary.Missing);
+        Assert.False(sheet.Summary.IsComplete(hasUnsaved: false));
+    }
+
+    [Fact]
     public void A_grid_row_gives_its_entries_on_one_day()
     {
         var monday = new TimeEntry { IssueKey = "ABC-1", Date = Monday, Duration = TimeSpan.FromHours(2) };

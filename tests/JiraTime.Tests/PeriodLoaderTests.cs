@@ -39,6 +39,7 @@ public class PeriodLoaderTests : IDisposable
 
         Assert.Equal(new DateOnly(2026, 10, 1), current.Previous?.Period.Start);
         Assert.True(current.Previous!.Missing > TimeSpan.Zero);
+        Assert.Equal(0, current.Previous.NotInJira);
         Assert.Null(older.Previous);
     }
 

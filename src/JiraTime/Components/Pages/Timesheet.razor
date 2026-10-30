@@ -20,10 +20,10 @@
 <CascadingValue Value="Shown.Statuses" IsFixed="true">
 <DayKeys @ref="_keys" OnSave="SaveAllAsync" OnMove="d => SelectDay(Shown.Day.AddDays(d))" OnAddRow="AddRowFromKeyboardAsync" />
 <div class="mx-auto max-w-7xl space-y-6 overflow-x-clip">
-    <PeriodHeader Sheet="sheet" Unsynced="Shown.Unsynced" Waits="Shown.Waits"
+    <PeriodHeader Sheet="sheet" Waits="Shown.Waits"
                   OnSync="Shown.SyncAsync" OnFillPeriod="FillPeriod" OnSaveAll="SaveAllAsync" OnDiscardAll="Shown.DiscardAll" />
 
-    <PeriodReminders Sheet="sheet" Unsynced="Shown.Unsynced" Previous="Shown.Extras.Previous" JiraError="@Shown.Extras.JiraError" Waits="Shown.Waits"
+    <PeriodReminders Sheet="sheet" Previous="Shown.Extras.Previous" JiraError="@Shown.Extras.JiraError" Waits="Shown.Waits"
                      OnRetry="Shown.RetryAsync" />
 
     @* A new period slides in from the side it comes from. While Jira is read the period shows as pending. *@

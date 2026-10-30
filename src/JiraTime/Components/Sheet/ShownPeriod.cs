@@ -25,9 +25,6 @@ public sealed class ShownPeriod(
     /// </summary>
     public PeriodExtras Extras { get; private set; } = new(null, null, [], new Dictionary<string, IReadOnlyList<string>>(), []);
 
-    /// <summary>Work in the period that Jira doesn't have yet.</summary>
-    public int Unsynced { get; private set; }
-
     /// <summary>Requests to Jira that are running; parts of the page show them as pending.</summary>
     public JiraWaits Waits { get; } = new();
 
@@ -65,8 +62,7 @@ public sealed class ShownPeriod(
         var sheet = new PeriodSheet(link.Period, () => Today);
         if (await Waits.OpenAsync(link.Period, () => loader.LoadAsync(sheet, statuses)) is not { } loaded) return;
         Slide = Sheet is null ? 0 : link.Period.Start.CompareTo(Sheet.Period.Start);
-        Show(sheet, loaded);
-        (Sheet, Day, Notice) = (sheet, day, null);
+        (Sheet, Extras, Day, Notice) = (sheet, loaded, day, null);
         sheet.Suggest(day);
     }
 
@@ -79,7 +75,7 @@ public sealed class ShownPeriod(
 
     /// <summary>Reads the shown period again, keeping its unsaved changes.</summary>
     public Task ReloadAsync() =>
-        Waits.RunAsync(JiraWait.Period, async () => Show(Shown, await loader.LoadAsync(Shown, statuses)));
+        Waits.RunAsync(JiraWait.Period, async () => Extras = await loader.LoadAsync(Shown, statuses));
 
     /// <summary>Try again after Jira couldn't be read: reads Jira afresh and suggests work for the shown day.</summary>
     public async Task RetryAsync()
@@ -167,12 +163,6 @@ public sealed class ShownPeriod(
             await calendar.UnmarkDayOffAsync(day);
             await ReloadAsync();
         });
-    }
-
-    private void Show(PeriodSheet sheet, PeriodExtras loaded)
-    {
-        Extras = loaded;
-        Unsynced = sheet.Entries.Count(e => !e.IsSynced);
     }
 }
 
