@@ -8,23 +8,23 @@
                 <th class="sticky left-0 z-10 min-w-64 bg-white dark:bg-slate-900 px-4 py-2 text-left font-medium">Issue</th>
                 @foreach (var (day, i) in Days)
                 {
-                    <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium" title="@DayTitle(day)" data-selected-day="@(day == Selected ? "" : null)" data-day-off="@DayOffLook.Data(Sheet.Day(day))">
+                    <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium" title="@DayTitle(day)" data-selected-day="@(day == Selected ? "" : null)" data-day-off="@DayOffLook.Data(Sheet.Info(day))">
                         <button type="button" class="relative w-full px-1 py-2" @onclick="() => OnSelectDay.InvokeAsync(day)">
-                            <div class="uppercase">@if (Sheet.Day(day) is { HasPartialDayOff: true, Reason: { } partOff }) { <span class="mr-0.5 text-[10px]" aria-hidden="true">@DayOffLook.Icon(partOff)</span> }@Format.TwoLetterWeekday(day)</div>
+                            <div class="uppercase">@if (Sheet.Info(day) is { HasPartialDayOff: true, Reason: { } partOff }) { <span class="mr-0.5 text-[10px]" aria-hidden="true">@DayOffLook.Icon(partOff)</span> }@Format.TwoLetterWeekday(day)</div>
                             <div class="text-sm @(day == Sheet.Today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700 dark:text-slate-200")">@day.Day</div>
                             @if (Sheet.IsUnsaved(day))
                             {
                                 <span class="dot-unsaved absolute right-1 top-1 size-1.5" title="Unsaved changes" data-unsaved-day></span>
                             }
-                            @if (Sheet.Day(day) is { Kind: DayKind.DayOff, Reason: { } reason })
+                            @if (Sheet.Info(day) is { Kind: DayKind.DayOff, Reason: { } reason })
                             {
                                 <span class="mt-0.5 block text-xs leading-none" aria-hidden="true">@DayOffLook.Icon(reason)</span>
                             }
-                            @if (Sheet.Day(day) is { Expected.Ticks: > 0 })
+                            @if (Sheet.Day(day) is { Expected.Ticks: > 0 } sheetDay)
                             {
-                                var complete = Sheet.IsComplete(day);
+                                var complete = sheetDay.IsComplete;
                                 <span class="mx-1.5 mt-1 block h-1 rounded-full bg-slate-200 dark:bg-slate-700 @(_complete.Fresh.Contains(day) ? "motion-pop" : "")" data-day-progress="@(complete ? "complete" : "")">
-                                    <span class="motion-bar block h-full rounded-full @(complete ? "bg-emerald-500" : "bg-blue-500")" style="width: @Format.Percent(Sheet.Progress(day))"></span>
+                                    <span class="motion-bar block h-full rounded-full @(complete ? "bg-emerald-500" : "bg-blue-500")" style="width: @Format.Percent(sheetDay.Progress)"></span>
                                 </span>
                             }
                         </button>
@@ -96,7 +96,7 @@
                     <td class="@FooterLabel" title="Day totals once the unsaved changes are saved">Unsaved</td>
                     @foreach (var (day, i) in Days)
                     {
-                        <td class="@DayCellClass(day, i, footer: true) @FooterDayCell">@if (Sheet.IsUnsaved(day)) { <Count Value="Sheet.UnsavedDayTotal(day)" Zero="0" /> }</td>
+                        <td class="@DayCellClass(day, i, footer: true) @FooterDayCell">@if (Sheet.IsUnsaved(day)) { <Count Value="Sheet.Day(day).Total" Zero="0" /> }</td>
                     }
                     <td class="@FooterTotalCell"><Count Value="Sheet.UnsavedTotal" /></td>
                 </tr>
@@ -107,7 +107,7 @@
                     <td class="@FooterLabel">Missing</td>
                     @foreach (var (day, i) in Days)
                     {
-                        <td class="@DayCellClass(day, i, footer: true) @FooterDayCell"><Count Value="Sheet.Missing(day)" /></td>
+                        <td class="@DayCellClass(day, i, footer: true) @FooterDayCell"><Count Value="Sheet.Day(day).Missing" /></td>
                     }
                     <td class="@FooterTotalCell"><Count Value="Sheet.Summary.Missing" /></td>
                 </tr>
@@ -146,7 +146,7 @@
     {
         Rows = Sheet.Rows;
         if (_shown != Sheet) (_shown, _complete) = (Sheet, new());
-        _complete.Update(Sheet.Period.Days.Where(Sheet.IsComplete));
+        _complete.Update(Sheet.Period.Days.Where(day => Sheet.Day(day).IsComplete));
     }
 
     private ElementReference _grid;
@@ -156,7 +156,7 @@
 
     private IEnumerable<(DateOnly Day, int Index)> Days => Sheet.Period.Days.Select((d, i) => (d, i));
 
-    private string? DayTitle(DateOnly day) => Sheet.Day(day) switch
+    private string? DayTitle(DateOnly day) => Sheet.Info(day) switch
     {
         { Kind: DayKind.Holiday, Name: var n } => n,
         var info => DayOffLook.Label(info),
@@ -164,7 +164,7 @@
 
     private string DayCellClass(DateOnly day, int index, bool footer = false)
     {
-        var info = Sheet.Day(day);
+        var info = Sheet.Info(day);
         var classes = new List<string> { "motion-colors" }; // a day marked off fades to grey
         if (index > 0 && day.DayOfWeek == DayOfWeek.Monday) classes.Add("border-l-2 border-slate-300 dark:border-slate-600"); // week boundary
         if (!footer && info is { Kind: DayKind.Weekend or DayKind.Holiday }) classes.Add("bg-slate-50 dark:bg-slate-800/60");

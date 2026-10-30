@@ -14,8 +14,12 @@ public class UnsavedChangesTests
         Description = comment, JiraWorklogId = worklog, SyncPending = worklog is null,
     };
 
-    private static TimeEntry Draft(string key, double hours, DateOnly date) =>
-        new() { IssueKey = key, IssueSummary = key + " summary", Date = date, Duration = TimeSpan.FromHours(hours) };
+    /// <summary>Adds a row the user filled in.</summary>
+    private static void Add(PeriodSheet sheet, DateOnly day, string key, double hours)
+    {
+        var row = sheet.Day(day).AddRow(new JiraIssue(key, key + " summary"));
+        sheet.Day(day).SetHours(row, hours.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
 
     private static PeriodSheet Sheet(params TimeEntry[] entries)
     {
@@ -32,11 +36,11 @@ public class UnsavedChangesTests
         var gone = Saved("ABC-2", 2, Friday);
         var same = Saved("ABC-3", 2, Friday);
         var sheet = Sheet(moved, gone, same);
-        var friday = sheet.WorkFor(Friday);
-        friday.PickIssue(moved, moved, new JiraIssue("ABC-9", "Other"));
-        friday.SetHours(moved, moved, "5");
-        friday.Remove(gone, gone);
-        sheet.WorkFor(Monday).Drafts.Add(Draft("ABC-4", 8, Monday));
+        var friday = sheet.Day(Friday);
+        friday.PickIssue(moved, new JiraIssue("ABC-9", "Other"));
+        friday.SetHours(moved, "5");
+        friday.Remove(gone);
+        Add(sheet, Monday, "ABC-4", 8);
 
         var changes = UnsavedChanges.Of(sheet);
 
@@ -57,9 +61,9 @@ public class UnsavedChangesTests
         var gone = Saved("ABC-2", 2, Friday);
         var waiting = Saved("ABC-3", 1, Friday, worklog: null); // not in Jira yet: removing it deletes no worklog
         var sheet = Sheet(gone, waiting);
-        sheet.WorkFor(Friday).Remove(gone, gone);
-        sheet.WorkFor(Friday).Remove(waiting, waiting);
-        sheet.WorkFor(Monday).Drafts.Add(Draft("ABC-4", 8, Monday));
+        sheet.Day(Friday).Remove(gone);
+        sheet.Day(Friday).Remove(waiting);
+        Add(sheet, Monday, "ABC-4", 8);
 
         var changes = UnsavedChanges.Of(sheet);
 
@@ -73,16 +77,15 @@ public class UnsavedChangesTests
     public void A_day_that_cannot_be_saved_says_why_and_is_left_out_of_the_totals()
     {
         var sheet = Sheet();
-        var monday = sheet.WorkFor(Monday);
-        monday.Drafts.Add(Draft("", 2, Monday));
-        var tuesday = sheet.WorkFor(Tuesday);
+        Add(sheet, Monday, "", 2);
+        var tuesday = sheet.Day(Tuesday);
         var row = tuesday.AddRow(new JiraIssue("ABC-1", "Login"));
-        tuesday.SetHours(row, null, "lots");
+        tuesday.SetHours(row, "lots");
 
         var changes = UnsavedChanges.Of(sheet);
 
         Assert.Equal("Pick a Jira issue.", changes.Days[0].Problem);
-        Assert.Equal(DayChanges.BadHours, changes.Days[1].Problem);
+        Assert.Equal(DaySave.BadHours, changes.Days[1].Problem);
         Assert.Empty(changes.ToSave);
         Assert.Equal(TimeSpan.Zero, changes.After);
     }
@@ -92,8 +95,8 @@ public class UnsavedChangesTests
     {
         var entry = Saved("ABC-1", 4, Friday, comment: "Review");
         var sheet = Sheet(entry);
-        var friday = sheet.WorkFor(Friday);
-        friday.SetDescription(entry, entry, "Planning");
+        var friday = sheet.Day(Friday);
+        friday.SetDescription(entry, "Planning");
         friday.AddRow();
 
         var change = Assert.Single(UnsavedChanges.Of(sheet).Days.Single().Rows);

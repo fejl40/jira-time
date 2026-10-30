@@ -3,7 +3,7 @@
 <ul class="divide-y divide-slate-100 overflow-hidden panel sm:hidden dark:divide-slate-800" data-day-list>
     @foreach (var day in Sheet.Period.Days)
     {
-        var info = Sheet.Day(day);
+        var info = Sheet.Info(day);
         var saved = Sheet.SavedOn(day);
         var logged = TimeEntry.Total(saved);
         <li>
@@ -32,7 +32,7 @@
                         <span class="text-slate-400 dark:text-slate-500"> / @Format.Hours(exp)</span>
                     }
                 </span>
-                <span class="w-10 flex-none text-right text-xs tabular-nums text-warning">@(Sheet.Missing(day) is var m && m > TimeSpan.Zero ? $"−{Format.Hours(m)}" : "")</span>
+                <span class="w-10 flex-none text-right text-xs tabular-nums text-warning">@(Sheet.Day(day).Missing is var m && m > TimeSpan.Zero ? $"−{Format.Hours(m)}" : "")</span>
             </button>
         </li>
     }

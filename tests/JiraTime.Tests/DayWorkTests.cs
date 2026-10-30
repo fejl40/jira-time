@@ -2,14 +2,14 @@ using JiraTime.Domain;
 
 namespace JiraTime.Tests;
 
-/// <summary>One day's unsaved changes: what counts as a change, totals, rows to save, removing and row states.</summary>
+/// <summary>One day's unsaved changes on their own: edited copies, removals, new rows, suggestions and unreadable hours.</summary>
 public class DayWorkTests
 {
     internal static readonly DateOnly Day = new(2026, 10, 19);
 
     /// <summary>A row Jira has.</summary>
     internal static TimeEntry Saved(string key, double hours, string? desc = null) =>
-        new() { IssueKey = key, Date = Day, Duration = TimeSpan.FromHours(hours), Description = desc, JiraWorklogId = "1", SyncPending = false };
+        new() { IssueKey = key, IssueSummary = key + " summary", Date = Day, Duration = TimeSpan.FromHours(hours), Description = desc, JiraWorklogId = "1", SyncPending = false };
 
     /// <summary>A row the user added.</summary>
     internal static TimeEntry Draft(DayWork work, string key = "ABC-1", double hours = 0)
@@ -22,8 +22,8 @@ public class DayWorkTests
     /// <summary>A row the app suggested.</summary>
     internal static TimeEntry Suggestion(DayWork work, string key, double hours)
     {
-        var draft = Draft(work, key, hours);
-        work.Suggested.Add(draft.Id);
+        var draft = new TimeEntry { IssueKey = key, Date = Day, Duration = TimeSpan.FromHours(hours) };
+        work.AddSuggestions([draft]);
         return draft;
     }
 
@@ -33,13 +33,16 @@ public class DayWorkTests
         var a = Saved("ABC-1", 4);
         var work = new DayWork(Day);
 
-        work.Edit(a).Duration = TimeSpan.FromHours(6);
+        work.SetHours(a, a, "6");
+        var copy = work.View(a);
+        work.SetDescription(copy, a, "Pairing");
 
         Assert.Equal(TimeSpan.FromHours(4), a.Duration);
-        Assert.Equal(TimeSpan.FromHours(6), work.View(a).Duration);
+        Assert.Null(a.Description);
+        Assert.NotSame(a, copy);
+        Assert.Same(copy, work.View(a)); // one copy, made on first use
+        Assert.Equal((TimeSpan.FromHours(6), "Pairing"), (copy.Duration, copy.Description));
         Assert.True(work.IsChanged(a));
-        Assert.True(work.HasChanges([a]));
-        Assert.Same(work.Edit(a), work.Edit(a));
         Assert.Same(a, new DayWork(Day).View(a));
     }
 
@@ -48,177 +51,71 @@ public class DayWorkTests
     {
         var a = Saved("ABC-1", 4, "x");
         var work = new DayWork(Day);
-        work.Edit(a).Duration = TimeSpan.FromHours(5);
+        work.SetHours(a, a, "5");
 
-        work.Edit(a).Duration = TimeSpan.FromHours(4);
+        work.SetHours(a, a, "4");
 
-        Assert.False(work.HasChanges([a]));
+        Assert.False(work.IsChanged(a));
     }
 
     [Fact]
-    public void Removed_rows_are_left_out_of_the_rows_to_save()
-    {
-        var a = Saved("ABC-1", 4);
-        var b = Saved("ABC-2", 4);
-        var work = new DayWork(Day);
-
-        work.Removed.Add(a.Id);
-
-        Assert.True(work.HasChanges([a, b]));
-        Assert.Equal([b.Id], work.RowsToSave([a, b]).Select(r => r.Id));
-        Assert.Equal(TimeSpan.FromHours(4), work.Total([a, b]));
-    }
-
-    [Fact]
-    public void Blank_new_rows_are_no_change_and_are_not_saved()
+    public void A_new_row_is_blank_until_it_has_hours_a_comment_or_unreadable_hours()
     {
         var work = new DayWork(Day);
-        work.Drafts.Add(new TimeEntry { IssueKey = "ABC-1", Date = Day });
+        var commented = work.AddRow();
+        var unreadable = work.AddRow();
+        Assert.True(work.IsBlank(commented));
 
-        Assert.False(work.HasChanges([]));
-        Assert.Empty(work.RowsToSave([]));
+        work.SetDescription(commented, null, "Pairing");
+        work.SetHours(unreadable, null, "abc");
 
-        work.Drafts[0].Description = "Pairing";
-        Assert.True(work.HasChanges([]));
-        Assert.Single(work.RowsToSave([]));
+        Assert.False(work.IsBlank(commented));
+        Assert.False(work.IsBlank(unreadable));
+        Assert.Equal("abc", work.UnreadHours(unreadable.Id));
+        Assert.Equal([unreadable.Id], work.BadHourRows);
     }
 
     [Fact]
-    public void Unreadable_hours_count_as_a_change()
+    public void Suggestions_count_as_suggestions_until_the_user_changes_them()
     {
         var work = new DayWork(Day);
-        var draft = new TimeEntry { IssueKey = "ABC-1", Date = Day };
-        work.Drafts.Add(draft);
+        var suggestion = Suggestion(work, "ABC-1", 8);
+        Assert.True(work.IsSuggested(suggestion));
+        Assert.True(work.HasOnlySuggestedDrafts);
 
-        work.BadHours[draft.Id] = "abc";
+        work.SetDescription(suggestion, null, "Pairing");
 
-        Assert.True(work.HasChanges([]));
-        Assert.False(work.IsBlank(draft));
+        Assert.False(work.IsSuggested(suggestion));
+        Assert.False(work.HasOnlySuggestedDrafts);
     }
 
     [Fact]
-    public void Totals_use_the_edited_hours()
-    {
-        var a = Saved("ABC-1", 4);
-        var work = new DayWork(Day);
-        work.Edit(a).Duration = TimeSpan.FromHours(3);
-        work.Drafts.Add(new TimeEntry { IssueKey = "ABC-1", Date = Day, Duration = TimeSpan.FromHours(2) });
-        work.Drafts.Add(new TimeEntry { IssueKey = "ABC-2", Date = Day, Duration = TimeSpan.FromHours(1) });
-
-        Assert.Equal(TimeSpan.FromHours(6), work.Total([a]));
-        Assert.Equal(TimeSpan.FromHours(5), work.TotalFor([a], "ABC-1"));
-    }
-
-    [Fact]
-    public void Rows_to_save_are_copies()
-    {
-        var a = Saved("ABC-1", 4);
-        var work = new DayWork(Day);
-
-        work.RowsToSave([a])[0].Duration = TimeSpan.FromHours(1);
-
-        Assert.Equal(TimeSpan.FromHours(4), a.Duration);
-        Assert.Equal(TimeSpan.FromHours(4), work.View(a).Duration);
-    }
-
-    [Fact]
-    public void Untouched_suggestions_are_changes_but_not_the_users_own()
-    {
-        var work = new DayWork(Day);
-        var suggestion = new TimeEntry { IssueKey = "ABC-1", Date = Day, Duration = TimeSpan.FromHours(8) };
-        work.Drafts.Add(suggestion);
-        work.Suggested.Add(suggestion.Id);
-
-        Assert.True(work.HasChanges([]));
-        Assert.False(work.HasOwnChanges([]));
-
-        work.Touched(suggestion);
-        Assert.True(work.HasOwnChanges([]));
-    }
-
-    [Fact]
-    public void A_day_with_only_untouched_suggestions_has_only_suggestions()
+    public void A_removed_saved_row_is_more_than_suggestions()
     {
         var saved = Saved("ABC-1", 4);
         var work = new DayWork(Day);
-        Assert.True(work.HasOnlySuggestions([saved]));
+        Assert.True(work.HasOnlySuggestedDrafts);
 
-        var suggestion = new TimeEntry { IssueKey = "ABC-2", Date = Day, Duration = TimeSpan.FromHours(4) };
-        work.AddSuggestions([suggestion]);
-        Assert.True(work.HasOnlySuggestions([saved]));
+        work.Remove(saved, saved);
 
-        work.Touched(suggestion);
-        Assert.False(work.HasOnlySuggestions([saved]));
-    }
-
-    [Fact]
-    public void A_changed_or_removed_saved_row_is_more_than_suggestions()
-    {
-        var saved = Saved("ABC-1", 4);
-        var changed = new DayWork(Day);
-        changed.Edit(saved).Duration = TimeSpan.FromHours(5);
-        var removed = new DayWork(Day);
-        removed.Remove(saved, saved);
-
-        Assert.False(changed.HasOnlySuggestions([saved]));
-        Assert.False(removed.HasOnlySuggestions([saved]));
-    }
-
-    [Fact]
-    public void Rows_show_each_state()
-    {
-        var inJira = Saved("ABC-1", 1);
-        var changed = Saved("ABC-2", 1);
-        var removed = Saved("ABC-3", 1);
-        var notInJira = Saved("ABC-4", 1);
-        notInJira.SyncPending = true;
-        notInJira.SyncError = "Jira said no";
-        var work = new DayWork(Day);
-        work.Edit(changed).Duration = TimeSpan.FromHours(2);
-        work.Remove(removed, removed);
-        var added = work.AddRow();
-        work.AddSuggestions([new TimeEntry { IssueKey = "ABC-5", Date = Day, Duration = TimeSpan.FromHours(1) }]);
-
-        var rows = work.Rows([inJira, changed, removed, notInJira]);
-
-        Assert.Equal(
-            [RowState.InJira, RowState.Changed, RowState.Removed, RowState.NotInJira, RowState.New, RowState.Suggested],
-            rows.Select(r => r.State));
-        Assert.Equal(TimeSpan.FromHours(2), rows[1].Entry.Duration);
-        Assert.Same(added, rows[4].Entry);
-        Assert.Null(rows[4].Saved);
-    }
-
-    [Fact]
-    public void Jira_s_reason_shows_only_on_untouched_rows_Jira_does_not_have()
-    {
-        var notInJira = Saved("ABC-1", 1);
-        notInJira.SyncPending = true;
-        notInJira.SyncError = "Jira said no";
-        var waiting = Saved("ABC-2", 1);
-        waiting.SyncPending = true;
-        var work = new DayWork(Day);
-
-        Assert.True(work.Rows([notInJira])[0].ShowsSyncError);
-        Assert.False(work.Rows([waiting])[0].ShowsSyncError);
-
-        work.Edit(notInJira).Duration = TimeSpan.FromHours(3);
-        Assert.False(work.Rows([notInJira])[0].ShowsSyncError);
+        Assert.False(work.HasOnlySuggestedDrafts);
     }
 
     [Fact]
     public void Removing_a_saved_row_marks_it_and_restore_keeps_it()
     {
         var a = Saved("ABC-1", 4);
+        var b = Saved("ABC-2", 4);
         var work = new DayWork(Day);
 
         work.Remove(work.View(a), a);
+        work.Remove(b, b);
         Assert.True(work.IsRemoved(a));
-        Assert.Empty(work.RowsToSave([a]));
 
         work.Restore(a);
         Assert.False(work.IsRemoved(a));
-        Assert.False(work.HasChanges([a]));
+        work.RestoreAll();
+        Assert.False(work.IsRemoved(b));
     }
 
     [Fact]
@@ -233,8 +130,34 @@ public class DayWorkTests
         work.Remove(d, null);
 
         Assert.Empty(work.Drafts);
-        Assert.Empty(work.Suggested);
-        Assert.Empty(work.BadHours);
-        Assert.Empty(work.Removed);
+        Assert.False(work.IsSuggested(s));
+        Assert.Empty(work.BadHourRows);
+        Assert.Null(work.UnreadHours(d.Id));
+    }
+
+    [Fact]
+    public void Dropping_suggestions_keeps_the_users_own_rows()
+    {
+        var work = new DayWork(Day);
+        Suggestion(work, "SUG-1", 8);
+        var own = Draft(work, "OWN-1", 2);
+        var filled = new TimeEntry { IssueKey = "FIL-1", Date = Day, Duration = TimeSpan.FromHours(1) };
+        work.AddDrafts([filled]);
+
+        work.DropSuggestions();
+
+        Assert.Equal([own, filled], work.Drafts);
+        Assert.False(work.IsSuggested(filled));
+    }
+
+    [Fact]
+    public void The_new_rows_can_only_be_changed_through_the_work()
+    {
+        var work = new DayWork(Day);
+        Draft(work);
+
+        var drafts = Assert.IsAssignableFrom<ICollection<TimeEntry>>(work.Drafts);
+        Assert.True(drafts.IsReadOnly);
+        Assert.Throws<NotSupportedException>(() => drafts.Add(new TimeEntry { IssueKey = "ABC-2" }));
     }
 }

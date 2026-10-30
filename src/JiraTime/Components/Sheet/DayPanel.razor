@@ -4,7 +4,8 @@
 @inject WorkCalendarService Calendar
 
 <section class="card p-6">
-    <DayHeader Date="Day" Info="Sheet.Day(Day)" Logged="TimeEntry.Total(Saved)" Missing="Sheet.Missing(Day)" Busy="!Waits.CanStart"
+    @{ var day = Sheet.Day(Day); }
+    <DayHeader Date="Day" Info="day.Info" Logged="day.Logged" Missing="day.Missing" Busy="!Waits.CanStart"
                OnMarkOff="MarkDayOffAsync" OnUnmarkOff="UnmarkDayOffAsync" />
 
     @if (Notice is not null)
@@ -14,10 +15,8 @@
     @if (User.Connection is { } connection && Sheet.HoursKnown)
     {
         <div class="mt-4">
-            <DayEditor @ref="_editor" Date="Day" Saved="Saved" Work="Sheet.WorkFor(Day)"
-                       Choices="Choices" Comments="Extras.Comments"
-                       OnIssuePicked="key => Statuses.LookUpAsync([key])" Connection="connection" Expected="@(Sheet.Day(Day)?.Expected ?? TimeSpan.Zero)"
-                       Previous="Sheet.PreviousWorkedDay(Day)" Waits="Waits"
+            <DayEditor @ref="_editor" Day="day" Choices="Choices" Comments="Extras.Comments"
+                       OnIssuePicked="key => Statuses.LookUpAsync([key])" Connection="connection" Waits="Waits"
                        OnChanged="OnChanged" OnDiscard="DiscardAsync" />
         </div>
         <p class="hint mt-4 hidden sm:block" data-shortcuts>
@@ -45,8 +44,6 @@
 
     private DayEditor? _editor;
 
-    private IReadOnlyList<TimeEntry> Saved => Sheet.SavedOn(Day);
-
     private IssueChoices Choices => new() { Sprint = Sheet.Sprint, Earlier = Extras.Earlier, Recent = Extras.Recent, Statuses = Statuses.Known };
 
     /// <summary>Adds an empty row, for the N shortcut; null when the day can't be edited.</summary>
@@ -58,22 +55,16 @@
         return OnChanged.InvokeAsync();
     }
 
-    /// <summary>
-    /// Marks the day, or part of it, off. A whole day off marks the day's saved work removed, so Save all
-    /// deletes it from Jira. A suggestion made for the old hours no longer fits and is made again; changes
-    /// the user made are kept.
-    /// </summary>
+    /// <summary>Marks the day, or part of it, off; PeriodSheet decides what happens to the day's work.</summary>
     private async Task MarkDayOffAsync(TimeOffModal.TimeOff off)
     {
         var day = Day;
-        var onlySuggested = Sheet.HasOnlySuggestions(day);
-        var partial = off.Hours is not null;
-        if (partial && onlySuggested) Sheet.Finish(day);
         using var action = JiraAction.Start($"Time off {Format.ShortDay(day)}");
-        await Calendar.MarkDayOffAsync(day, off.Reason, off.Hours);
-        await OnReload.InvokeAsync();
-        if (!partial) Sheet.TakeOff(day);
-        else if (onlySuggested) Sheet.Restart(day);
+        await Sheet.MarkDayOffAsync(day, wholeDay: off.Hours is null, async () =>
+        {
+            await Calendar.MarkDayOffAsync(day, off.Reason, off.Hours);
+            await OnReload.InvokeAsync();
+        });
         await OnChanged.InvokeAsync();
     }
 
@@ -81,9 +72,11 @@
     {
         var day = Day;
         using var action = JiraAction.Start($"Remove time off {Format.ShortDay(day)}");
-        await Calendar.UnmarkDayOffAsync(day);
-        await OnReload.InvokeAsync();
-        Sheet.UndoTakeOff(day);
+        await Sheet.UnmarkDayOffAsync(day, async () =>
+        {
+            await Calendar.UnmarkDayOffAsync(day);
+            await OnReload.InvokeAsync();
+        });
         await OnChanged.InvokeAsync();
     }
 }

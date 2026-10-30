@@ -1,5 +1,5 @@
 @* One row of the day editor: issue, hours and comment to edit, or a removed row to undo, with its state
-   and notes (errors, Jira's reason, an issue that is Done). Edits go to the day's DayWork. *@
+   and notes (errors, Jira's reason, an issue that is Done). Edits go to the day (a SheetDay). *@
 @inject MotionScript Animations
 
 <li class="motion-colors flex flex-wrap items-center gap-2 py-2.5 @RowClass" data-row="@(Row.Removed ? "removed" : Row.IsDraft ? "draft" : "saved")" data-row-id="@E.Id">
@@ -43,7 +43,7 @@
         </span>
         <button type="button" class="btn-ghost" title="Remove" aria-label="Remove" @onclick="Remove">✕</button>
     }
-    @if (Errors.GetValueOrDefault(E.Id) is { } error)
+    @if (Day.Errors.GetValueOrDefault(E.Id) is { } error)
     {
         <span class="basis-full pl-5 text-xs text-red-700 dark:text-red-400" role="alert">@error</span>
     }
@@ -61,13 +61,11 @@
 
 @code {
     [Parameter, EditorRequired] public WorkRow Row { get; set; } = default!;
-    /// <summary>The day's unsaved changes, which the row's edits go to.</summary>
-    [Parameter, EditorRequired] public DayWork Work { get; set; } = default!;
+    /// <summary>The row's day, which the row's edits go to and which says why rows can't be saved.</summary>
+    [Parameter, EditorRequired] public SheetDay Day { get; set; } = default!;
     /// <summary>What the issue picker offers; its statuses also mark rows on Done issues.</summary>
     [Parameter, EditorRequired] public IssueChoices Choices { get; set; } = default!;
     [Parameter, EditorRequired] public Func<string, CancellationToken, Task<IReadOnlyList<JiraIssue>>> Search { get; set; } = default!;
-    /// <summary>Why rows of the day can't be saved, by row id (DayChanges.Errors).</summary>
-    [Parameter, EditorRequired] public IReadOnlyDictionary<string, string> Errors { get; set; } = default!;
     /// <summary>The row's issue was just picked: its dot pops.</summary>
     [Parameter] public bool Picked { get; set; }
     /// <summary>Raised after the row's issue was picked (and the change made).</summary>
@@ -78,23 +76,23 @@
     private TimeEntry E => Row.Entry;
 
     /// <summary>The hours as typed (kept when they can't be read) or as saved.</summary>
-    private string HoursText => Work.BadHours.TryGetValue(E.Id, out var text) ? text : Format.Hours(E.Duration);
+    private string HoursText => Day.UnreadHours(E.Id) ?? Format.Hours(E.Duration);
 
     private Task PickIssue(JiraIssue issue)
     {
-        Work.PickIssue(E, Row.Saved, issue);
+        Day.PickIssue(E, issue);
         return OnPicked.InvokeAsync(issue);
     }
 
     private Task SetHours(ChangeEventArgs ev)
     {
-        Work.SetHours(E, Row.Saved, ev.Value?.ToString());
+        Day.SetHours(E, ev.Value?.ToString());
         return OnChanged.InvokeAsync();
     }
 
     private Task SetDescription(ChangeEventArgs ev)
     {
-        Work.SetDescription(E, Row.Saved, ev.Value?.ToString());
+        Day.SetDescription(E, ev.Value?.ToString());
         return OnChanged.InvokeAsync();
     }
 
@@ -102,13 +100,13 @@
     private async Task Remove()
     {
         if (Row.IsDraft) await Animations.CollapseAsync($"[data-row-id='{E.Id}']");
-        Work.Remove(E, Row.Saved);
+        Day.Remove(E);
         await OnChanged.InvokeAsync();
     }
 
     private Task Restore()
     {
-        Work.Restore(Row.Saved!);
+        Day.Restore(E);
         return OnChanged.InvokeAsync();
     }
 

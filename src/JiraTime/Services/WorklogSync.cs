@@ -11,40 +11,67 @@ public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log, 
 {
     private readonly WorklogWriter _writer = new(jira, queue, log);
 
-    /// <summary>Outcome of <see cref="SaveDayAsync"/>.</summary>
-    /// <param name="Errors">Row id → why it is invalid; <see cref="DayError"/> for the day as a whole. Empty when saved.</param>
+    /// <summary>How saving one day went.</summary>
+    /// <param name="Errors">Row id → why it is invalid; <see cref="DaySave.DayError"/> for the day as a whole. Empty when saved.</param>
     /// <param name="SyncFailures">Changes Jira did not get (yet); they wait in the retry queue.</param>
     /// <param name="ChangedInJira">Nothing was saved because Jira's worklogs changed since the day was read.</param>
     public record DayResult(IReadOnlyDictionary<string, string> Errors, int SyncFailures, bool ChangedInJira = false)
     {
-        public const string DayError = DaySave.DayError;
         public bool Saved => Errors.Count == 0;
     }
 
     public const string ChangedInJiraMessage =
         "This day's worklogs were changed in Jira since you opened it, so nothing was saved. The day now shows Jira's version with your changes on top; check them and save again.";
 
-    /// <summary>
-    /// Makes the day's work match <paramref name="rows"/>: new rows are created in Jira, changed rows
-    /// updated, and work in <paramref name="saved"/> missing from the rows deleted. Every row is validated
-    /// first; if any is invalid, or a worklog to change was changed in Jira since it was read, nothing is written.
-    /// </summary>
-    /// <param name="saved">The day's work as it was read, which the rows were edited from.</param>
-    public Task<DayResult> SaveDayAsync(JiraConnection c, DateOnly date, IReadOnlyList<TimeEntry> rows, IReadOnlyList<TimeEntry> saved,
-        CancellationToken ct = default) =>
-        SaveAsync(c, DaySave.Plan(date, rows, saved), inJira: null, ct);
+    /// <summary>Outcome of <see cref="SaveDaysAsync"/>: how each planned day went, in the order planned.</summary>
+    public record SaveAllResult(IReadOnlyDictionary<DateOnly, DayResult> Days)
+    {
+        /// <summary>Days saved, with how each went.</summary>
+        public IReadOnlyDictionary<DateOnly, DayResult> Saved => Days.Where(d => d.Value.Saved).ToDictionary();
 
-    /// <summary>Saves a planned day.</summary>
-    /// <param name="inJira">The checked worklogs as Jira has them now, when they were read already (Save all reads every day's at once).</param>
-    private async Task<DayResult> SaveAsync(JiraConnection c, DaySave plan, WorklogsInJira? inJira, CancellationToken ct)
+        /// <summary>Days not saved because a row needs an issue or hours.</summary>
+        public IReadOnlyList<DateOnly> NeedsWork => Days.Where(d => !d.Value.Saved && !d.Value.ChangedInJira).Select(d => d.Key).Order().ToList();
+
+        /// <summary>Days not saved because their worklogs changed in Jira meanwhile.</summary>
+        public IReadOnlyList<DateOnly> ChangedInJira => Days.Where(d => d.Value.ChangedInJira).Select(d => d.Key).ToList();
+
+        /// <summary>The day to show the user, the one <see cref="Notice"/> is about; null when every day was saved.</summary>
+        public DateOnly? FirstToFix => ChangedInJira.Count > 0 ? ChangedInJira[0] : NeedsWork.Count > 0 ? NeedsWork[0] : null;
+
+        /// <summary>What to tell the user about the days not saved; null when every day was saved.</summary>
+        public string? Notice =>
+            ChangedInJira.Count > 0
+                ? $"{Count(ChangedInJira.Count)} not saved because the worklogs were changed in Jira meanwhile. Each shows Jira's version with your changes on top; check it and press Save all."
+                : NeedsWork.Count > 0
+                    ? $"{Count(NeedsWork.Count)} not saved because a row needs an issue or hours. Finish it below and press Save all."
+                    : null;
+
+        private static string Count(int n) => n == 1 ? "1 day" : $"{n} days";
+    }
+
+    /// <summary>
+    /// Saves planned days (<see cref="PeriodSheet.PlanSaveAll"/>): for each, new rows are created in Jira, changed rows
+    /// updated and removed work deleted. A day whose plan has errors is left for the user to finish. One search first
+    /// checks the worklogs of every day; a day with a worklog changed in Jira since it was read writes nothing.
+    /// </summary>
+    public async Task<SaveAllResult> SaveDaysAsync(JiraConnection c, IReadOnlyList<DaySave> plans, CancellationToken ct = default)
+    {
+        // Plans with errors have nothing to check.
+        var inJira = await ReadWorklogsAsync(c, plans.SelectMany(p => p.ToCheck).ToList(), ct);
+        var results = new Dictionary<DateOnly, DayResult>();
+        foreach (var plan in plans) results[plan.Date] = await SaveAsync(c, plan, inJira, ct);
+        return new SaveAllResult(results);
+    }
+
+    /// <summary>Saves one planned day.</summary>
+    /// <param name="inJira">The checked worklogs as Jira has them now.</param>
+    private async Task<DayResult> SaveAsync(JiraConnection c, DaySave plan, WorklogsInJira inJira, CancellationToken ct)
     {
         if (plan.Errors.Count > 0) return new DayResult(plan.Errors, 0);
-
-        inJira ??= await ReadWorklogsAsync(c, plan.ToCheck, ct);
         if (inJira.ChangedSinceRead(plan.ToCheck))
         {
             log.Refresh();
-            return new DayResult(new Dictionary<string, string> { [DayResult.DayError] = ChangedInJiraMessage }, 0, ChangedInJira: true);
+            return new DayResult(new Dictionary<string, string> { [DaySave.DayError] = ChangedInJiraMessage }, 0, ChangedInJira: true);
         }
 
         var failures = 0;
@@ -53,60 +80,6 @@ public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log, 
         foreach (var row in plan.RowsToSend(clock.GetUtcNow().UtcDateTime))
             if (await _writer.PushAsync(c, row, ct) is not null) failures++;
         return new DayResult(plan.Errors, failures);
-    }
-
-    /// <summary>Outcome of <see cref="SaveDaysAsync"/>.</summary>
-    /// <param name="Saved">Days saved, with how each went.</param>
-    /// <param name="NeedsWork">Days not saved because a row needs an issue or hours.</param>
-    /// <param name="ChangedInJira">Days not saved because their worklogs changed in Jira meanwhile.</param>
-    public record SaveAllResult(IReadOnlyDictionary<DateOnly, DayResult> Saved, IReadOnlyList<DateOnly> NeedsWork, IReadOnlyList<DateOnly> ChangedInJira)
-    {
-        /// <summary>The day to show the user, the one <see cref="Notice"/> is about; null when every day was saved.</summary>
-        public DateOnly? FirstToFix => ChangedInJira.Count > 0 ? ChangedInJira[0] : NeedsWork.Count > 0 ? NeedsWork[0] : null;
-
-        /// <summary>What to tell the user about the days not saved; null when every day was saved.</summary>
-        public string? Notice =>
-            ChangedInJira.Count > 0
-                ? $"{Days(ChangedInJira.Count)} not saved because the worklogs were changed in Jira meanwhile. Each shows Jira's version with your changes on top; check it and press Save all."
-                : NeedsWork.Count > 0
-                    ? $"{Days(NeedsWork.Count)} not saved because a row needs an issue or hours. Finish it below and press Save all."
-                    : null;
-
-        private static string Days(int n) => n == 1 ? "1 day" : $"{n} days";
-    }
-
-    /// <summary>
-    /// Saves every day of the sheet with unsaved changes, each as <see cref="SaveDayAsync"/> does, but with one
-    /// changed-in-Jira check for all days. Days with hours that can't be read are left for the user to finish.
-    /// The sheet itself is not changed.
-    /// </summary>
-    public async Task<SaveAllResult> SaveDaysAsync(JiraConnection c, PeriodSheet sheet, CancellationToken ct = default)
-    {
-        var plans = new Dictionary<DateOnly, DaySave>();
-        var needsWork = new List<DateOnly>();
-        foreach (var day in sheet.UnsavedDays)
-        {
-            var work = sheet.WorkFor(day);
-            var before = sheet.SavedOn(day);
-            if (work.BadHours.Count == 0) plans[day] = DaySave.Plan(day, work.RowsToSave(before), before);
-            else needsWork.Add(day);
-        }
-
-        // One search checks the worklogs of every day before any day is written.
-        var toCheck = plans.Values.Where(p => p.Errors.Count == 0).SelectMany(p => p.ToCheck).ToList();
-        var inJira = await ReadWorklogsAsync(c, toCheck, ct);
-
-        var saved = new Dictionary<DateOnly, DayResult>();
-        var changedInJira = new List<DateOnly>();
-        foreach (var (day, plan) in plans)
-        {
-            var result = await SaveAsync(c, plan, inJira, ct);
-            if (result.Saved) saved[day] = result;
-            else if (result.ChangedInJira) changedInJira.Add(day);
-            else needsWork.Add(day);
-        }
-        needsWork.Sort();
-        return new SaveAllResult(saved, needsWork, changedInJira);
     }
 
     /// <summary>

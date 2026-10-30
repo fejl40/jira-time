@@ -94,9 +94,15 @@ public sealed class TimeHarness : IDisposable
     /// <summary>The day's work as the timesheet reads it.</summary>
     public async Task<IReadOnlyList<TimeEntry>> DayAsync(DateOnly day) => (await Log.GetRangeAsync(day, day)).Entries;
 
-    /// <summary>Saves the day the way the timesheet does: rows edited from what was read.</summary>
-    public async Task<WorklogSync.DayResult> SaveDayAsync(DateOnly day, IReadOnlyList<TimeEntry> rows, IReadOnlyList<TimeEntry>? saved = null) =>
-        await Sync.SaveDayAsync(Connection, day, rows, saved ?? await DayAsync(day));
+    /// <summary>
+    /// Saves one day the way Save all does: <paramref name="rows"/> edited from what was read (<paramref name="saved"/>,
+    /// read now when not given) are planned and sent to Jira.
+    /// </summary>
+    public async Task<WorklogSync.DayResult> SaveDayAsync(DateOnly day, IReadOnlyList<TimeEntry> rows, IReadOnlyList<TimeEntry>? saved = null)
+    {
+        var plan = DaySave.Plan(day, rows, saved ?? await DayAsync(day));
+        return (await Sync.SaveDaysAsync(Connection, [plan])).Days[day];
+    }
 
     /// <summary>Editable copies of the day's work.</summary>
     public async Task<List<TimeEntry>> CopiesAsync(DateOnly day) => (await DayAsync(day)).Select(e => e.Copy()).ToList();

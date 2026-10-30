@@ -7,7 +7,7 @@ namespace JiraTime.Services;
 /// Writes one entry's worklog to Jira, or deletes it. What Jira can't take waits in the retry queue
 /// with the reason; once Jira has it, it leaves the queue. Used by <see cref="WorklogSync"/>.
 /// </summary>
-public class WorklogWriter(JiraWorklogClient jira, RetryQueue queue, TimeLog log)
+internal sealed class WorklogWriter(JiraWorklogClient jira, RetryQueue queue, TimeLog log)
 {
     /// <summary>
     /// Sends the entry's current state to Jira. When Jira has it, any queued copy is dropped; otherwise the

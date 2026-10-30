@@ -1,13 +1,13 @@
 @* One day's work as editable rows. Nothing is written until Save all (in the period header), which
-   updates Jira. The unsaved changes live in a DayWork owned by the page, so they survive picking another
-   day. Rows that can't be saved say why as soon as the change is made. *@
+   updates Jira. The day (a SheetDay) keeps its unsaved changes in the page's PeriodSheet, so they survive
+   picking another day. Rows that can't be saved say why as soon as the change is made. *@
 @inject JiraClient Jira
 
 <div>
     <ul class="waiting-dim divide-y divide-slate-100 dark:divide-slate-800" aria-busy="@JiraWaits.Aria(Waits.DayPending)" data-day-rows>
         @foreach (var row in Rows)
         {
-            <DayRow @key="row.Entry.Id" Row="row" Work="Work" Choices="Choices" Search="Search" Errors="Errors" Picked="row.Entry.Id == _picked"
+            <DayRow @key="row.Entry.Id" Row="row" Day="Day" Choices="Choices" Search="Search" Picked="row.Entry.Id == _picked"
                     OnPicked="issue => PickedAsync(row, issue)" OnChanged="Changed" />
         }
         @if (Rows.Count == 0)
@@ -36,15 +36,15 @@
         {
             <button type="button" class="btn-ghost" @onclick="FillRest">Fill the rest (@Format.Hours(Expected - Total) h)</button>
         }
-        @if (Previous is { } previous)
+        @if (Day.PreviousWorkedDay is { } previous)
         {
             <button type="button" class="btn-ghost" data-copy-previous
                     title="Same issues and split as @Format.Day(previous.Date), scaled to the hours missing"
-                    @onclick="CopyPrevious">Copy @Format.ShortDay(previous.Date)</button>
+                    @onclick="() => CopyDay(previous.Rows)">Copy @Format.ShortDay(previous.Date)</button>
         }
     </div>
 
-    @if (Errors.GetValueOrDefault(DaySave.DayError) is { } dayError)
+    @if (Day.Errors.GetValueOrDefault(DaySave.DayError) is { } dayError)
     {
         <div class="alert-error" role="alert">@dayError</div>
     }
@@ -57,7 +57,7 @@
                 <span class="text-muted"> of @Format.Hours(Expected) h</span>
             }
         </span>
-        @if (HasChanges)
+        @if (Day.HasChanges)
         {
             <span class="text-xs text-unsaved" title="Save all in the period header saves every changed day">Unsaved changes</span>
             <button type="button" class="btn-secondary ml-auto" disabled="@(!Waits.CanStart)" @onclick="ResetAsync">Discard changes</button>
@@ -66,11 +66,8 @@
 </div>
 
 @code {
-    [Parameter, EditorRequired] public DateOnly Date { get; set; }
-    /// <summary>The day's saved entries.</summary>
-    [Parameter, EditorRequired] public IReadOnlyList<TimeEntry> Saved { get; set; } = [];
-    /// <summary>The day's unsaved changes. Owned by the page, so the grid shows them and they outlive this editor.</summary>
-    [Parameter, EditorRequired] public DayWork Work { get; set; } = default!;
+    /// <summary>The day to edit: its hours, saved rows and unsaved changes (kept in the page's sheet, so the grid shows them and they outlive this editor).</summary>
+    [Parameter, EditorRequired] public SheetDay Day { get; set; } = default!;
     /// <summary>What the issue picker offers (sprint, earlier this period, recent); its statuses mark rows on Done issues.</summary>
     [Parameter, EditorRequired] public IssueChoices Choices { get; set; } = default!;
     /// <summary>Recent comments per issue key, newest first.</summary>
@@ -80,10 +77,6 @@
     [Parameter, EditorRequired] public JiraConnection Connection { get; set; } = default!;
     /// <summary>Requests to Jira that are running: the rows are pending and Discard changes waits for them.</summary>
     [Parameter, EditorRequired] public JiraWaits Waits { get; set; } = default!;
-    /// <summary>Hours the day should have (zero on weekends, holidays and days off).</summary>
-    [Parameter] public TimeSpan Expected { get; set; }
-    /// <summary>The latest earlier day with work, offered to copy.</summary>
-    [Parameter] public (DateOnly Date, IReadOnlyList<TimeEntry> Rows)? Previous { get; set; }
     /// <summary>Raised after rows were added, edited or removed.</summary>
     [Parameter] public EventCallback OnChanged { get; set; }
     /// <summary>Raised when the user discards the unsaved changes.</summary>
@@ -91,7 +84,7 @@
 
     private DateOnly? _loadedDate;
 
-    private IReadOnlyList<WorkRow> Rows => Work.Rows(Saved);
+    private IReadOnlyList<WorkRow> Rows => Day.Rows;
 
     /// <summary>Issues on the day's rows, each once, for their recent comments.</summary>
     private IEnumerable<string> RowIssues => Rows.Select(r => r.Entry.IssueKey).Where(k => k != "").Distinct();
@@ -102,17 +95,15 @@
         return await Jira.SearchIssuesAsync(Connection, query, ct);
     }
 
-    private TimeSpan Total => Work.Total(Saved);
+    private TimeSpan Total => Day.Total;
 
-    private bool HasChanges => Work.HasChanges(Saved);
-
-    /// <summary>Why rows can't be saved, by row id; Save all leaves such a day unsaved.</summary>
-    private IReadOnlyDictionary<string, string> Errors => DayChanges.Errors(Work, Saved);
+    /// <summary>Hours the day should have (zero on weekends, holidays and days off).</summary>
+    private TimeSpan Expected => Day.Expected;
 
     protected override void OnParametersSet()
     {
-        if (_loadedDate == Date) return;
-        _loadedDate = Date;
+        if (_loadedDate == Day.Date) return;
+        _loadedDate = Day.Date;
         _picked = null;
     }
 
@@ -131,21 +122,20 @@
     /// <summary>Adds an empty row, optionally on an issue. Returns it so the caller can focus it.</summary>
     public async Task<TimeEntry> AddRowAsync(JiraIssue? issue = null)
     {
-        var draft = Work.AddRow(issue);
+        var draft = Day.AddRow(issue);
         await Changed();
         return draft;
     }
 
     private Task FillRest()
     {
-        Work.FillRest(Saved, Expected, Choices.Sprint);
+        Day.FillRest();
         return Changed();
     }
 
-    private Task CopyPrevious()
+    private Task CopyDay(IReadOnlyList<TimeEntry> previous)
     {
-        if (Previous is not { } previous) return Task.CompletedTask;
-        Work.CopyDay(Saved, Expected, previous.Rows);
+        Day.CopyDay(previous);
         return Changed();
     }
 

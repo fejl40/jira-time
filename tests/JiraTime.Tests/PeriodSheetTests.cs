@@ -2,6 +2,7 @@ using JiraTime.Domain;
 
 namespace JiraTime.Tests;
 
+/// <summary>A period being worked on: missing hours, suggestions, unsaved days and totals, grid rows and days off.</summary>
 public class PeriodSheetTests
 {
     // Fri 16 Oct .. Sat 31 Oct 2026; today is Tue 20 Oct.
@@ -15,25 +16,37 @@ public class PeriodSheetTests
         JiraWorklogId = worklog, SyncPending = worklog is null,
     };
 
+    private static Dictionary<DateOnly, DayInfo> Days(params DayOff[] off) =>
+        Period.Days.ToDictionary(d => d, d => DayInfo.For(d, off.ToDictionary(o => o.Date)));
+
     private static PeriodSheet Sheet(params TimeEntry[] entries)
     {
         var sheet = new PeriodSheet(Period, () => Tuesday) { Sprint = [Doing] };
-        var days = Period.Days.ToDictionary(d => d, d => DayInfo.For(d, new Dictionary<DateOnly, DayOff>()));
-        sheet.Load(entries, [], days);
+        sheet.Load(entries, [], Days());
         return sheet;
     }
 
     private static string Show(IEnumerable<TimeEntry> rows) => string.Join(", ", rows.Select(r => $"{r.IssueKey} {r.Duration.TotalHours}h"));
+
+    /// <summary>The day's new rows (suggested or added).</summary>
+    private static string Drafts(PeriodSheet sheet, DateOnly day) => Show(sheet.Day(day).Rows.Where(r => r.IsDraft).Select(r => r.Entry));
+
+    private static TimeEntry Add(PeriodSheet sheet, DateOnly day, string key, double hours)
+    {
+        var row = sheet.Day(day).AddRow(new JiraIssue(key, ""));
+        sheet.Day(day).SetHours(row, hours.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        return row;
+    }
 
     [Fact]
     public void Missing_hours_count_up_to_today_only()
     {
         var sheet = Sheet(Saved("XYZ-1", 8, Friday), Saved("XYZ-2", 2, Monday));
 
-        Assert.Equal(TimeSpan.Zero, sheet.Missing(Friday));
-        Assert.Equal(TimeSpan.FromHours(6), sheet.Missing(Monday));
-        Assert.Equal(TimeSpan.FromHours(8), sheet.Missing(Tuesday));
-        Assert.Equal(TimeSpan.Zero, sheet.Missing(Wednesday));
+        Assert.Equal(TimeSpan.Zero, sheet.Day(Friday).Missing);
+        Assert.Equal(TimeSpan.FromHours(6), sheet.Day(Monday).Missing);
+        Assert.Equal(TimeSpan.FromHours(8), sheet.Day(Tuesday).Missing);
+        Assert.Equal(TimeSpan.Zero, sheet.Day(Wednesday).Missing);
         Assert.False(sheet.CanFill(Wednesday));
     }
 
@@ -45,8 +58,8 @@ public class PeriodSheetTests
         sheet.FillPeriod();
 
         Assert.Equal([Monday, Tuesday], sheet.UnsavedDays);
-        Assert.Equal("XYZ-2 6h", Show(sheet.WorkFor(Monday).Drafts));  // partly logged: the rest on its issue
-        Assert.Equal("XYZ-2 8h", Show(sheet.WorkFor(Tuesday).Drafts)); // copies Monday as it will be
+        Assert.Equal("XYZ-2 6h", Drafts(sheet, Monday));  // partly logged: the rest on its issue
+        Assert.Equal("XYZ-2 8h", Drafts(sheet, Tuesday)); // copies Monday as it will be
         Assert.Empty(sheet.OwnChangeDays); // untouched suggestions are not the user's changes
     }
 
@@ -68,8 +81,8 @@ public class PeriodSheetTests
     public void Rows_list_each_issue_once_with_unsaved_issues_and_the_empty_issue_last()
     {
         var sheet = Sheet(Saved("XYZ-2", 4, Friday), Saved("abc-9", 4, Friday));
-        sheet.WorkFor(Monday).Drafts.Add(new TimeEntry { IssueKey = "DEF-1", Date = Monday, Duration = TimeSpan.FromHours(1) });
-        sheet.WorkFor(Monday).Drafts.Add(new TimeEntry { IssueKey = "", Date = Monday, Duration = TimeSpan.FromHours(1) });
+        Add(sheet, Monday, "DEF-1", 1);
+        Add(sheet, Monday, "", 1);
 
         Assert.Equal(["abc-9", "DEF-1", "XYZ-2", ""], sheet.Rows.Select(r => r.Key));
         Assert.Empty(sheet.Rows.Single(r => r.Key == "DEF-1").Entries); // only saved entries count as the row's entries
@@ -81,13 +94,27 @@ public class PeriodSheetTests
         var keep = Saved("XYZ-1", 4, Friday);
         var gone = Saved("XYZ-2", 4, Friday);
         var sheet = Sheet(keep, gone);
-        sheet.WorkFor(Friday).Removed.Add(gone.Id);
-        sheet.WorkFor(Monday).Drafts.Add(new TimeEntry { IssueKey = "ABC-1", Date = Monday, Duration = TimeSpan.FromHours(8) });
+        sheet.Day(Friday).Remove(gone);
+        Add(sheet, Monday, "ABC-1", 8);
 
         Assert.Equal(TimeSpan.FromHours(12), sheet.UnsavedTotal);
         Assert.Equal(TimeSpan.Zero, sheet.UnsavedFor(Friday, "XYZ-2"));
         Assert.Null(sheet.UnsavedFor(Friday, "XYZ-1")); // unchanged
         Assert.Equal(TimeSpan.FromHours(8), sheet.UnsavedFor(Monday, "ABC-1"));
+        Assert.Null(sheet.UnsavedFor(Tuesday, "ABC-1")); // no changes
+    }
+
+    [Fact]
+    public void Every_day_object_reads_the_same_unsaved_changes_and_reading_leaves_nothing_behind()
+    {
+        var sheet = Sheet();
+        var shown = sheet.Day(Wednesday);
+        Assert.Empty(sheet.Rows);
+
+        Add(sheet, Wednesday, "ABC-1", 2);
+
+        Assert.Equal(TimeSpan.FromHours(2), shown.Total);
+        Assert.Equal([Wednesday], sheet.UnsavedDays);
     }
 
     [Fact]
@@ -104,53 +131,38 @@ public class PeriodSheetTests
     }
 
     [Fact]
-    public void Only_suggestions_means_no_edit_removal_or_own_row()
-    {
-        var saved = Saved("XYZ-1", 2, Monday);
-        var sheet = Sheet(saved);
-        Assert.True(sheet.HasOnlySuggestions(Monday));
-
-        sheet.Suggest(Monday);
-        Assert.True(sheet.HasOnlySuggestions(Monday));
-
-        sheet.WorkFor(Monday).Edit(saved).Duration = TimeSpan.FromHours(3);
-        Assert.False(sheet.HasOnlySuggestions(Monday));
-    }
-
-    [Fact]
-    public void Rows_before_the_period_come_from_the_earlier_entries()
+    public void The_previous_worked_day_comes_from_the_earlier_entries_before_the_period()
     {
         var sheet = new PeriodSheet(Period, () => Tuesday);
         var thursday = new DateOnly(2026, 10, 15);
         sheet.Load([], [Saved("OLD-1", 8, thursday)], new Dictionary<DateOnly, DayInfo>());
 
-        Assert.Equal("OLD-1 8h", Show(sheet.RowsOn(thursday)));
-        Assert.Equal(thursday, sheet.PreviousWorkedDay(Monday)?.Date);
+        var previous = sheet.PreviousWorkedDay(Monday);
+
+        Assert.Equal(thursday, previous?.Date);
+        Assert.Equal("OLD-1 8h", Show(previous!.Value.Rows));
     }
 
     [Fact]
     public void Progress_is_the_share_of_the_day_saved()
     {
         var sheet = Sheet(Saved("XYZ-1", 8, Friday), Saved("XYZ-2", 2, Monday), Saved("XYZ-3", 9, Tuesday));
-        var saturday = new DateOnly(2026, 10, 17);
+        var saturday = sheet.Day(new DateOnly(2026, 10, 17));
+        Add(sheet, Monday, "XYZ-4", 6); // unsaved hours don't count
 
-        Assert.Equal(1, sheet.Progress(Friday));
-        Assert.Equal(0.25, sheet.Progress(Monday));
-        Assert.Equal(1, sheet.Progress(Tuesday)); // more than needed is still full
-        Assert.Equal(0, sheet.Progress(saturday));
-        Assert.True(sheet.IsComplete(Friday));
-        Assert.False(sheet.IsComplete(Monday));
-        Assert.False(sheet.IsComplete(saturday));
+        Assert.Equal((1d, true), (sheet.Day(Friday).Progress, sheet.Day(Friday).IsComplete));
+        Assert.Equal((0.25, false), (sheet.Day(Monday).Progress, sheet.Day(Monday).IsComplete));
+        Assert.Equal(1, sheet.Day(Tuesday).Progress); // more than needed is still full
+        Assert.Equal((0d, false), (saturday.Progress, saturday.IsComplete));
     }
 
     [Fact]
     public void Without_Jira_hours_are_unknown_so_nothing_is_missing_or_suggested()
     {
         var sheet = new PeriodSheet(Period, () => Tuesday) { Sprint = [Doing] };
-        var days = Period.Days.ToDictionary(d => d, d => DayInfo.For(d, new Dictionary<DateOnly, DayOff>()));
-        sheet.Load([], [], days, hoursKnown: false);
+        sheet.Load([], [], Days(), hoursKnown: false);
 
-        Assert.Equal(TimeSpan.Zero, sheet.Missing(Monday));
+        Assert.Equal(TimeSpan.Zero, sheet.Day(Monday).Missing);
         Assert.False(sheet.CanFill(Monday));
         sheet.FillPeriod();
         Assert.Empty(sheet.UnsavedDays);
@@ -167,32 +179,69 @@ public class PeriodSheetTests
         Assert.Empty(row.On(Monday.AddDays(2)));
     }
 
-    [Fact]
-    public void Taking_a_whole_day_off_marks_its_saved_work_removed_and_keeps_added_rows()
+    private static Func<Task> Reload(PeriodSheet sheet, TimeEntry[] entries, params DayOff[] off) => () =>
     {
-        var sheet = Sheet(Saved("XYZ-1", 6, Monday), Saved("XYZ-2", 2, Monday));
-        var added = sheet.WorkFor(Monday).AddRow(new JiraIssue("XYZ-3", ""));
+        sheet.Load(entries, [], Days(off));
+        return Task.CompletedTask;
+    };
 
-        sheet.TakeOff(Monday);
+    private static DayOff HoursOff(double hours) => new() { Date = Monday, Hours = TimeSpan.FromHours(hours) };
 
-        var work = sheet.WorkFor(Monday);
-        Assert.Equal(2, work.Removed.Count);
-        Assert.Contains(added, work.Drafts);
-        Assert.Contains(Monday, sheet.UnsavedDays); // Save day deletes the worklogs
+    [Fact]
+    public async Task Part_of_a_day_off_remakes_an_untouched_suggestion_for_the_new_hours()
+    {
+        TimeEntry[] saved = [Saved("XYZ-1", 2, Monday)];
+        var sheet = Sheet(saved);
+        sheet.Suggest(Monday);
+        Assert.Equal("XYZ-1 6h", Drafts(sheet, Monday));
+        var reload = Reload(sheet, saved, HoursOff(4));
+
+        await sheet.MarkDayOffAsync(Monday, wholeDay: false, async () =>
+        {
+            Assert.Equal("", Drafts(sheet, Monday)); // the old suggestion doesn't show meanwhile
+            await reload();
+        });
+
+        Assert.Equal("XYZ-1 2h", Drafts(sheet, Monday));
     }
 
     [Fact]
-    public void Taking_a_day_off_drops_suggestions_and_undoing_it_brings_the_work_back()
+    public async Task Part_of_a_day_off_keeps_the_users_own_rows()
     {
-        var sheet = Sheet(Saved("XYZ-1", 2, Monday));
+        TimeEntry[] saved = [Saved("XYZ-1", 2, Monday)];
+        var sheet = Sheet(saved);
+        Add(sheet, Monday, "ABC-1", 6);
+
+        await sheet.MarkDayOffAsync(Monday, wholeDay: false, Reload(sheet, saved, HoursOff(4)));
+
+        Assert.Equal("ABC-1 6h", Drafts(sheet, Monday));
+    }
+
+    [Fact]
+    public async Task A_whole_day_off_marks_saved_work_removed_drops_suggestions_and_keeps_added_rows()
+    {
+        TimeEntry[] saved = [Saved("XYZ-1", 2, Monday), Saved("XYZ-2", 1, Monday)];
+        var sheet = Sheet(saved);
         sheet.Suggest(Monday);
-        Assert.NotEmpty(sheet.WorkFor(Monday).Drafts);
+        Add(sheet, Monday, "XYZ-3", 1);
 
-        sheet.TakeOff(Monday);
-        Assert.Empty(sheet.WorkFor(Monday).Drafts);
+        await sheet.MarkDayOffAsync(Monday, wholeDay: true, Reload(sheet, saved, new DayOff { Date = Monday }));
 
-        sheet.UndoTakeOff(Monday);
-        Assert.Empty(sheet.WorkFor(Monday).Removed);
-        Assert.Equal("XYZ-1 6h", Show(sheet.WorkFor(Monday).Drafts)); // suggested again
+        Assert.Equal([RowState.Removed, RowState.Removed, RowState.New], sheet.Day(Monday).Rows.Select(r => r.State));
+        Assert.Contains(Monday, sheet.UnsavedDays); // Save all deletes the worklogs
+    }
+
+    [Fact]
+    public async Task Undoing_a_day_off_brings_the_work_back_and_suggests_the_day_again()
+    {
+        TimeEntry[] saved = [Saved("XYZ-1", 2, Monday)];
+        var sheet = Sheet(saved);
+        sheet.Suggest(Monday);
+        await sheet.MarkDayOffAsync(Monday, wholeDay: true, Reload(sheet, saved, new DayOff { Date = Monday }));
+
+        await sheet.UnmarkDayOffAsync(Monday, Reload(sheet, saved));
+
+        Assert.Equal([RowState.InJira, RowState.Suggested], sheet.Day(Monday).Rows.Select(r => r.State));
+        Assert.Equal("XYZ-1 6h", Drafts(sheet, Monday));
     }
 }

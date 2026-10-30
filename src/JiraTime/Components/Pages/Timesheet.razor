@@ -159,7 +159,7 @@ else
         WorklogSync.SaveAllResult? result = null;
         await _waits.RunAsync(JiraWait.SaveAll, async () =>
         {
-            result = await Sync.SaveDaysAsync(c, Sheet);
+            result = await Sync.SaveDaysAsync(c, Sheet.PlanSaveAll());
             foreach (var (savedDay, dayResult) in result.Saved) Saved(savedDay, dayResult);
             if (_saveMotion.JustSaved.Contains(_selectedDay)) await Animations.CollapseAsync(MotionScript.RemovedRows);
             await ReloadAsync();

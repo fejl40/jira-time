@@ -8,9 +8,8 @@ public sealed record PeriodRow(string Key, string Summary, IReadOnlyList<TimeEnt
 }
 
 /// <summary>
-/// One timesheet period as the user works on it: the saved entries and days, plus unsaved changes per
-/// day (edits, removals, suggestions and added issues) until they are saved or discarded. Pure logic:
-/// the page loads the data and saves the days.
+/// One timesheet period as the user works on it: saved entries and days, plus each day's unsaved changes (read and
+/// edited through <see cref="Day"/>) until they are saved or discarded. Pure logic: the page loads and saves.
 /// </summary>
 public sealed class PeriodSheet(Period period, Func<DateOnly> today)
 {
@@ -29,83 +28,49 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
     /// <summary>The user's sprint issues, used to guess the issue of a suggestion.</summary>
     public IReadOnlyList<IssueWithStatus> Sprint { get; set; } = [];
 
-    /// <summary>
-    /// False when Jira couldn't be read, so <see cref="Entries"/> is only the work waiting for Jira: hours
-    /// are then unknown, so nothing counts as missing and nothing is suggested.
-    /// </summary>
+    /// <summary>False when Jira couldn't be read: <see cref="Entries"/> is then only the work waiting for Jira, so nothing counts as missing or is suggested.</summary>
     public bool HoursKnown { get; private set; } = true;
 
     /// <summary>Takes freshly loaded saved data. Unsaved changes are kept.</summary>
-    public void Load(IReadOnlyList<TimeEntry> entries, IReadOnlyList<TimeEntry> before, IReadOnlyDictionary<DateOnly, DayInfo> days, bool hoursKnown = true)
-    {
-        Entries = entries;
-        Before = before;
-        Days = days;
-        HoursKnown = hoursKnown;
-    }
+    public void Load(IReadOnlyList<TimeEntry> entries, IReadOnlyList<TimeEntry> before, IReadOnlyDictionary<DateOnly, DayInfo> days, bool hoursKnown = true) =>
+        (Entries, Before, Days, HoursKnown) = (entries, before, days, hoursKnown);
 
     public PeriodSummary Summary => PeriodSummary.For(Period, Days, Entries, Today);
-
-    public DayInfo? Day(DateOnly day) => Days.GetValueOrDefault(day);
-
+    /// <summary>The day's kind and hours; null for a day that wasn't loaded.</summary>
+    public DayInfo? Info(DateOnly day) => Days.GetValueOrDefault(day);
     public IReadOnlyList<TimeEntry> SavedOn(DateOnly day) => Entries.Where(e => e.Date == day).ToList();
-
-    /// <summary>Hours missing on a day; only counted up to today.</summary>
-    public TimeSpan Missing(DateOnly day) =>
-        !HoursKnown || day > Today || !Days.TryGetValue(day, out var info) ? TimeSpan.Zero : info.MissingWith(TimeEntry.Total(SavedOn(day)));
-
-    /// <summary>Saved hours as a share of the hours the day needs, from 0 to 1; 0 on days that need none.</summary>
-    public double Progress(DateOnly day) =>
-        Days.GetValueOrDefault(day) is { Expected: var expected } && expected > TimeSpan.Zero
-            ? Math.Min(1, TimeEntry.Total(SavedOn(day)) / expected)
-            : 0;
-
-    /// <summary>A day that needs hours and has them all saved.</summary>
-    public bool IsComplete(DateOnly day) => Days.GetValueOrDefault(day) is { Expected.Ticks: > 0 } && Progress(day) >= 1;
-
     /// <summary>Only workdays up to today with hours missing can be filled.</summary>
-    public bool CanFill(DateOnly day) => day <= Today && Missing(day) > TimeSpan.Zero;
+    public bool CanFill(DateOnly day) => Day(day).Missing > TimeSpan.Zero;
 
-    // ---- Unsaved work ----
+    /// <summary>The day with its saved rows and unsaved changes, to read and edit.</summary>
+    public SheetDay Day(DateOnly day) => new(this, day);
+    internal DayWork? WorkOn(DateOnly day) => _work.GetValueOrDefault(day);
+    internal DayWork WorkToChange(DateOnly day) => _work.TryGetValue(day, out var w) ? w : _work[day] = new DayWork(day);
 
-    /// <summary>The day's unsaved changes, made on first use.</summary>
-    public DayWork WorkFor(DateOnly day) => _work.TryGetValue(day, out var w) ? w : _work[day] = new DayWork(day);
+    /// <summary>Days with unsaved work of any kind.</summary>
+    private IEnumerable<SheetDay> Edited => _work.Keys.Select(Day);
 
     /// <summary>Days with changes that are not saved, in order.</summary>
-    public IReadOnlyList<DateOnly> UnsavedDays =>
-        _work.Where(w => w.Value.HasChanges(SavedOn(w.Key))).Select(w => w.Key).Order().ToList();
-
-    public bool IsUnsaved(DateOnly day) => _work.TryGetValue(day, out var w) && w.HasChanges(SavedOn(day));
-
+    public IReadOnlyList<DateOnly> UnsavedDays => Edited.Where(d => d.HasChanges).Select(d => d.Date).Order().ToList();
+    public bool IsUnsaved(DateOnly day) => Day(day).HasChanges;
     /// <summary>Days with changes the user made (untouched suggestions don't count).</summary>
-    public IReadOnlyList<DateOnly> OwnChangeDays =>
-        _work.Where(w => w.Value.HasOwnChanges(SavedOn(w.Key))).Select(w => w.Key).ToList();
-
+    public IReadOnlyList<DateOnly> OwnChangeDays => Edited.Where(d => d.HasOwnChanges).Select(d => d.Date).ToList();
     /// <summary>Hours the unsaved days will have once saved.</summary>
-    public TimeSpan UnsavedTotal => UnsavedDays.Select(UnsavedDayTotal).Sum();
-
-    /// <summary>Hours a day will have once its changes are saved.</summary>
-    public TimeSpan UnsavedDayTotal(DateOnly day) => WorkFor(day).Total(SavedOn(day));
-
+    public TimeSpan UnsavedTotal => UnsavedDays.Select(day => Day(day).Total).Sum();
     /// <summary>Hours an issue will have on a day once saved, when the day has unsaved changes for it; otherwise null.</summary>
-    public TimeSpan? UnsavedFor(DateOnly day, string issueKey)
-    {
-        if (!_work.TryGetValue(day, out var work)) return null;
-        var saved = SavedOn(day);
-        if (!work.HasChanges(saved)) return null;
-        var after = work.TotalFor(saved, issueKey);
-        return after == TimeEntry.Total(saved.Where(e => e.IssueKey == issueKey)) ? null : after;
-    }
+    public TimeSpan? UnsavedFor(DateOnly day, string issueKey) => Day(day).UnsavedFor(issueKey);
+
+    /// <summary>What Save all sends: a save plan for every unsaved day, in order. A day that can't be saved has errors.</summary>
+    public IReadOnlyList<DaySave> PlanSaveAll() => UnsavedDays.Select(day => Day(day).Plan()).ToList();
 
     /// <summary>One row per issue with saved or unsaved time in the period; issues by key, a row without an issue last.</summary>
     public IReadOnlyList<PeriodRow> Rows
     {
         get
         {
-            var unsaved = _work.Values.SelectMany(w => w.RowsToSave(SavedOn(w.Date))).ToList();
-            var keys = Entries.Concat(unsaved).Select(e => e.IssueKey).Distinct();
-            var rows = keys.Select(key => RowOf(key, unsaved));
-            return rows.OrderBy(r => r.Key == "").ThenBy(r => r.Key, StringComparer.OrdinalIgnoreCase).ToList();
+            var unsaved = Edited.SelectMany(d => d.RowsToSave).ToList();
+            var keys = Entries.Concat(unsaved).Select(e => e.IssueKey).Distinct().OrderBy(k => k == "").ThenBy(k => k, StringComparer.OrdinalIgnoreCase);
+            return keys.Select(key => RowOf(key, unsaved)).ToList();
         }
     }
 
@@ -117,27 +82,21 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
         return new PeriodRow(key, named.IssueSummary, saved);
     }
 
-    /// <summary>
-    /// Puts a suggestion for the missing hours on a short workday, unless the day has unsaved changes or
-    /// the user saved or discarded it.
-    /// </summary>
+    /// <summary>The latest day before this one with work, to copy: its rows as they will be once saved (suggestions too).</summary>
+    public (DateOnly Date, IReadOnlyList<TimeEntry> Rows)? PreviousWorkedDay(DateOnly day) =>
+        DayFiller.PreviousWorkedDay(day, d => Period.Contains(d) ? Day(d).RowsToSave : Before.Where(e => e.Date == d).ToList());
+
+    /// <summary>Suggests the missing hours of a short workday, unless the day has unsaved changes or the user saved or discarded it.</summary>
     public void Suggest(DateOnly day)
     {
-        if (!CanFill(day) || _finished.Contains(day) || !Days.TryGetValue(day, out var info)) return;
-        var work = WorkFor(day);
-        if (work.HasChanges(SavedOn(day)) || work.Drafts.Count > 0) return;
-        var drafts = DayFiller.Propose(info, SavedOn(day), Sprint, PreviousWorkedDay(day)?.Rows);
-        work.AddSuggestions(drafts);
+        if (CanFill(day) && !_finished.Contains(day)) Day(day).Suggest();
     }
 
     /// <summary>Suggests work for every short workday so far, including days saved or discarded before.</summary>
     public void FillPeriod()
     {
-        foreach (var day in Period.Days)
-        {
-            _finished.Remove(day);
-            Suggest(day);
-        }
+        _finished.ExceptWith(Period.Days);
+        foreach (var day in Period.Days) Suggest(day);
     }
 
     /// <summary>The day was saved or its changes discarded: drop them and don't suggest the day again.</summary>
@@ -160,40 +119,32 @@ public sealed class PeriodSheet(Period period, Func<DateOnly> today)
         Suggest(day);
     }
 
-    /// <summary>The whole day was marked off: its saved work is marked removed, to delete from Jira on save.</summary>
-    public void TakeOff(DateOnly day)
-    {
-        _finished.Remove(day);
-        WorkFor(day).TakeOff(SavedOn(day));
-    }
-
-    /// <summary>The day off was undone: saved work marked removed comes back, and the day is suggested again if untouched.</summary>
-    public void UndoTakeOff(DateOnly day)
-    {
-        if (_work.TryGetValue(day, out var work)) work.Removed.Clear();
-        if (HasOnlySuggestions(day)) Restart(day);
-    }
-
-    /// <summary>True when the day's only unsaved changes are untouched suggestions (or there are none).</summary>
-    public bool HasOnlySuggestions(DateOnly day) => !_work.TryGetValue(day, out var work) || work.HasOnlySuggestions(SavedOn(day));
-
-    /// <summary>A day's rows as they will be once saved: saved work plus unsaved changes (suggestions too).</summary>
-    public IReadOnlyList<TimeEntry> RowsOn(DateOnly day) =>
-        !Period.Contains(day) ? Before.Where(e => e.Date == day).ToList()
-        : _work.TryGetValue(day, out var w) ? w.RowsToSave(SavedOn(day))
-        : SavedOn(day);
-
-    /// <summary>The latest day before this one with work, to copy.</summary>
-    public (DateOnly Date, IReadOnlyList<TimeEntry> Rows)? PreviousWorkedDay(DateOnly day) => DayFiller.PreviousWorkedDay(day, RowsOn);
-
-    /// <summary>
-    /// The day's row for an issue, for a click on a grid cell: the row it has (suggesting work first, as
-    /// opening the day would), or a new empty row on the issue.
-    /// </summary>
+    /// <summary>The day's row for an issue, for a grid cell: the row it has (suggesting work first, as opening the day would), or a new empty row.</summary>
     public TimeEntry RowFor(DateOnly day, string issueKey, string issueSummary)
     {
         Suggest(day);
-        var work = WorkFor(day);
-        return work.RowOn(SavedOn(day), issueKey) ?? work.AddRow(new JiraIssue(issueKey, issueSummary));
+        return Day(day).RowOn(issueKey) ?? Day(day).AddRow(new JiraIssue(issueKey, issueSummary));
+    }
+
+    /// <summary>
+    /// Marks the day off around <paramref name="saveAndReload"/> (stores it, reads the period again). A whole day off marks
+    /// the saved work removed, so Save all deletes it from Jira. Part of a day off remakes an untouched suggestion for the
+    /// new hours (dropping it first, so it doesn't show meanwhile); changes the user made are kept.
+    /// </summary>
+    public async Task MarkDayOffAsync(DateOnly day, bool wholeDay, Func<Task> saveAndReload)
+    {
+        var onlySuggestions = Day(day).HasOnlySuggestions;
+        if (!wholeDay && onlySuggestions) Finish(day);
+        await saveAndReload();
+        if (wholeDay) Day(day).TakeOff();
+        else if (onlySuggestions) Restart(day);
+    }
+
+    /// <summary>Removes the day off around <paramref name="saveAndReload"/>: saved work marked removed comes back, and an untouched day is suggested again.</summary>
+    public async Task UnmarkDayOffAsync(DateOnly day, Func<Task> saveAndReload)
+    {
+        await saveAndReload();
+        Day(day).UndoTakeOff();
+        if (Day(day).HasOnlySuggestions) Restart(day);
     }
 }

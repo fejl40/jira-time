@@ -31,11 +31,11 @@ public class SaveDayTests : IDisposable
     [Fact]
     public async Task Saved_rows_are_stamped_with_the_clock()
     {
-        var row = Row("ABC-1", 8);
+        _h.Jira.Offline = true;
 
-        await _h.SaveDayAsync(Day, [row]);
+        await _h.SaveDayAsync(Day, [Row("ABC-1", 8)]);
 
-        Assert.Equal(_h.Clock.Now.UtcDateTime, row.UpdatedUtc);
+        Assert.Equal(_h.Clock.Now.UtcDateTime, Assert.Single(await _h.QueuedAsync()).UpdatedUtc);
     }
 
     [Fact]
@@ -104,128 +104,8 @@ public class SaveDayTests : IDisposable
     {
         var result = await _h.SaveDayAsync(Day, [Row("ABC-1", 20), Row("ABC-2", 5)]);
 
-        Assert.Equal(TimeEntry.TooManyHours, result.Errors[WorklogSync.DayResult.DayError]);
+        Assert.Equal(TimeEntry.TooManyHours, result.Errors[DaySave.DayError]);
         Assert.Empty(_h.Jira.Worklogs);
-    }
-
-    [Fact]
-    public async Task Moving_hours_between_rows_near_24_hours_is_allowed()
-    {
-        await _h.SaveDayAsync(Day, [Row("ABC-1", 20), Row("ABC-2", 4)]);
-        var rows = await _h.CopiesAsync(Day);
-        rows.Single(r => r.IssueKey == "ABC-1").Duration = TimeSpan.FromHours(16);
-        rows.Single(r => r.IssueKey == "ABC-2").Duration = TimeSpan.FromHours(8);
-
-        Assert.True((await _h.SaveDayAsync(Day, rows)).Saved);
-    }
-
-    [Fact]
-    public async Task A_worklog_changed_in_Jira_since_the_day_was_read_is_not_overwritten()
-    {
-        var id = _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 3600);
-        var saved = await _h.DayAsync(Day);
-        var rows = saved.Select(e => e.Copy()).ToList();
-        rows[0].Duration = TimeSpan.FromHours(2);
-        _h.Jira.Worklogs["ABC-1"][id]!["timeSpentSeconds"] = 3 * 3600; // someone edits it in Jira meanwhile
-
-        var result = await _h.SaveDayAsync(Day, rows, saved);
-
-        Assert.True(result.ChangedInJira);
-        Assert.False(result.Saved);
-        Assert.Equal(WorklogSync.ChangedInJiraMessage, result.Errors[WorklogSync.DayResult.DayError]);
-        Assert.Equal(3 * 3600, _h.JiraSeconds("ABC-1"));
-        Assert.Equal(TimeSpan.FromHours(3), Assert.Single(await _h.DayAsync(Day)).Duration); // read again
-    }
-
-    [Fact]
-    public async Task A_worklog_deleted_in_Jira_since_the_day_was_read_stops_the_save()
-    {
-        var id = _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 3600);
-        var saved = await _h.DayAsync(Day);
-        var rows = saved.Select(e => e.Copy()).Append(Row("ABC-2", 1)).ToList();
-        rows[0].Description = "Edited";
-        _h.Jira.Worklogs["ABC-1"].Remove(id);
-
-        var result = await _h.SaveDayAsync(Day, rows, saved);
-
-        Assert.True(result.ChangedInJira);
-        Assert.Equal(0, _h.JiraSeconds("ABC-2")); // nothing written, the new row neither
-    }
-
-    [Fact]
-    public async Task The_check_before_saving_reads_every_issue_in_one_search()
-    {
-        foreach (var key in new[] { "ABC-1", "ABC-2", "ABC-3" })
-        {
-            _h.Jira.AddWorklog(key, "2026-10-19T09:00:00.000+0200", 3600);
-            _h.Jira.AddWorklog(key, "2026-10-19T09:00:00.000+0200", 1800);
-        }
-        var rows = await _h.CopiesAsync(Day);
-        foreach (var row in rows) row.Description = "Edited";
-        _h.Jira.Requests.Clear();
-
-        Assert.True((await _h.SaveDayAsync(Day, rows)).Saved);
-
-        var check = _h.Jira.Requests.TakeWhile(r => r.Method != HttpMethod.Put).ToList();
-        var search = Assert.Single(check);
-        Assert.StartsWith("key in (", FakeJira.Jql(search));
-        Assert.Contains("validateQuery=warn", search.Path);
-        Assert.Equal(6, _h.Jira.Requests.Count(r => r.Method == HttpMethod.Put));
-    }
-
-    [Fact]
-    public async Task An_issue_with_more_worklogs_than_the_search_sends_is_read_in_full_for_the_check()
-    {
-        _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 3600);
-        var later = _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 1800);
-        var saved = await _h.DayAsync(Day);
-        var rows = saved.Select(e => e.Copy()).ToList();
-        rows.Single(r => r.JiraWorklogId == later).Description = "Edited";
-        _h.Jira.Worklogs["ABC-1"][later]!["timeSpentSeconds"] = 7200; // changed in Jira, beyond what the search sends
-        _h.Jira.EmbeddedWorklogLimit = 1;
-        _h.Jira.Requests.Clear();
-
-        Assert.True((await _h.SaveDayAsync(Day, rows, saved)).ChangedInJira);
-        Assert.Single(_h.Jira.Requests, r => r.Path.StartsWith("/rest/api/2/issue/ABC-1/worklog?"));
-    }
-
-    [Fact]
-    public async Task An_issue_deleted_in_Jira_since_the_day_was_read_stops_the_save()
-    {
-        _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 3600);
-        _h.Jira.AddWorklog("ABC-2", "2026-10-19T09:00:00.000+0200", 3600);
-        var saved = await _h.DayAsync(Day);
-        var rows = saved.Select(e => e.Copy()).ToList();
-        foreach (var row in rows) row.Description = "Edited";
-        _h.Jira.Worklogs.Remove("ABC-2");
-        _h.Jira.Requests.Clear();
-
-        Assert.True((await _h.SaveDayAsync(Day, rows, saved)).ChangedInJira);
-        Assert.DoesNotContain(_h.Jira.Requests, r => r.Method == HttpMethod.Put);
-    }
-
-    [Fact]
-    public async Task When_Jira_cannot_be_asked_before_saving_the_save_goes_ahead()
-    {
-        _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 3600);
-        var rows = await _h.CopiesAsync(Day);
-        rows[0].Description = "Edited";
-        _h.Jira.FailWhen = uri => uri.AbsolutePath.EndsWith("/search") ? HttpStatusCode.ServiceUnavailable : null;
-
-        Assert.True((await _h.SaveDayAsync(Day, rows)).Saved);
-        Assert.Equal("Edited", (string?)_h.Jira.Worklogs["ABC-1"].Values.Single()["comment"]);
-    }
-
-    [Fact]
-    public async Task Rows_only_added_need_no_check_against_Jira()
-    {
-        _h.Jira.AddWorklog("ABC-1", "2026-10-19T09:00:00.000+0200", 3600);
-        var rows = (await _h.CopiesAsync(Day)).Append(Row("ABC-2", 1)).ToList();
-        _h.Jira.Requests.Clear();
-
-        Assert.True((await _h.SaveDayAsync(Day, rows)).Saved);
-
-        Assert.DoesNotContain(_h.Jira.Requests, r => FakeJira.Jql(r).StartsWith("key in"));
     }
 
     [Fact]
@@ -259,20 +139,5 @@ public class SaveDayTests : IDisposable
     {
         var zone = TimeZoneInfo.CreateCustomTimeZone("Plus2", TimeSpan.FromHours(2), "Plus2", "Plus2");
         Assert.Equal("2026-10-19T09:00:00.000+0200", JiraWorklogClient.FormatStarted(Day, new TimeOnly(9, 0), zone));
-    }
-
-    [Fact]
-    public async Task A_day_taken_off_deletes_its_worklogs_in_Jira_on_save()
-    {
-        await _h.SaveDayAsync(Day, [Row("ABC-1", 6), Row("ABC-2", 2)]);
-        var saved = await _h.DayAsync(Day);
-        var work = new DayWork(Day);
-
-        work.TakeOff(saved);
-        var result = await _h.SaveDayAsync(Day, work.RowsToSave(saved), saved);
-
-        Assert.True(result.Saved);
-        Assert.Equal(0, _h.JiraSeconds("ABC-1") + _h.JiraSeconds("ABC-2"));
-        Assert.Empty(await _h.DayAsync(Day));
     }
 }

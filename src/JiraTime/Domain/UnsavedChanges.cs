@@ -25,33 +25,21 @@ public sealed record DayChanges(DateOnly Day, IReadOnlyList<RowChange> Rows, Tim
     /// <summary>Why Save all will leave the day unsaved (a row needs an issue or hours); null when it saves.</summary>
     public string? Problem { get; init; }
 
-    public const string BadHours = "Enter the hours, e.g. 1.5 or 1:30.";
-
-    /// <summary>The day's changes, made from its unsaved work and its saved rows.</summary>
-    public static DayChanges Of(DayWork work, IReadOnlyList<TimeEntry> saved)
+    /// <summary>The day's changes, made from its saved rows and unsaved work.</summary>
+    public static DayChanges Of(SheetDay day)
     {
         var rows = new List<RowChange>();
-        foreach (var entry in saved)
+        foreach (var row in day.Rows)
         {
-            if (work.IsRemoved(entry)) rows.Add(Removed(entry));
-            else if (work.IsChanged(entry)) rows.Add(Changed(entry, work.View(entry)));
+            if (row.State == RowState.Removed) rows.Add(Removed(row.Saved!));
+            else if (row.State == RowState.Changed) rows.Add(Changed(row.Saved!, row.Entry));
         }
-        foreach (var draft in work.Drafts.Where(d => !work.IsBlank(d)))
-            rows.Add(new RowChange(RowChangeKind.Added, draft.IssueKey, draft.IssueSummary, draft.Duration) { Comment = draft.Description });
+        var savedIds = day.Saved.Select(e => e.Id).ToHashSet();
+        foreach (var added in day.RowsToSave.Where(r => !savedIds.Contains(r.Id)))
+            rows.Add(new RowChange(RowChangeKind.Added, added.IssueKey, added.IssueSummary, added.Duration) { Comment = added.Description });
 
-        var problem = Errors(work, saved).Values.FirstOrDefault();
-        return new DayChanges(work.Date, rows, TimeEntry.Total(saved), work.Total(saved)) { Problem = problem };
-    }
-
-    /// <summary>
-    /// Why the day's rows can't be saved: row id → what to fix, and <see cref="DaySave.DayError"/> for the
-    /// day as a whole. Empty when the day can be saved.
-    /// </summary>
-    public static Dictionary<string, string> Errors(DayWork work, IReadOnlyList<TimeEntry> saved)
-    {
-        var errors = DaySave.Plan(work.Date, work.RowsToSave(saved), saved).Errors.ToDictionary();
-        foreach (var id in work.BadHours.Keys) errors[id] = BadHours;
-        return errors;
+        var problem = day.Errors.Values.FirstOrDefault();
+        return new DayChanges(day.Date, rows, day.Logged, day.Total) { Problem = problem };
     }
 
     private static RowChange Removed(TimeEntry entry) =>
@@ -76,7 +64,7 @@ public sealed record UnsavedChanges(IReadOnlyList<DayChanges> Days)
 {
     /// <summary>The unsaved days of <paramref name="sheet"/>, in order.</summary>
     public static UnsavedChanges Of(PeriodSheet sheet) =>
-        new(sheet.UnsavedDays.Select(day => DayChanges.Of(sheet.WorkFor(day), sheet.SavedOn(day))).ToList());
+        new(sheet.UnsavedDays.Select(day => DayChanges.Of(sheet.Day(day))).ToList());
 
     /// <summary>Days Save all will save; the others have a <see cref="DayChanges.Problem"/>.</summary>
     public IReadOnlyList<DayChanges> ToSave => Days.Where(d => d.Problem is null).ToList();
