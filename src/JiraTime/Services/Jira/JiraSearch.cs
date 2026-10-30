@@ -18,23 +18,47 @@ internal static class JiraSearch
 
     private const int MaxPages = 50;
 
-    /// <summary>Every issue matching <paramref name="jql"/> with <paramref name="fields"/> (comma separated), page by page.</summary>
+    /// <summary>
+    /// Every issue matching <paramref name="jql"/> with <paramref name="fields"/> (comma separated). On Server/DC the first
+    /// page gives the total, so the other pages are asked for together; Cloud's pages follow each other's page token.
+    /// </summary>
     /// <param name="skipUnknownKeys">Asks Jira to warn about keys it doesn't know instead of refusing the whole search.</param>
     public static async Task<List<T>> SearchAllAsync<T>(this JiraHttp jira, JiraConnection c, string jql, string fields, CancellationToken ct,
         bool skipUnknownKeys = false)
     {
-        var all = new List<T>();
-        string? token = null;
-        for (var page = 0; page < MaxPages; page++)
+        var first = new SearchQuery(jql, fields, 0, null, skipUnknownKeys);
+        var page = await SearchPageAsync<T>(jira, c, first, ct);
+        var all = new List<T>(page.Issues);
+        if (!c.IsCloud && await OtherPagesTogetherAsync(jira, c, first, page, ct) is { } rest)
         {
-            var query = new SearchQuery(jql, fields, all.Count, token, skipUnknownKeys);
-            var result = await SearchPageAsync<T>(jira, c, query, ct);
-            all.AddRange(result.Issues);
-            token = result.NextPageToken;
-            var more = c.IsCloud ? token is not null && result.IsLast != true : result.Total is { } total && all.Count < total;
-            if (!more || result.Issues.Count == 0) break;
+            all.AddRange(rest);
+            return all;
+        }
+        for (var n = 1; n < MaxPages && HasMore(c, page, all.Count) && page.Issues.Count > 0; n++)
+        {
+            page = await SearchPageAsync<T>(jira, c, first with { StartAt = all.Count, PageToken = page.NextPageToken }, ct);
+            all.AddRange(page.Issues);
         }
         return all;
+    }
+
+    private static bool HasMore<T>(JiraConnection c, SearchPage<T> page, int read) =>
+        c.IsCloud ? page.NextPageToken is not null && page.IsLast != true : page.Total is { } total && read < total;
+
+    /// <summary>
+    /// The rest of a Server/DC search after its first page, every page asked for at once and joined in order; empty when
+    /// the first page had it all. Null when the pages don't fit together (the answer changed meanwhile, or Jira sent a
+    /// page shorter than the first): then the rest is read page by page, as it always was.
+    /// </summary>
+    private static async Task<List<T>?> OtherPagesTogetherAsync<T>(JiraHttp jira, JiraConnection c, SearchQuery first, SearchPage<T> page,
+        CancellationToken ct)
+    {
+        var step = page.Issues.Count;
+        if (page.Total is not { } total || step == 0 || step >= total) return [];
+        var starts = Enumerable.Range(1, MaxPages - 1).Select(n => n * step).TakeWhile(start => start < total).ToList();
+        var pages = await Task.WhenAll(starts.Select(start => SearchPageAsync<T>(jira, c, first with { StartAt = start }, ct)));
+        var fits = pages.Select((p, i) => p.Total == total && p.Issues.Count == Math.Min(step, total - starts[i])).All(ok => ok);
+        return fits ? pages.SelectMany(p => p.Issues).ToList() : null;
     }
 
     /// <summary>
@@ -61,10 +85,9 @@ internal static class JiraSearch
         }
         catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest && keys.Count > 1)
         {
-            var found = new List<T>();
-            foreach (var key in keys)
-                found.AddRange(await BatchAsync<T>(jira, c, [key], fields, ct));
-            return found;
+            // The keys are asked together; the client's limiter decides how many are out at once.
+            var each = await Task.WhenAll(keys.Select(key => BatchAsync<T>(jira, c, [key], fields, ct)));
+            return each.SelectMany(issues => issues).ToList();
         }
         catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest)
         {

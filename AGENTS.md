@@ -201,10 +201,10 @@ return is taken from the search by key.
 
 Several issues are always read in one search, never one request each (`Services/Jira/JiraSearch.cs`): status and epic
 lookups, the recently saved issues and the changed-in-Jira check all use `key in (...)`, 100 keys per search (the
-batches go out together), and every search reads all its pages (`startAt`/`total` on Server/DC, `nextPageToken` on
-Cloud). A search whose URL would be longer than 2000 characters is sent as `POST /search` with a JSON body. Key
+batches go out together), and every search reads all its pages (`startAt`/`total` on Server/DC, where the pages after the first go out
+together and are read again one by one if they no longer fit; `nextPageToken` on Cloud, page by page). A search whose URL would be longer than 2000 characters is sent as `POST /search` with a JSON body. Key
 searches on Server/DC send `validateQuery=warn`, so a deleted or unknown key is skipped with a warning instead of
-failing the whole search; only a Jira that still answers 400 (Cloud, which has no `validateQuery`) is asked key by key.
+failing the whole search; only a Jira that still answers 400 (Cloud, which has no `validateQuery`) is asked key by key, all keys at once.
 
 Saving (with **Save all**) creates, updates and deletes each changed day's worklogs in Jira, then reads the period back. Moving a row
 to another issue moves its worklog; removing a row deletes it. Before changing or deleting worklogs,

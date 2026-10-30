@@ -1,9 +1,10 @@
 ---
 id: TASK-107
 title: Ask key by key in parallel when Jira rejects a key search
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-30 15:19'
+updated_date: '2026-10-30 15:25'
 labels:
   - jira
   - performance
@@ -20,8 +21,8 @@ When a search by keys gets 400 (Cloud, which has no validateQuery, and one key u
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The key-by-key fallback sends its searches at the same time, in batches the limiter allows
-- [ ] #2 Unknown keys are still skipped and found issues keep their order
-- [ ] #3 Tests show the requests overlap and the results are unchanged
-- [ ] #4 Build has 0 warnings and all tests pass
+- [x] #1 The key-by-key fallback sends its searches at the same time, in batches the limiter allows
+- [x] #2 Unknown keys are still skipped and found issues keep their order
+- [x] #3 Tests show the requests overlap and the results are unchanged
+- [x] #4 Build has 0 warnings and all tests pass
 <!-- AC:END -->

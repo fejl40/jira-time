@@ -91,7 +91,66 @@ public class JiraSearchTests : IDisposable
         var issues = await _jira.GetIssuesAsync(TimeHarness.Server, keys);
 
         Assert.Equal(100, issues.Count);
-        Assert.Equal([0, 40, 80], _h.Jira.Requests.Select(r => Search(r).StartAt));
+        Assert.Equal([0, 40, 80], _h.Jira.Requests.Select(r => Search(r).StartAt).Order());
+    }
+
+    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(5);
+
+    private async Task ArrivedAsync(TimeHarness h, int requests)
+    {
+        for (var i = 0; i < requests; i++)
+            Assert.True(await h.Jira.Arrived.WaitAsync(Patience), $"Only {i} of {requests} requests reached Jira.");
+    }
+
+    [Fact]
+    public async Task On_Server_the_pages_after_the_first_are_asked_for_together_and_joined_in_order()
+    {
+        var keys = AddIssues(100);
+        _h.Jira.SearchPageLimit = 40;
+        _h.Jira.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _h.Jira.HoldWhen = r => Search(r).StartAt > 0;
+
+        var reading = _jira.GetIssuesAsync(TimeHarness.Server, keys);
+        await ArrivedAsync(_h, 3); // the first page, then both other pages before Jira answered either
+        _h.Jira.Hold.SetResult();
+        var issues = await reading;
+
+        Assert.Equal(keys, issues.Select(i => i.Key));
+    }
+
+    [Fact]
+    public async Task Pages_that_no_longer_fit_together_are_read_again_one_after_another()
+    {
+        var keys = Enumerable.Range(1, 100).Select(i => $"ABC-{i}").ToList();
+        AddIssues(99); // ABC-100 doesn't exist yet
+        _h.Jira.SearchPageLimit = 40;
+        _h.Jira.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _h.Jira.HoldWhen = r => Search(r).StartAt > 0 && _h.Jira.Requests.Count <= 3;
+
+        var reading = _jira.GetIssuesAsync(TimeHarness.Server, keys);
+        await ArrivedAsync(_h, 3);
+        AddIssues(1, first: 100); // the answer grows while the pages are out
+        _h.Jira.Hold.SetResult();
+        var issues = await reading;
+
+        Assert.Equal(keys, issues.Select(i => i.Key));
+        Assert.Equal([0, 40, 40, 80, 80], _h.Jira.Requests.Select(r => Search(r).StartAt).Order());
+    }
+
+    [Fact]
+    public async Task Each_key_on_its_own_is_asked_together()
+    {
+        using var cloud = new TimeHarness(TimeHarness.Cloud);
+        cloud.Jira.AddIssue("ABC-1", "Login page");
+        cloud.Jira.AddIssue("ABC-2", "Fix the build");
+        cloud.Jira.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        cloud.Jira.HoldWhen = r => !Search(r).Jql.Contains(',');
+
+        var reading = new JiraClient(cloud.Http).GetIssuesAsync(TimeHarness.Cloud, ["ABC-1", "NOPE-1", "ABC-2"]);
+        await ArrivedAsync(cloud, 4); // the refused search, then all three keys before Jira answered any
+        cloud.Jira.Hold.SetResult();
+
+        Assert.Equal(["ABC-1", "ABC-2"], (await reading).Select(i => i.Key));
     }
 
     [Fact]
