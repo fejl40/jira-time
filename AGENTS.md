@@ -304,8 +304,9 @@ on the clipboard; **Download .tsv** saves UTF-8 with a byte order mark so Excel 
 Every wait on Jira shows where the user is looking, with one shared indicator, `Components/Shared/Waiting.razor`
 (a small spinner, with text where it helps). It stays hidden for the first 200 ms (`--waiting-delay` in
 `Styles/motion.css`), so a fast answer doesn't flicker, and stands still with reduced motion. While a period opens,
-the old one stays on screen dimmed, and the header says **Opening 1 Oct – 15 Oct…**; Sync and Save all dim the
-grid and the day's rows (`aria-busy`, `.waiting-dim`). The first load,
+the old one stays on screen dimmed, and the header says **Opening 1 Oct – 15 Oct…**; Sync, Save all and time off dim the
+grid and the day's rows (time off is one wait from the click until the period is read again, shown at least 600 ms
+so its spinner is seen) (`aria-busy`, `.waiting-dim`). The first load,
 signing in and the export show a waiting line instead of empty content. The button that started a request gets the
 spinner, and on the timesheet every button that sends a request to Jira (Sync, Save all, Try again, time
 off) is off until the running one ends, so saves and reads never cross. `JiraWaits` (`Components/Sheet/JiraWaits.cs`) decides this and is tested;

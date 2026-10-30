@@ -98,6 +98,77 @@ public class ShownPeriodTests : IDisposable
     }
 
     [Fact]
+    public async Task Time_off_is_one_wait_from_the_start_until_the_period_is_read_again()
+    {
+        var shown = NewShownPeriod();
+        await shown.ShowAsync(Link(Monday));
+        var requests = _h.Jira.Requests.Count;
+        int? requestsWhenTheWaitStarted = null;
+        shown.Waits.Changed += () => requestsWhenTheWaitStarted ??= shown.Waits.Has(JiraWait.TimeOff) ? _h.Jira.Requests.Count : null;
+        _h.Jira.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var marking = shown.MarkDayOffAsync(Monday, new TimeOffModal.TimeOff(DayOffReason.Vacation, null));
+
+        Assert.Equal(requests, requestsWhenTheWaitStarted);
+        Assert.False(shown.Waits.CanStart);
+        Assert.Equal("Saving time off…", shown.Waits.Status(shown.Sheet!.Period));
+        _h.Jira.Hold.SetResult();
+        await marking;
+        Assert.True(shown.Waits.CanStart);
+        Assert.Equal(DayKind.DayOff, shown.Sheet!.Day(Monday).Info?.Kind);
+    }
+
+    [Fact]
+    public async Task Quick_time_off_still_shows_its_wait_long_enough_to_be_seen()
+    {
+        var shown = NewShownPeriod();
+        await shown.ShowAsync(Link(Monday));
+        var started = _h.Clock.Now;
+        var ended = started;
+        shown.Waits.Changed += () => { if (shown.Waits.CanStart) ended = _h.Clock.Now; };
+
+        await shown.UnmarkDayOffAsync(Monday);
+
+        Assert.True(ended - started >= ShownPeriod.TimeOffShownFor);
+    }
+
+    [Fact]
+    public async Task Nothing_else_starts_while_time_off_is_saved()
+    {
+        var shown = NewShownPeriod();
+        await shown.ShowAsync(Link(Monday));
+        _h.Jira.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var marking = shown.MarkDayOffAsync(Monday, new TimeOffModal.TimeOff(DayOffReason.Vacation, null));
+        var requests = _h.Jira.Requests.Count;
+
+        await shown.SyncAsync();
+        await shown.UnmarkDayOffAsync(Monday);
+        await shown.MarkDayOffAsync(Tuesday, new TimeOffModal.TimeOff(DayOffReason.Sick, null));
+
+        Assert.Equal(requests, _h.Jira.Requests.Count);
+        Assert.False(shown.Waits.Has(JiraWait.Sync));
+        _h.Jira.Hold.SetResult();
+        await marking;
+        Assert.Equal(DayKind.DayOff, shown.Sheet!.Day(Monday).Info?.Kind);
+        Assert.Equal(DayKind.Workday, shown.Sheet!.Day(Tuesday).Info?.Kind);
+    }
+
+    [Fact]
+    public async Task Time_off_waits_while_another_request_to_jira_runs()
+    {
+        var shown = NewShownPeriod();
+        await shown.ShowAsync(Link(Monday));
+        _h.Jira.Hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var syncing = shown.SyncAsync();
+
+        await shown.MarkDayOffAsync(Monday, new TimeOffModal.TimeOff(DayOffReason.Vacation, null));
+
+        _h.Jira.Hold.SetResult();
+        await syncing;
+        Assert.Equal(DayKind.Workday, shown.Sheet!.Day(Monday).Info?.Kind);
+    }
+
+    [Fact]
     public async Task A_period_left_before_it_was_read_is_not_shown()
     {
         var shown = NewShownPeriod();

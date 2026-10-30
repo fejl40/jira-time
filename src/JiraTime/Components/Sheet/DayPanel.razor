@@ -5,6 +5,7 @@
 <section class="card p-6">
     @{ var day = Sheet.Day(Day); }
     <DayHeader Date="Day" Info="day.Info" Logged="day.Logged" Missing="day.Missing" Busy="!Waits.CanStart"
+               Saving="Waits.Has(JiraWait.TimeOff)"
                OnMarkOff="MarkDayOffAsync" OnUnmarkOff="UnmarkDayOffAsync" />
 
     @if (Notice is not null)

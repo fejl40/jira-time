@@ -149,26 +149,41 @@ public sealed class ShownPeriod(
         return toFix;
     }
 
-    /// <summary>Marks the day, or part of it, off; PeriodSheet decides what happens to the day's work.</summary>
+    /// <summary>
+    /// Marks the day, or part of it, off; PeriodSheet decides what happens to the day's work. It is one wait on
+    /// Jira from the start until the period is read again, as a whole day off changes the day's worklogs.
+    /// </summary>
     public async Task MarkDayOffAsync(DateOnly day, TimeOffModal.TimeOff off)
     {
+        if (!Waits.CanStart) return;
         using var action = JiraAction.Start($"Time off {Format.ShortDay(day)}");
-        await Shown.MarkDayOffAsync(day, wholeDay: off.Hours is null, async () =>
+        await RunTimeOffAsync(() => Shown.MarkDayOffAsync(day, wholeDay: off.Hours is null, async () =>
         {
             await calendar.MarkDayOffAsync(day, off.Reason, off.Hours);
             await ReloadAsync();
-        });
+        }));
     }
 
+    /// <summary>Removes the day's time off, as one wait on Jira like <see cref="MarkDayOffAsync"/>.</summary>
     public async Task UnmarkDayOffAsync(DateOnly day)
     {
+        if (!Waits.CanStart) return;
         using var action = JiraAction.Start($"Remove time off {Format.ShortDay(day)}");
-        await Shown.UnmarkDayOffAsync(day, async () =>
+        await RunTimeOffAsync(() => Shown.UnmarkDayOffAsync(day, async () =>
         {
             await calendar.UnmarkDayOffAsync(day);
             await ReloadAsync();
-        });
+        }));
     }
+
+    /// <summary>
+    /// Time off is often quick (the period reads back from the cache), so its wait shows at least this long:
+    /// past the Waiting spinner's 200 ms delay, so the user sees that it ran.
+    /// </summary>
+    public static readonly TimeSpan TimeOffShownFor = TimeSpan.FromMilliseconds(600);
+
+    private Task RunTimeOffAsync(Func<Task> work) =>
+        Waits.RunAsync(JiraWait.TimeOff, () => Task.WhenAll(work(), Task.Delay(TimeOffShownFor, clock)));
 }
 
 /// <summary>The last save, for its animation: days saved, and those Jira got completely.</summary>

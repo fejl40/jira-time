@@ -9,6 +9,8 @@ public enum JiraWait
     Period,
     Sync,
     SaveAll,
+    /// <summary>Marking or removing time off: the day off is written, then the period is read again.</summary>
+    TimeOff,
 }
 
 /// <summary>
@@ -43,6 +45,7 @@ public sealed class JiraWaits
         if (Opening is { } opening && opening != shown) return $"Opening {Format.Range(opening.Start, opening.End)}…";
         if (Has(JiraWait.SaveAll)) return "Saving to Jira…";
         if (Has(JiraWait.Sync)) return "Syncing with Jira…";
+        if (Has(JiraWait.TimeOff)) return "Saving time off…";
         if (Has(JiraWait.Period)) return "Reading Jira…";
         return null;
     }

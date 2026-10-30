@@ -22,11 +22,11 @@
     @if (Info is { Reason: { } reason } && DayLook.Label(Info) is { } timeOff)
     {
         <span class="@DayLook.Badge(reason)" data-time-off>@Icon @timeOff</span>
-        <button class="btn-ghost text-xs" disabled="@Busy" @onclick="OnUnmarkOff">Undo</button>
+        <button class="btn-ghost text-xs" disabled="@Busy" @onclick="OnUnmarkOff" data-time-off-undo>@if (Saving) { <Waiting /> } Undo</button>
     }
     else if (Info is { Kind: DayKind.Workday } work)
     {
-        <button class="btn-ghost text-xs" disabled="@Busy" @onclick="() => OpenTimeOffAsync(work)" data-time-off-open>Time off…</button>
+        <button class="btn-ghost text-xs" disabled="@Busy" @onclick="() => OpenTimeOffAsync(work)" data-time-off-open>@if (Saving) { <Waiting /> } Time off…</button>
     }
 </div>
 
@@ -36,8 +36,10 @@
     [Parameter] public TimeSpan Logged { get; set; }
     /// <summary>Hours missing so far (zero after today).</summary>
     [Parameter] public TimeSpan Missing { get; set; }
-    /// <summary>A request to Jira is running: time off waits, as it reads the period again.</summary>
+    /// <summary>A wait on Jira is running (time off is one): the time off buttons are off meanwhile.</summary>
     [Parameter] public bool Busy { get; set; }
+    /// <summary>Time off is being marked or removed: its button shows the spinner.</summary>
+    [Parameter] public bool Saving { get; set; }
     [Parameter] public EventCallback<TimeOffModal.TimeOff> OnMarkOff { get; set; }
     [Parameter] public EventCallback OnUnmarkOff { get; set; }
 

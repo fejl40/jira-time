@@ -94,6 +94,24 @@ public class JiraWaitsTests
         Assert.True(waits.CanStart);
     }
 
+    [Fact]
+    public async Task Time_off_says_so_while_it_reads_the_period_again()
+    {
+        var waits = new JiraWaits();
+        var jira = new TaskCompletionSource();
+
+        var timeOff = waits.RunAsync(JiraWait.TimeOff, () => waits.RunAsync(JiraWait.Period, () => jira.Task));
+
+        Assert.False(waits.CanStart);
+        Assert.True(waits.PeriodPending);
+        Assert.True(waits.DayPending);
+        Assert.Equal("Saving time off…", waits.Status(October));
+
+        jira.SetResult();
+        await timeOff;
+        Assert.True(waits.CanStart);
+    }
+
     [Theory]
     [InlineData(true, "true")]
     [InlineData(false, "false")]
