@@ -13,39 +13,51 @@ public class JiraWorklogClient(JiraHttp jira)
     /// <summary>
     /// Worklogs <paramref name="profile"/> logged on days from <paramref name="from"/> to <paramref name="to"/>,
     /// on any issue, however they were logged. The issues in <paramref name="alsoRead"/> are read even when
-    /// Jira's search doesn't return them, which it can't for a while after a worklog was written.
+    /// Jira's worklog search doesn't return them, which it can't for a while after a worklog was written.
     /// </summary>
     public async Task<IReadOnlyList<JiraWorklog>> GetMyWorklogsAsync(JiraConnection c, JiraProfile profile, DateOnly from, DateOnly to,
         IReadOnlyCollection<JiraIssue>? alsoRead = null, CancellationToken ct = default)
     {
         var jql = $"worklogAuthor = {Jql.User(profile)} AND worklogDate >= {Jql.Date(from)} AND worklogDate <= {Jql.Date(to)}";
-        // The search sends each issue's first worklogs along; only an issue with more is read on its own.
-        var found = await SearchAllAsync(c, jql, ct);
+        var found = await _jira.SearchAllAsync<SearchIssue>(c, jql, WorklogFields, ct);
         var keys = found.Select(i => i.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var notFound = (alsoRead ?? []).Where(i => keys.Add(i.Key)).ToList();
-        var range = new WorklogRange(profile, from, to);
+        // A search by key reads the issues themselves, so their worklogs are there before the worklog search finds them.
+        var notFound = (alsoRead ?? []).Where(i => keys.Add(i.Key)).Select(i => i.Key).ToList();
+        if (notFound.Count > 0) found.AddRange(await _jira.ByKeysAsync<SearchIssue>(c, notFound, WorklogFields, ct));
 
-        // The issues read on their own go out together; the Jira client keeps at most four in flight.
-        var perIssue = found.Select(hit => WorklogsOfAsync(c, hit, range, ct))
-            .Concat(notFound.Select(issue => ReadUnlessGoneAsync(c, issue, range, ct)));
+        var range = new WorklogRange(profile, from, to);
+        // Only an issue with more worklogs than the search sent is read on its own; those go out together.
+        var perIssue = found.Select(async hit => range.Mine(await WorklogsOfAsync(c, hit, ct), ToIssue(hit)).ToList());
         return (await Task.WhenAll(perIssue)).SelectMany(w => w).ToList();
     }
 
-    /// <summary>The issue's worklogs from the search answer when it sent them all, else read from Jira.</summary>
-    private async Task<IReadOnlyList<JiraWorklog>> WorklogsOfAsync(JiraConnection c, SearchIssue hit, WorklogRange range, CancellationToken ct)
+    /// <summary>
+    /// Every worklog on the given issues, by worklog id, read with the issues in one search (more when an issue has more
+    /// worklogs than the search sends). Worklogs and issues Jira no longer has are left out.
+    /// </summary>
+    public async Task<IReadOnlyDictionary<string, JiraWorklog>> GetWorklogsOnAsync(JiraConnection c, IReadOnlyCollection<string> issueKeys,
+        CancellationToken ct = default)
     {
-        var issue = new JiraIssue(hit.Key, hit.Fields?.Summary ?? "");
-        return hit.Fields?.Worklog is { IsComplete: true } embedded
-            ? range.Mine(embedded.Worklogs, issue).ToList()
-            : await ReadWorklogsAsync(c, issue, range, ct);
+        var found = await _jira.ByKeysAsync<SearchIssue>(c, issueKeys, WorklogFields, ct);
+        var perIssue = await Task.WhenAll(found.Select(async hit => (Issue: ToIssue(hit), Worklogs: await WorklogsOfAsync(c, hit, ct))));
+        var result = new Dictionary<string, JiraWorklog>();
+        foreach (var (issue, worklogs) in perIssue)
+            foreach (var w in worklogs)
+                if (w.Id is not null && ToWorklog(w, w.Id, issue) is { } worklog) result[worklog.Id] = worklog;
+        return result;
     }
 
-    /// <summary>An issue Jira's search doesn't find yet; when it is gone, so are its worklogs.</summary>
-    private async Task<IReadOnlyList<JiraWorklog>> ReadUnlessGoneAsync(JiraConnection c, JiraIssue issue, WorklogRange range, CancellationToken ct)
+    private const string WorklogFields = "summary,worklog";
+
+    private static JiraIssue ToIssue(SearchIssue hit) => new(hit.Key, hit.Fields?.Summary ?? "");
+
+    /// <summary>The issue's worklogs from the search answer when it sent them all, else read from Jira; none when the issue is gone.</summary>
+    private async Task<IReadOnlyList<RawJiraWorklog>> WorklogsOfAsync(JiraConnection c, SearchIssue hit, CancellationToken ct)
     {
+        if (hit.Fields?.Worklog is { IsComplete: true } embedded) return embedded.Worklogs;
         try
         {
-            return await ReadWorklogsAsync(c, issue, range, ct);
+            return await ReadWorklogsAsync(c, hit.Key, ct);
         }
         catch (JiraException ex) when (ex.Status == HttpStatusCode.NotFound)
         {
@@ -53,14 +65,14 @@ public class JiraWorklogClient(JiraHttp jira)
         }
     }
 
-    /// <summary>The issue's worklogs by the range's user on its days, read page by page.</summary>
-    private async Task<List<JiraWorklog>> ReadWorklogsAsync(JiraConnection c, JiraIssue issue, WorklogRange range, CancellationToken ct)
+    /// <summary>Every worklog of the issue, read page by page.</summary>
+    private async Task<List<RawJiraWorklog>> ReadWorklogsAsync(JiraConnection c, string issueKey, CancellationToken ct)
     {
-        var result = new List<JiraWorklog>();
+        var result = new List<RawJiraWorklog>();
         for (var startAt = 0; ; )
         {
-            var page = await _jira.GetAsync<WorklogPage>(c, $"{WorklogUrl(c, issue.Key)}?startAt={startAt}&maxResults=1000", ct);
-            result.AddRange(range.Mine(page.Worklogs, issue));
+            var page = await _jira.GetAsync<WorklogPage>(c, $"{WorklogUrl(c, issueKey)}?startAt={startAt}&maxResults=1000", ct);
+            result.AddRange(page.Worklogs);
             startAt += page.Worklogs.Count;
             if (page.Worklogs.Count == 0 || startAt >= page.Total) break;
         }
@@ -77,20 +89,6 @@ public class JiraWorklogClient(JiraHttp jira)
                 if (w.Id is null || !IsAuthor(w.Author, Profile) || ToWorklog(w, w.Id, issue) is not { } worklog) continue;
                 if (worklog.Date >= From && worklog.Date <= To) yield return worklog;
             }
-        }
-    }
-
-    /// <summary>One worklog, or null when Jira no longer has it.</summary>
-    public async Task<JiraWorklog?> GetWorklogAsync(JiraConnection c, string issueKey, string worklogId, CancellationToken ct = default)
-    {
-        try
-        {
-            var w = await _jira.GetAsync<RawJiraWorklog>(c, WorklogUrl(c, issueKey, worklogId), ct);
-            return ToWorklog(w, w.Id ?? worklogId, new JiraIssue(issueKey, ""));
-        }
-        catch (JiraException ex) when (ex.Status == HttpStatusCode.NotFound)
-        {
-            return null;
         }
     }
 
@@ -122,26 +120,6 @@ public class JiraWorklogClient(JiraHttp jira)
         // Jira writes the offset without a colon (+0200), which .NET only reads with one.
         var text = created[^5] is '+' or '-' ? created.Insert(created.Length - 2, ":") : created;
         return DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.None, out var d) ? d : null;
-    }
-
-    /// <summary>Every issue matching <paramref name="jql"/> with its summary and first worklogs, page by page.</summary>
-    private async Task<List<SearchIssue>> SearchAllAsync(JiraConnection c, string jql, CancellationToken ct)
-    {
-        var all = new List<SearchIssue>();
-        string? token = null;
-        for (var page = 0; page < 50; page++)
-        {
-            var paging = c.IsCloud
-                ? (token is null ? "" : $"&nextPageToken={Uri.EscapeDataString(token)}")
-                : $"&startAt={all.Count}";
-            var result = await _jira.GetAsync<SearchResult>(c,
-                $"{SearchPath(c)}?jql={Uri.EscapeDataString(jql)}&fields=summary,worklog&maxResults=100{paging}", ct);
-            all.AddRange(result.Issues);
-            token = result.NextPageToken;
-            var more = c.IsCloud ? token is not null && result.IsLast != true : result.Total is { } total && all.Count < total;
-            if (!more || result.Issues.Count == 0) break;
-        }
-        return all;
     }
 
     /// <summary>Creates a worklog for <paramref name="entry"/> on its issue.</summary>

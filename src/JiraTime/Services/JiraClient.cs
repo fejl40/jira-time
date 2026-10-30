@@ -65,7 +65,7 @@ public class JiraClient(JiraHttp jira)
 
     /// <summary>Current summary and status of the given issues. Keys Jira doesn't know are left out.</summary>
     public async Task<IReadOnlyList<IssueWithStatus>> GetIssuesAsync(JiraConnection c, IReadOnlyCollection<string> keys, CancellationToken ct = default) =>
-        await ByKeysAsync(keys, some => SearchAsync(c, $"key in {Jql.List(some)}", ct));
+        (await _jira.ByKeysAsync<SearchIssue>(c, keys, StatusFields, ct)).Select(ToIssueWithStatus).ToList();
 
     /// <summary>
     /// The epic of each issue, by key; null for issues with no epic (and for epics themselves). The epic is
@@ -104,43 +104,12 @@ public class JiraClient(JiraHttp jira)
 
     private async Task<Dictionary<string, IssueEpic>> ReadEpicsAsync(JiraConnection c, IReadOnlyCollection<string> keys, string? epicLink, CancellationToken ct)
     {
-        var found = await ByKeysAsync(keys, some => SearchEpicsAsync(c, some, epicLink, ct));
-        return found.DistinctBy(f => f.Key, StringComparer.OrdinalIgnoreCase).ToDictionary(f => f.Key, f => f.Epic, StringComparer.OrdinalIgnoreCase);
-    }
-
-    private async Task<IReadOnlyList<(string Key, IssueEpic Epic)>> SearchEpicsAsync(JiraConnection c, IReadOnlyCollection<string> keys, string? epicLink, CancellationToken ct)
-    {
         var fields = "issuetype,parent" + (epicLink is null ? "" : "," + epicLink);
-        var result = await _jira.GetAsync<EpicSearchResult>(c,
-            $"{SearchPath(c)}?jql={Uri.EscapeDataString($"key in {Jql.List(keys)}")}&fields={fields}&maxResults=100", ct);
-        return result.Issues
+        var found = await _jira.ByKeysAsync<EpicSearchIssue>(c, keys, fields, ct);
+        return found
             .Where(i => i.Key is not null)
-            .Select(i => (i.Key!, EpicOf(i.Fields, epicLink)))
-            .ToList();
-    }
-
-    /// <summary>
-    /// Searches for issues by key. One key Jira doesn't know fails the whole query, so then each key is
-    /// asked on its own; a single unknown key gives nothing.
-    /// </summary>
-    private static async Task<IReadOnlyList<T>> ByKeysAsync<T>(IReadOnlyCollection<string> keys, Func<IReadOnlyCollection<string>, Task<IReadOnlyList<T>>> search)
-    {
-        if (keys.Count == 0) return [];
-        try
-        {
-            return await search(keys);
-        }
-        catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest && keys.Count > 1)
-        {
-            var found = new List<T>();
-            foreach (var key in keys)
-                found.AddRange(await ByKeysAsync([key], search));
-            return found;
-        }
-        catch (JiraException ex) when (ex.Status == HttpStatusCode.BadRequest)
-        {
-            return [];
-        }
+            .DistinctBy(i => i.Key, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(i => i.Key!, i => EpicOf(i.Fields, epicLink), StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>The id of the Epic Link field (e.g. customfield_10008) on Jiras that have one (Server/DC); null otherwise.</summary>
@@ -153,15 +122,13 @@ public class JiraClient(JiraHttp jira)
             .FirstOrDefault(id => id is not null);
     }
 
-    private async Task<IReadOnlyList<IssueWithStatus>> SearchAsync(JiraConnection c, string jql, CancellationToken ct)
-    {
-        var result = await _jira.GetAsync<SearchResult>(c,
-            $"{SearchPath(c)}?jql={Uri.EscapeDataString(jql)}&fields=summary,issuetype,status&maxResults=100", ct);
-        return result.Issues
-            .Select(i => new IssueWithStatus(i.Key, i.Fields?.Summary ?? "", i.Fields?.IssueType?.Name ?? "",
-                i.Fields?.Status?.Name ?? "", i.Fields?.Status?.StatusCategory?.Key ?? ""))
-            .ToList();
-    }
+    private const string StatusFields = "summary,issuetype,status";
+
+    private async Task<IReadOnlyList<IssueWithStatus>> SearchAsync(JiraConnection c, string jql, CancellationToken ct) =>
+        (await _jira.SearchAllAsync<SearchIssue>(c, jql, StatusFields, ct)).Select(ToIssueWithStatus).ToList();
+
+    private static IssueWithStatus ToIssueWithStatus(SearchIssue i) =>
+        new(i.Key, i.Fields?.Summary ?? "", i.Fields?.IssueType?.Name ?? "", i.Fields?.Status?.Name ?? "", i.Fields?.Status?.StatusCategory?.Key ?? "");
 
     private static JiraProfile ToProfile(RawUser u) =>
         new(u.AccountId ?? u.Key ?? u.Name ?? "", u.Name, u.DisplayName ?? u.Name ?? "?", u.EmailAddress);

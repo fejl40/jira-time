@@ -30,13 +30,18 @@ public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log, 
     /// first; if any is invalid, or a worklog to change was changed in Jira since it was read, nothing is written.
     /// </summary>
     /// <param name="saved">The day's work as it was read, which the rows were edited from.</param>
-    public async Task<DayResult> SaveDayAsync(JiraConnection c, DateOnly date, IReadOnlyList<TimeEntry> rows, IReadOnlyList<TimeEntry> saved,
-        CancellationToken ct = default)
+    public Task<DayResult> SaveDayAsync(JiraConnection c, DateOnly date, IReadOnlyList<TimeEntry> rows, IReadOnlyList<TimeEntry> saved,
+        CancellationToken ct = default) =>
+        SaveAsync(c, DaySave.Plan(date, rows, saved), inJira: null, ct);
+
+    /// <summary>Saves a planned day.</summary>
+    /// <param name="inJira">The checked worklogs as Jira has them now, when they were read already (Save all reads every day's at once).</param>
+    private async Task<DayResult> SaveAsync(JiraConnection c, DaySave plan, WorklogsInJira? inJira, CancellationToken ct)
     {
-        var plan = DaySave.Plan(date, rows, saved);
         if (plan.Errors.Count > 0) return new DayResult(plan.Errors, 0);
 
-        if (await ChangedInJiraAsync(c, plan.ToCheck, ct))
+        inJira ??= await ReadWorklogsAsync(c, plan.ToCheck, ct);
+        if (inJira.ChangedSinceRead(plan.ToCheck))
         {
             log.Refresh();
             return new DayResult(new Dictionary<string, string> { [DayResult.DayError] = ChangedInJiraMessage }, 0, ChangedInJira: true);
@@ -71,45 +76,68 @@ public class WorklogSync(JiraWorklogClient jira, RetryQueue queue, TimeLog log, 
     }
 
     /// <summary>
-    /// Saves every day of the sheet with unsaved changes, each as <see cref="SaveDayAsync"/> does. Days with
-    /// hours that can't be read are left for the user to finish. The sheet itself is not changed.
+    /// Saves every day of the sheet with unsaved changes, each as <see cref="SaveDayAsync"/> does, but with one
+    /// changed-in-Jira check for all days. Days with hours that can't be read are left for the user to finish.
+    /// The sheet itself is not changed.
     /// </summary>
     public async Task<SaveAllResult> SaveDaysAsync(JiraConnection c, PeriodSheet sheet, CancellationToken ct = default)
     {
-        var saved = new Dictionary<DateOnly, DayResult>();
+        var plans = new Dictionary<DateOnly, DaySave>();
         var needsWork = new List<DateOnly>();
-        var changedInJira = new List<DateOnly>();
         foreach (var day in sheet.UnsavedDays)
         {
             var work = sheet.WorkFor(day);
             var before = sheet.SavedOn(day);
-            var result = work.BadHours.Count == 0 ? await SaveDayAsync(c, day, work.RowsToSave(before), before, ct) : null;
-            if (result is { Saved: true }) saved[day] = result;
-            else if (result is { ChangedInJira: true }) changedInJira.Add(day);
+            if (work.BadHours.Count == 0) plans[day] = DaySave.Plan(day, work.RowsToSave(before), before);
             else needsWork.Add(day);
         }
+
+        // One search checks the worklogs of every day before any day is written.
+        var toCheck = plans.Values.Where(p => p.Errors.Count == 0).SelectMany(p => p.ToCheck).ToList();
+        var inJira = await ReadWorklogsAsync(c, toCheck, ct);
+
+        var saved = new Dictionary<DateOnly, DayResult>();
+        var changedInJira = new List<DateOnly>();
+        foreach (var (day, plan) in plans)
+        {
+            var result = await SaveAsync(c, plan, inJira, ct);
+            if (result.Saved) saved[day] = result;
+            else if (result.ChangedInJira) changedInJira.Add(day);
+            else needsWork.Add(day);
+        }
+        needsWork.Sort();
         return new SaveAllResult(saved, needsWork, changedInJira);
     }
 
     /// <summary>
-    /// True when one of the worklogs is gone from Jira or no longer has the day, hours and comment it was
-    /// read with. When Jira can't be asked the save goes ahead: its changes then wait in the retry queue.
+    /// The worklogs a save would change, as Jira has them now, read with their issues in one search. When Jira can't
+    /// be asked the save goes ahead: its changes then wait in the retry queue.
     /// </summary>
-    private async Task<bool> ChangedInJiraAsync(JiraConnection c, IReadOnlyList<TimeEntry> read, CancellationToken ct)
+    private async Task<WorklogsInJira> ReadWorklogsAsync(JiraConnection c, IReadOnlyList<TimeEntry> read, CancellationToken ct)
     {
+        if (read.Count == 0) return WorklogsInJira.Unknown;
         try
         {
-            foreach (var e in read)
-            {
-                var now = await jira.GetWorklogAsync(c, e.WorklogIssueKey, e.JiraWorklogId!, ct);
-                if (now is null || !e.Matches(now)) return true;
-            }
+            var issues = read.Select(e => e.WorklogIssueKey).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            return new WorklogsInJira(await jira.GetWorklogsOnAsync(c, issues, ct));
         }
         catch (JiraException)
         {
-            // Jira can't be asked: save anyway, the changes wait in the retry queue.
+            return WorklogsInJira.Unknown;
         }
-        return false;
+    }
+
+    /// <summary>Worklogs as Jira has them now, by id; <see cref="Unknown"/> when Jira couldn't be asked.</summary>
+    private sealed record WorklogsInJira(IReadOnlyDictionary<string, JiraWorklog>? ById)
+    {
+        public static readonly WorklogsInJira Unknown = new((IReadOnlyDictionary<string, JiraWorklog>?)null);
+
+        /// <summary>
+        /// True when one of the worklogs is gone from Jira or no longer has the day, hours and comment it was read with.
+        /// Never when Jira couldn't be asked.
+        /// </summary>
+        public bool ChangedSinceRead(IReadOnlyList<TimeEntry> read) =>
+            ById is not null && read.Any(e => !ById.TryGetValue(e.JiraWorklogId!, out var now) || !e.Matches(now));
     }
 
     /// <summary>Sends every change in the range that waits in the retry queue.</summary>

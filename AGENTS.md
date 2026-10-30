@@ -89,7 +89,7 @@ Services/RetryQueue.cs             the retry queue: changes Jira couldn't take y
 Services/WorkCalendarService.cs    days and work hours of the signed-in user
 Services/JiraClient.cs             Jira REST calls about issues (myself, issue picker, searches)
 Services/JiraWorklogClient.cs      Jira REST calls that read and write worklogs
-Services/Jira/                     JiraHttp (the one typed HttpClient for Jira), JiraResilience (429 retries, pause, queue), JQL quoting, comment format, raw JSON shapes
+Services/Jira/                     JiraHttp (the one typed HttpClient for Jira), JiraResilience (429 retries, pause, queue), JiraSearch (pages, batches of keys, POST), JQL quoting, comment format, raw JSON shapes
 Services/WorklogSync.cs            saves a day or every unsaved day to Jira, sends the retry queue
 Services/WorklogWriter.cs          writes or deletes one worklog in Jira, queues what fails
 Services/PeriodLoader.cs           loads a period for the timesheet: time, days, picks, previous period
@@ -177,12 +177,22 @@ period's issues at the same time, and issues read on their own are read in paral
 at most 4 in flight per host (see Jira rate limits). Writes stay one at a time, so the changed-in-Jira check and
 Jira's per-issue write limits keep working. `JiraAction` is AsyncLocal, so parallel requests still log under their action.
 Jira's search can take a while to find a new worklog, so for 15 minutes after a save the issues you
-saved on are read directly.
+saved on, when the worklog search doesn't return them, are read by key in one search with their worklogs
+(`key in (...)`, `fields=summary,worklog`): field values come from the issue itself, not the worklog index.
+
+Several issues are always read in one search, never one request each (`Services/Jira/JiraSearch.cs`): status and epic
+lookups, the recently saved issues and the changed-in-Jira check all use `key in (...)`, 100 keys per search (the
+batches go out together), and every search reads all its pages (`startAt`/`total` on Server/DC, `nextPageToken` on
+Cloud). A search whose URL would be longer than 2000 characters is sent as `POST /search` with a JSON body. Key
+searches on Server/DC send `validateQuery=warn`, so a deleted or unknown key is skipped with a warning instead of
+failing the whole search; only a Jira that still answers 400 (Cloud, which has no `validateQuery`) is asked key by key.
 
 Saving (with **Save all**) creates, updates and deletes each changed day's worklogs in Jira, then reads the period back. Moving a row
 to another issue moves its worklog; removing a row deletes it. Before changing or deleting worklogs,
-the app checks that Jira still has them as they were read. If someone changed one meanwhile nothing is
-saved: the day shows Jira's version with your changes on top, to check and save again.
+the app checks that Jira still has them as they were read: one search reads the issues of every worklog
+Save all would change, on every day, with their worklogs (an issue with more worklogs than the search sends is
+read on its own). If someone changed one meanwhile nothing is saved on that day: it shows Jira's version with your
+changes on top, to check and save again. If Jira can't be asked, the save goes ahead.
 
 If Jira can't take a change, it waits in a local retry queue: it shows as **Not in Jira** with the
 reason, counts in totals (a waiting removal hides the work), and is sent by **Sync now**. Once Jira has it, it leaves the queue.
@@ -404,5 +414,5 @@ interfaces and replace the `IDocumentStore` registration in `Program.cs`.
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, loading a period, saving days to Jira and the retry queue, links, Jira queries, issue lookups and the picker, fill suggestions, the Save all change list, modals (queue, results, defaults), the waits on Jira (what shows pending and which buttons wait), Jira rate limits (retries after 429, the pause across users and hosts, the queue), and parallel reads (overlap, the cap of four, writes one at a time).
+xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, loading a period, saving days to Jira and the retry queue, links, Jira queries, issue lookups and the picker, fill suggestions, the Save all change list, modals (queue, results, defaults), the waits on Jira (what shows pending and which buttons wait), Jira rate limits (retries after 429, the pause across users and hosts, the queue), parallel reads (overlap, the cap of four, writes one at a time), and searches by key (batches, pages, POST, unknown keys).
 

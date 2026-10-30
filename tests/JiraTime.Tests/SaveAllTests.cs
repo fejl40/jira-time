@@ -42,6 +42,29 @@ public class SaveAllTests : IDisposable
     }
 
     [Fact]
+    public async Task One_search_checks_the_worklogs_of_every_day_before_any_is_written()
+    {
+        foreach (var day in new[] { "19", "20", "21" })
+        {
+            _h.Jira.AddWorklog("ABC-1", $"2026-10-{day}T09:00:00.000+0200", 3600);
+            _h.Jira.AddWorklog("ABC-2", $"2026-10-{day}T09:00:00.000+0200", 3600);
+        }
+        var sheet = await SheetAsync();
+        foreach (var day in new[] { Monday, Tuesday, Wednesday })
+            foreach (var row in sheet.SavedOn(day))
+                sheet.WorkFor(day).Edit(row).Description = "Edited";
+        _h.Jira.Requests.Clear();
+
+        var result = await _h.Sync.SaveDaysAsync(_h.Connection, sheet);
+
+        Assert.Equal([Monday, Tuesday, Wednesday], result.Saved.Keys.Order());
+        var check = Assert.Single(_h.Jira.Requests.TakeWhile(r => r.Method != HttpMethod.Put));
+        Assert.StartsWith("key in (", FakeJira.Jql(check));
+        Assert.Equal(6, _h.Jira.Requests.Count(r => r.Method == HttpMethod.Put));
+        Assert.Single(_h.Jira.Requests, r => FakeJira.Jql(r).StartsWith("key in")); // not one per day
+    }
+
+    [Fact]
     public async Task When_every_day_is_saved_there_is_nothing_to_fix()
     {
         var sheet = await SheetAsync();

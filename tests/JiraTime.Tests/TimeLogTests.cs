@@ -74,6 +74,52 @@ public class TimeLogTests : IDisposable
     }
 
     [Fact]
+    public async Task Several_issues_just_saved_on_are_read_in_one_search_with_their_worklogs()
+    {
+        await _h.SaveDayAsync(Day, [TimeHarness.Row("NEW-1", 3), TimeHarness.Row("NEW-2", 3), TimeHarness.Row("NEW-3", 2)]);
+        foreach (var key in new[] { "NEW-1", "NEW-2", "NEW-3" }) _h.Jira.NotIndexed.Add(key);
+        _h.Log.Refresh();
+        _h.Jira.Requests.Clear();
+
+        Assert.Equal(["NEW-1", "NEW-2", "NEW-3"], (await Period()).Entries.Select(e => e.IssueKey).Order());
+
+        Assert.Equal(2, _h.Jira.Requests.Count); // the worklog search, then one search by key
+        var byKey = FakeJira.Jql(_h.Jira.Requests[1]);
+        Assert.StartsWith("key in (", byKey);
+        Assert.All(new[] { "NEW-1", "NEW-2", "NEW-3" }, key => Assert.Contains(key, byKey));
+        Assert.Contains("fields=summary,worklog", _h.Jira.Requests[1].Path);
+    }
+
+    [Fact]
+    public async Task An_issue_just_saved_on_with_more_worklogs_than_the_search_sends_is_read_on_its_own()
+    {
+        await _h.SaveDayAsync(Day, [TimeHarness.Row("NEW-1", 3), TimeHarness.Row("NEW-2", 3)]);
+        _h.Jira.AddWorklog("NEW-1", "2026-10-20T09:00:00.000+0200", 3600);
+        _h.Jira.NotIndexed.UnionWith(["NEW-1", "NEW-2"]);
+        _h.Jira.EmbeddedWorklogLimit = 1;
+        _h.Log.Refresh();
+        _h.Jira.Requests.Clear();
+
+        Assert.Equal(3, (await Period()).Entries.Count);
+
+        var read = Assert.Single(_h.Jira.Requests, r => r.Path.Contains("/worklog"));
+        Assert.Contains("/issue/NEW-1/worklog", read.Path);
+    }
+
+    [Fact]
+    public async Task An_issue_just_saved_on_that_is_gone_from_Jira_has_no_work()
+    {
+        await _h.SaveDayAsync(Day, [TimeHarness.Row("NEW-1", 3), TimeHarness.Row("NEW-2", 1)]);
+        _h.Jira.Worklogs.Remove("NEW-2"); // the issue was deleted
+        _h.Jira.NotIndexed.Add("NEW-1");
+        _h.Log.Refresh();
+        _h.Jira.Requests.Clear();
+
+        Assert.Equal("NEW-1", Assert.Single((await Period()).Entries).IssueKey);
+        Assert.Equal(2, _h.Jira.Requests.Count);
+    }
+
+    [Fact]
     public async Task Issues_are_read_directly_only_for_a_while_after_a_save()
     {
         await _h.SaveDayAsync(Day, [TimeHarness.Row("NEW-1", 3)]);

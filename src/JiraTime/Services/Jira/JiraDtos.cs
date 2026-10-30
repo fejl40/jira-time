@@ -10,7 +10,8 @@ internal record PickerResult(List<PickerSection> Sections);
 internal record PickerSection(List<PickerIssue> Issues);
 internal record PickerIssue(string Key, string? SummaryText);
 internal record RawWorklog(string? Id);
-internal record SearchResult(List<SearchIssue> Issues, int? Total = null, string? NextPageToken = null, bool? IsLast = null);
+/// <summary>One page of a search answer: <see cref="Total"/> on Server/DC, <see cref="NextPageToken"/> on Cloud.</summary>
+internal record SearchPage<TIssue>(List<TIssue> Issues, int? Total = null, string? NextPageToken = null, bool? IsLast = null);
 internal record WorklogPage(List<RawJiraWorklog> Worklogs, int Total);
 internal record RawJiraWorklog(string? Id, string? Started, int TimeSpentSeconds, JsonElement? Comment, RawUser? Author, string? Created = null);
 internal record SearchIssue(string Key, SearchFields? Fields);
@@ -23,7 +24,6 @@ internal record EmbeddedWorklogs(List<RawJiraWorklog> Worklogs, int Total)
 internal record NamedField(string? Name);
 internal record StatusField(string? Name, StatusCategoryField? StatusCategory);
 internal record StatusCategoryField(string? Key);
-internal record EpicSearchResult(List<EpicSearchIssue> Issues);
 internal record EpicSearchIssue(string? Key, EpicFields? Fields);
 internal record EpicFields(EpicParent? Parent, IssueTypeField? IssueType)
 {
