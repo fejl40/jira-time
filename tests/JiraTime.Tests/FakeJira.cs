@@ -24,6 +24,24 @@ public sealed class FakeJira : HttpMessageHandler
     /// <summary>When set and it returns a status, that request fails with it.</summary>
     public Func<Uri, HttpStatusCode?>? FailWhen { get; set; }
 
+    /// <summary>How many of the next requests Jira refuses with 429 Too Many Requests.</summary>
+    public int TooManyRequests { get; set; }
+
+    /// <summary>The Retry-After header sent with a 429 (seconds or an HTTP date); none when null.</summary>
+    public string? RetryAfter { get; set; }
+
+    /// <summary>When set, requests wait for it before Jira answers, so tests can see how many are out at once.</summary>
+    public TaskCompletionSource? Hold { get; set; }
+
+    /// <summary>Released once for each request that reached Jira.</summary>
+    public SemaphoreSlim Arrived { get; } = new(0);
+
+    /// <summary>The most requests that were out at the same time.</summary>
+    public int MostInFlight { get; private set; }
+
+    private readonly Lock _lock = new();
+    private int _inFlight;
+
     /// <summary>When set, requests throw as if the server can't be reached.</summary>
     public bool Offline { get; set; }
 
@@ -79,8 +97,34 @@ public sealed class FakeJira : HttpMessageHandler
         if (Offline) throw new HttpRequestException("Connection refused");
 
         var body = req.Content is null ? null : JsonNode.Parse(await req.Content.ReadAsStringAsync(ct));
+        lock (_lock)
+        {
+            Requests.Add(new Request(req.Method, req.RequestUri!.PathAndQuery, body));
+            MostInFlight = Math.Max(MostInFlight, ++_inFlight);
+        }
+        Arrived.Release();
+        try
+        {
+            if (Hold is { } hold) await hold.Task.WaitAsync(ct);
+            lock (_lock) return Answer(req, body);
+        }
+        finally
+        {
+            lock (_lock) _inFlight--;
+        }
+    }
+
+    /// <summary>Jira's answer, one request at a time, so parallel requests see consistent worklogs.</summary>
+    private HttpResponseMessage Answer(HttpRequestMessage req, JsonNode? body)
+    {
         var path = req.RequestUri!.AbsolutePath;
-        Requests.Add(new Request(req.Method, path + req.RequestUri.Query, body));
+        if (TooManyRequests > 0)
+        {
+            TooManyRequests--;
+            var refused = Json(HttpStatusCode.TooManyRequests, new { errorMessages = new[] { "Rate limit exceeded" } });
+            if (RetryAfter is { } after) refused.Headers.TryAddWithoutValidation("Retry-After", after);
+            return refused;
+        }
 
         if ((FailWith ?? FailWhen?.Invoke(req.RequestUri)) is { } status)
             return Json(status, new { errorMessages = new[] { $"Failed with {(int)status}" } });

@@ -17,7 +17,7 @@ public class JiraRequestLogTests : IDisposable
     private Task<IReadOnlyList<JiraLogEntry>> CarlsLogAsync() => _h.RequestLog.ReadDayAsync(TestUsers.Carl.Id, Day);
 
     private Task<JiraProfile> MyselfAsync(TimeHarness? h = null) =>
-        new JiraClient((h ?? _h).Jira.Client(), (h ?? _h).Recorder).GetMyselfAsync((h ?? _h).Connection);
+        new JiraClient((h ?? _h).Http).GetMyselfAsync((h ?? _h).Connection);
 
     [Fact]
     public async Task Saving_a_day_logs_each_request_with_what_was_sent_and_what_came_back()
@@ -72,7 +72,7 @@ public class JiraRequestLogTests : IDisposable
     [Fact]
     public async Task A_request_that_times_out_is_logged_as_timed_out()
     {
-        var client = new JiraClient(new HttpClient(new StubHandler(_ => throw new TaskCanceledException())), _h.Recorder);
+        var client = new JiraClient(_h.HttpOver(new StubHandler(_ => throw new TaskCanceledException())));
 
         await Assert.ThrowsAsync<JiraException>(() => client.GetMyselfAsync(_h.Connection));
 
@@ -84,7 +84,7 @@ public class JiraRequestLogTests : IDisposable
     public async Task An_answer_that_is_not_JSON_is_logged_as_it_came()
     {
         var html = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("<html>Log in</html>", Encoding.UTF8, "text/html") });
-        var client = new JiraClient(new HttpClient(html), _h.Recorder);
+        var client = new JiraClient(_h.HttpOver(html));
 
         await Assert.ThrowsAsync<JiraException>(() => client.GetMyselfAsync(_h.Connection));
 
@@ -120,7 +120,7 @@ public class JiraRequestLogTests : IDisposable
         var big = new string('x', JiraRequestRecorder.MaxBody + 10);
         _h.Jira.Gets["/rest/api/2/myself"] = _ => new { key = "JIRAUSER1", displayName = big };
 
-        await new JiraClient(_h.Jira.Client(), _h.Recorder).GetMyselfAsync(_h.Connection);
+        await new JiraClient(_h.Http).GetMyselfAsync(_h.Connection);
         await _h.SaveDayAsync(Day, [TimeHarness.Row("ABC-1", 1, big)]);
 
         var log = await CarlsLogAsync();

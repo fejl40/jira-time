@@ -44,8 +44,10 @@ builder.Services.AddSingleton(sp => new JiraRequestLog(Path.Combine(dataDir, "lo
 builder.Services.AddSingleton<JiraRequestFeed>();
 builder.Services.AddSingleton<JiraRequestRecorder>();
 builder.Services.AddScoped<MyJiraLog>();
-builder.Services.AddHttpClient<JiraClient>(c => c.Timeout = TimeSpan.FromSeconds(30));
-builder.Services.AddHttpClient<JiraWorklogClient>(c => c.Timeout = TimeSpan.FromSeconds(30));
+// One typed client for every Jira request: timeout, rate-limit retries, queue and logging (JiraResilience).
+builder.Services.AddJiraHttp();
+builder.Services.AddTransient<JiraClient>();
+builder.Services.AddTransient<JiraWorklogClient>();
 
 var app = builder.Build();
 

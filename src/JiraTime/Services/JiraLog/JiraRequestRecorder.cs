@@ -136,3 +136,23 @@ public sealed class JiraCall
         await _recorder.FinishAsync(_entry, _action);
     }
 }
+
+/// <summary>
+/// Logs each attempt of a Jira request, retries included: it sits inside the resilience pipeline, next to the
+/// network. A 429 is logged here at once, saying how long Jira asked to wait; any other attempt is finished
+/// by <see cref="JiraHttp"/>, which knows how the request ended.
+/// </summary>
+public sealed class JiraRecordingHandler(JiraRequestRecorder recorder, TimeProvider clock) : DelegatingHandler
+{
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage req, CancellationToken ct)
+    {
+        if (JiraRequest.Of(req) is not { } request) return await base.SendAsync(req, ct);
+
+        var call = request.Call = recorder.Start(request.Connection, req, request.Body);
+        var res = await base.SendAsync(req, ct);
+        await call.ReadResponseAsync(res, ct);
+        if (res.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+            await call.FinishAsync(JiraResilience.WaitMessage(JiraResilience.RetryAfter(res, clock)));
+        return res;
+    }
+}

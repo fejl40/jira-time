@@ -1,6 +1,7 @@
 using JiraTime.Domain;
 using JiraTime.Services;
 using JiraTime.Storage;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace JiraTime.Tests;
@@ -30,6 +31,9 @@ public sealed class TimeHarness : IDisposable
     public JiraRequestLog RequestLog { get; }
     public JiraRequestFeed Feed { get; } = new(NullLogger<JiraRequestFeed>.Instance);
     public JiraRequestRecorder Recorder { get; }
+    /// <summary>The Jira client as the app registers it (resilience pipeline and request log), over <see cref="Jira"/>.</summary>
+    public JiraHttp Http { get; }
+    private readonly List<ServiceProvider> _providers = [];
 
     public TimeHarness(JiraConnection? connection = null)
     {
@@ -37,10 +41,11 @@ public sealed class TimeHarness : IDisposable
         Connection = user.Connection!;
         RequestLog = new JiraRequestLog(System.IO.Path.Combine(Files.Path, "jira-logs"), Clock);
         Recorder = new JiraRequestRecorder(RequestLog, Feed, Clock, NullLogger<JiraRequestRecorder>.Instance);
-        Issues = new JiraIssueLookup(new JiraClient(Jira.Client(), Recorder), Clock);
+        Http = HttpOver(Jira);
+        Issues = new JiraIssueLookup(new JiraClient(Http), Clock);
         Calendar = new WorkCalendarService(Store, user);
         Legacy = new LegacyDataMigration(Store, Clock);
-        var client = new JiraWorklogClient(Jira.Client(), Recorder);
+        var client = new JiraWorklogClient(Http);
         Queue = new RetryQueue(Store, user);
         Recent = new RecentWorklogIssues(Clock);
         Log = new TimeLog(client, Queue, user, Recent, Clock);
@@ -57,7 +62,23 @@ public sealed class TimeHarness : IDisposable
     }
 
     /// <summary>Signing in through the fake Jira; <paramref name="tab"/> becomes the user Jira confirms.</summary>
-    public JiraIdentity Identity(CurrentUser tab) => new(new JiraClient(Jira.Client(), Recorder), Store, tab, Legacy, Clock);
+    public JiraIdentity Identity(CurrentUser tab) => new(new JiraClient(Http), Store, tab, Legacy, Clock);
+
+    /// <summary>
+    /// A Jira client registered the way Program.cs does it, sending to <paramref name="network"/>. Clients from one
+    /// call share their pipelines (one per Jira host), as all tabs of the app do.
+    /// </summary>
+    public JiraHttp HttpOver(HttpMessageHandler network)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<TimeProvider>(Clock);
+        services.AddSingleton(Recorder);
+        services.AddJiraHttp().ConfigurePrimaryHttpMessageHandler(() => network);
+        var provider = services.BuildServiceProvider();
+        _providers.Add(provider);
+        return provider.GetRequiredService<JiraHttp>();
+    }
 
     /// <summary>A period loader and status book over the same fake Jira and store.</summary>
     public (PeriodLoader Loader, IssueStatuses Statuses) PeriodLoading() =>
@@ -89,7 +110,11 @@ public sealed class TimeHarness : IDisposable
     public static TimeEntry Row(string key, double hours, string? comment = null) =>
         new() { IssueKey = key, IssueSummary = $"Summary of {key}", Duration = TimeSpan.FromHours(hours), Description = comment };
 
-    public void Dispose() => Files.Dispose();
+    public void Dispose()
+    {
+        foreach (var provider in _providers) provider.Dispose();
+        Files.Dispose();
+    }
 }
 
 /// <summary>One user's stored data: the retry queue, days and work hours, and export values per epic.</summary>
@@ -104,15 +129,57 @@ public static class TestUsers
     public static CurrentUser SignedIn(UserKey? key = null) => CurrentUser.SignedIn(key ?? Carl);
 }
 
-/// <summary>A clock tests can set and move. Without a time it is noon UTC on Tuesday 27 October 2026.</summary>
+/// <summary>
+/// A clock tests can set and move. Without a time it is noon UTC on Tuesday 27 October 2026. Timers fire at
+/// once and move the clock on to when they were due, so waits (such as a retry after a 429) take no real time
+/// and tests can see how long they waited.
+/// </summary>
 public sealed class TestClock(DateTimeOffset now) : TimeProvider
 {
+    private readonly Lock _lock = new();
+    private DateTimeOffset _now = now;
+
     public TestClock() : this(new DateTimeOffset(2026, 10, 27, 12, 0, 0, TimeSpan.Zero)) { }
 
-    public DateTimeOffset Now { get; set; } = now;
+    public DateTimeOffset Now
+    {
+        get { lock (_lock) return _now; }
+        set { lock (_lock) _now = value; }
+    }
+
     public override DateTimeOffset GetUtcNow() => Now;
     public override TimeZoneInfo LocalTimeZone => TimeZoneInfo.Utc;
-    public void Advance(TimeSpan by) => Now += by;
+    public void Advance(TimeSpan by) { lock (_lock) _now += by; }
+
+    /// <summary>Moves the clock to <paramref name="time"/> unless it is already later: waits that overlap don't add up.</summary>
+    private void MoveTo(DateTimeOffset time) { lock (_lock) if (time > _now) _now = time; }
+
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period) =>
+        new JumpingTimer(this, callback, state, dueTime);
+
+    private sealed class JumpingTimer : ITimer
+    {
+        private readonly TestClock _clock;
+        private readonly TimerCallback _callback;
+        private readonly object? _state;
+
+        public JumpingTimer(TestClock clock, TimerCallback callback, object? state, TimeSpan dueTime)
+        {
+            (_clock, _callback, _state) = (clock, callback, state);
+            Change(dueTime, Timeout.InfiniteTimeSpan);
+        }
+
+        public bool Change(TimeSpan dueTime, TimeSpan period)
+        {
+            if (dueTime == Timeout.InfiniteTimeSpan) return true;
+            _clock.MoveTo(_clock.Now + dueTime);
+            ThreadPool.QueueUserWorkItem(_ => _callback(_state));
+            return true;
+        }
+
+        public void Dispose() { }
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
 }
 
 /// <summary>A file document store in its own temp folder, deleted after the test.</summary>

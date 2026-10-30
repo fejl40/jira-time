@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using JiraTime.Domain;
+using Polly.CircuitBreaker;
+using Polly.RateLimiting;
 
 namespace JiraTime.Services;
 
@@ -12,10 +14,11 @@ public class JiraException(string message, HttpStatusCode? status = null) : Exce
 }
 
 /// <summary>
-/// Sends requests to Jira: picks the API version, adds auth, and turns failures into <see cref="JiraException"/>s
-/// with messages a user can act on.
+/// The one typed HttpClient for Jira: picks the API version, adds auth, and turns failures into <see cref="JiraException"/>s
+/// with messages a user can act on. Retries, the rate-limit pause and the queue are its resilience pipeline
+/// (<see cref="JiraResilience"/>); each attempt is logged by <see cref="JiraRecordingHandler"/>.
 /// </summary>
-internal class JiraHttp(HttpClient http, JiraRequestRecorder recorder)
+public class JiraHttp(HttpClient http)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -39,23 +42,23 @@ internal class JiraHttp(HttpClient http, JiraRequestRecorder recorder)
         req.Headers.Authorization = c.IsCloud
             ? new AuthenticationHeaderValue("Basic", Convert.ToBase64String(Encoding.UTF8.GetBytes($"{c.Email}:{c.Token}")))
             : new AuthenticationHeaderValue("Bearer", c.Token);
+        var request = JiraRequest.Attach(req, c, json);
 
-        // Every request is logged, however it ends.
-        var call = recorder.Start(c, req, json);
+        // Every attempt that reached Jira is logged; the last one is finished here, with how the request ended.
         try
         {
-            var result = await SendAsync<T>(c, req, call, ct);
-            await call.FinishAsync(null);
+            var result = await SendAsync<T>(c, req, ct);
+            await request.FinishAsync(null);
             return result;
         }
         catch (Exception ex)
         {
-            await call.FinishAsync(ex is OperationCanceledException ? "Cancelled before Jira answered." : ex.Message);
+            await request.FinishAsync(ex is OperationCanceledException ? "Cancelled before Jira answered." : ex.Message);
             throw;
         }
     }
 
-    private async Task<T> SendAsync<T>(JiraConnection c, HttpRequestMessage req, JiraCall call, CancellationToken ct)
+    private async Task<T> SendAsync<T>(JiraConnection c, HttpRequestMessage req, CancellationToken ct)
     {
         var method = req.Method;
         HttpResponseMessage res;
@@ -71,12 +74,21 @@ internal class JiraHttp(HttpClient http, JiraRequestRecorder recorder)
         {
             throw new JiraException($"{c.Host} did not respond in time.");
         }
+        catch (BrokenCircuitException)
+        {
+            throw new JiraException(JiraResilience.SlowDownMessage, HttpStatusCode.TooManyRequests);
+        }
+        catch (RateLimiterRejectedException)
+        {
+            throw new JiraException("Too many requests are waiting for Jira. Try again in a moment.", HttpStatusCode.TooManyRequests);
+        }
 
         using (res)
         {
-            await call.ReadResponseAsync(res, ct);
             if (res.StatusCode == HttpStatusCode.Unauthorized)
                 throw new JiraException("Jira rejected the token (401). Check that it is correct and not expired.", res.StatusCode);
+            if (res.StatusCode == HttpStatusCode.TooManyRequests)
+                throw new JiraException(JiraResilience.SlowDownMessage, res.StatusCode);
 
             // Nothing to read (e.g. 204 after a delete).
             if (res.IsSuccessStatusCode && (res.StatusCode == HttpStatusCode.NoContent || method == HttpMethod.Delete))
@@ -88,23 +100,51 @@ internal class JiraHttp(HttpClient http, JiraRequestRecorder recorder)
                 throw new JiraException($"{c.Host} did not return JSON. Is the URL the Jira base URL?", res.StatusCode);
 
             if (!res.IsSuccessStatusCode)
-            {
-                var message = $"Jira returned {(int)res.StatusCode} {res.ReasonPhrase}.";
-                if (isJson)
-                {
-                    try
-                    {
-                        var err = await res.Content.ReadFromJsonAsync<JiraErrorBody>(Json, ct);
-                        var msgs = (err?.ErrorMessages ?? []).Concat(err?.Errors?.Values.AsEnumerable() ?? []).ToList();
-                        if (msgs.Count > 0) message = string.Join(" ", msgs);
-                    }
-                    catch (JsonException) { }
-                }
-                throw new JiraException(message, res.StatusCode);
-            }
+                throw new JiraException(await ErrorMessageAsync(res, isJson, ct), res.StatusCode);
 
             return await res.Content.ReadFromJsonAsync<T>(Json, ct)
                    ?? throw new JiraException("Jira returned an empty response.");
         }
     }
+
+    /// <summary>Jira's own error messages when it sent any, else the status.</summary>
+    private static async Task<string> ErrorMessageAsync(HttpResponseMessage res, bool isJson, CancellationToken ct)
+    {
+        var message = $"Jira returned {(int)res.StatusCode} {res.ReasonPhrase}.";
+        if (!isJson) return message;
+        try
+        {
+            var err = await res.Content.ReadFromJsonAsync<JiraErrorBody>(Json, ct);
+            var msgs = (err?.ErrorMessages ?? []).Concat(err?.Errors?.Values.AsEnumerable() ?? []).ToList();
+            if (msgs.Count > 0) message = string.Join(" ", msgs);
+        }
+        catch (JsonException) { }
+        return message;
+    }
+}
+
+/// <summary>
+/// What the handlers below <see cref="JiraHttp"/> need to know about a request: whose connection it is, the JSON
+/// sent, and the attempt being logged. Travels in the request's options, through every retry.
+/// </summary>
+public sealed class JiraRequest
+{
+    private static readonly HttpRequestOptionsKey<JiraRequest> Key = new("JiraTime.JiraRequest");
+
+    public required JiraConnection Connection { get; init; }
+    public string? Body { get; init; }
+    /// <summary>The latest attempt that reached Jira; null until one did.</summary>
+    public JiraCall? Call { get; set; }
+
+    public static JiraRequest Attach(HttpRequestMessage req, JiraConnection c, string? body)
+    {
+        var request = new JiraRequest { Connection = c, Body = body };
+        req.Options.Set(Key, request);
+        return request;
+    }
+
+    public static JiraRequest? Of(HttpRequestMessage req) => req.Options.TryGetValue(Key, out var r) ? r : null;
+
+    /// <summary>Logs the latest attempt with how the request ended (an attempt already logged stays as it was).</summary>
+    public Task FinishAsync(string? error) => Call?.FinishAsync(error) ?? Task.CompletedTask;
 }

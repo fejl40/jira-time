@@ -53,7 +53,7 @@ The `backlog/` folder is committed with the code.
 Paths below are relative to `src/JiraTime/`.
 
 ```
-Program.cs                         DI: storage, data protection, Jira clients
+Program.cs                         DI: storage, data protection, the Jira client (AddJiraHttp)
 Domain/TimeEntry.cs                one block of work on an issue on a day
 Domain/Period.cs                   semi-monthly periods, today from the clock
 Domain/Jira.cs                     connection, profile, issues and worklogs as Jira has them
@@ -86,7 +86,7 @@ Services/RetryQueue.cs             the retry queue: changes Jira couldn't take y
 Services/WorkCalendarService.cs    days and work hours of the signed-in user
 Services/JiraClient.cs             Jira REST calls about issues (myself, issue picker, searches)
 Services/JiraWorklogClient.cs      Jira REST calls that read and write worklogs
-Services/Jira/                     HTTP transport, JQL quoting, comment format, raw JSON shapes
+Services/Jira/                     JiraHttp (the one typed HttpClient for Jira), JiraResilience (429 retries, pause, queue), JQL quoting, comment format, raw JSON shapes
 Services/WorklogSync.cs            saves a day or every unsaved day to Jira, sends the retry queue
 Services/WorklogWriter.cs          writes or deletes one worklog in Jira, queues what fails
 Services/PeriodLoader.cs           loads a period for the timesheet: time, days, picks, previous period
@@ -295,9 +295,31 @@ off) is off until the running one ends, so saves and reads never cross. `JiraWai
 a period left before it was read is never shown. Settings (Save hours), Connect, the issue picker's search and
 the export's values per epic show the same spinner.
 
+### Jira rate limits
+
+`JiraHttp` is the one typed HttpClient for Jira (`AddJiraHttp` in `Services/Jira/JiraResilience.cs`): the 30 s
+timeout, a Microsoft.Extensions.Http.Resilience pipeline and the request log are set up there once; `JiraClient` and
+`JiraWorklogClient` get it injected. There is one pipeline per Jira host (`SelectPipelineByAuthority`), shared by every
+user and tab, with three strategies, outermost first:
+
+1. **Retry**: a 429 or the open circuit is waited out (Retry-After, in seconds or as a date, else exponential backoff
+   from 1 s with jitter) and the request sent again, at most 5 times; a pause longer than 10 s isn't waited out and
+   the request fails as before (a write goes to the retry queue). Only 429 and the open circuit are retried, never
+   5xx, timeouts or network errors, so a worklog is never logged twice; Jira did nothing with a request it refused with 429.
+2. **Concurrency limiter**: at most 4 requests to a host at once; the rest wait in a FIFO queue (200 places; a full
+   queue fails like any Jira error). It sits outside the breaker, so a request turned away by the open circuit gives
+   its place back while the retry waits.
+3. **Circuit breaker**: a 429 opens it for Retry-After plus up to 20% jitter, so no request goes to that host,
+   for any user, until the pause is over. Polly needs two requests in its window (5 minutes) before it can open, so
+   the very first request after a quiet spell that gets a 429 only waits on its own.
+
+`JiraRecordingHandler` sits inside the pipeline, so every attempt is in the request log; a 429 is logged as
+"Jira asked us to slow down: requests to Jira pause for N s.", which the request toast shows too. Tests use
+`TestClock`, whose timers fire at once and move the clock on, so waits take no real time.
+
 ### Jira request log
 
-Every Jira request goes through `JiraHttp`, which records it with `JiraRequestRecorder`: method, full URL,
+Every Jira request goes through `JiraHttp`; each attempt is recorded by `JiraRecordingHandler` with `JiraRequestRecorder`: method, full URL,
 status and reason, duration, headers (without `Authorization`, `Proxy-Authorization` and cookies), content
 type, response size, request and response bodies (cut at 64 KB and flagged) and the error for failures,
 timeouts and unreachable Jira. Each request is one JSON line in `data/logs/jira/<owner>/yyyy-MM-dd.jsonl`;
@@ -372,5 +394,5 @@ interfaces and replace the `IDocumentStore` registration in `Program.cs`.
 dotnet test
 ```
 
-xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, loading a period, saving days to Jira and the retry queue, links, Jira queries, issue lookups and the picker, fill suggestions, the Save all change list, modals (queue, results, defaults), and the waits on Jira (what shows pending and which buttons wait).
+xUnit tests in `tests/JiraTime.Tests` cover periods, the period sheet, the file document store, time entry rules, workdays, reading time from Jira, loading a period, saving days to Jira and the retry queue, links, Jira queries, issue lookups and the picker, fill suggestions, the Save all change list, modals (queue, results, defaults), the waits on Jira (what shows pending and which buttons wait), and Jira rate limits (retries after 429, the pause across users and hosts, the queue).
 
