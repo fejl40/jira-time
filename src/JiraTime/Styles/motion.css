@@ -137,54 +137,6 @@
   @keyframes modal-sheet { from { transform: translateY(100%); } }
 }
 
-/* ---- Health check (Components/Pages/HealthCheckSection.razor) ---- */
-
-/* A thin bar fills left to right as checks finish (transform only); it fades in on the first run. */
-.health-progress {
-  height: 3px; overflow: hidden; border-radius: 9999px;
-  background: rgb(148 163 184 / 0.2); opacity: 0;
-  transition: opacity var(--motion) var(--motion-ease);
-}
-.health-progress[data-visible] { opacity: 1; }
-.health-progress-fill {
-  height: 100%; width: 100%; transform-origin: left;
-  transition: transform var(--motion) var(--motion-ease), background-color var(--motion) var(--motion-ease);
-}
-
-/* A finished check's icon pops in; a failed one gives a small shake after. */
-.health-icon-pop { animation: health-pop var(--motion) var(--motion-ease) both; }
-@keyframes health-pop {
-  from { opacity: 0; transform: scale(0.4) rotate(-20deg); }
-  60% { opacity: 1; transform: scale(1.15) rotate(0deg); }
-  to { transform: scale(1); }
-}
-.health-icon-shake { animation: health-pop var(--motion) var(--motion-ease) both, health-shake 360ms ease-in-out var(--motion) 1; }
-@keyframes health-shake { 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
-
-/* The row being checked gets a soft wash that fades in and out (opacity of a layer behind it). */
-.health-row { position: relative; }
-.health-row::before {
-  content: ""; position: absolute; inset: 0 -0.75rem; z-index: -1; border-radius: 0.5rem;
-  background: rgb(59 130 246 / 0.07); opacity: 0;
-  transition: opacity var(--motion) var(--motion-ease);
-}
-.health-row[data-health-state="running"]::before { opacity: 1; }
-.health-card { position: relative; isolation: isolate; }
-
-/* The summary rises in once the run is done. */
-.health-summary { animation: health-rise var(--motion) var(--motion-ease) both; }
-@keyframes health-rise { from { opacity: 0; transform: translateY(6px); } }
-
-/* When every check passed, a soft emerald glow breathes around the card once (opacity of a shadow layer). */
-.health-card::after {
-  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
-  box-shadow: 0 0 0 2px rgb(16 185 129 / 0.45), 0 0 28px 4px rgb(16 185 129 / 0.25); opacity: 0;
-}
-.health-card[data-health-all-passed]::after { animation: health-glow 1400ms var(--motion-ease) 1; }
-@keyframes health-glow { 30% { opacity: 1; } }
-@media (prefers-reduced-motion: reduce) {
-  .health-card[data-health-all-passed]::after { animation: none; }
-
 /* ---- Water in the grid's day columns (Components/Sheet/DayWater.razor) ---- */
 
 /* The glass: a faint outline; the water inside rises to the day's level by moving up (transform only). */
@@ -262,3 +214,52 @@
 }
 @keyframes motion-ripple-lift { 35% { transform: translateY(-2px); } }
 @keyframes motion-ripple-glow { 35% { opacity: 1; } }
+
+/* ---- Health check (Components/Pages/HealthCheckSection.razor) ---- */
+
+/* A thin bar fills left to right as checks finish (transform only); it fades in on the first run. */
+.health-progress {
+  height: 3px; overflow: hidden; border-radius: 9999px;
+  background: rgb(148 163 184 / 0.2); opacity: 0;
+  transition: opacity var(--motion) var(--motion-ease);
+}
+.health-progress[data-visible] { opacity: 1; }
+.health-progress-fill {
+  height: 100%; width: 100%; transform-origin: left;
+  transition: transform var(--motion) var(--motion-ease), background-color var(--motion) var(--motion-ease);
+}
+
+/* A finished check's icon pops in; a failed one gives a small shake after. */
+.health-icon-pop { animation: health-pop var(--motion) var(--motion-ease) both; }
+@keyframes health-pop {
+  from { opacity: 0; transform: scale(0.4) rotate(-20deg); }
+  60% { opacity: 1; transform: scale(1.15) rotate(0deg); }
+  to { transform: scale(1); }
+}
+.health-icon-shake { animation: health-pop var(--motion) var(--motion-ease) both, health-shake 360ms ease-in-out var(--motion) 1; }
+@keyframes health-shake { 25% { transform: translateX(-2px); } 75% { transform: translateX(2px); } }
+
+/* The row being checked gets a soft wash that fades in and out (opacity of a layer behind it). */
+.health-row { position: relative; }
+.health-row::before {
+  content: ""; position: absolute; inset: 0 -0.75rem; z-index: -1; border-radius: 0.5rem;
+  background: rgb(59 130 246 / 0.07); opacity: 0;
+  transition: opacity var(--motion) var(--motion-ease);
+}
+.health-row[data-health-state="running"]::before { opacity: 1; }
+.health-card { position: relative; isolation: isolate; }
+
+/* The summary rises in once the run is done. */
+.health-summary { animation: health-rise var(--motion) var(--motion-ease) both; }
+@keyframes health-rise { from { opacity: 0; transform: translateY(6px); } }
+
+/* When every check passed, a soft emerald glow breathes around the card once (opacity of a shadow layer). */
+.health-card::after {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 0 2px rgb(16 185 129 / 0.45), 0 0 28px 4px rgb(16 185 129 / 0.25); opacity: 0;
+}
+.health-card[data-health-all-passed]::after { animation: health-glow 1400ms var(--motion-ease) 1; }
+@keyframes health-glow { 30% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .health-card[data-health-all-passed]::after { animation: none; }
+}
