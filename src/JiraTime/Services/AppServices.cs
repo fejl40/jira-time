@@ -40,6 +40,7 @@ public static class AppServices
         services.AddScoped<WorklogSync>();
         services.AddScoped<TimeLog>();
         services.AddScoped<PeriodLoader>();
+        services.AddScoped<WorkStreak>();
         services.AddTransient<IssueStatuses>();
         services.AddSingleton<RecentWorklogIssues>();
         services.AddScoped<WorkCalendarService>();

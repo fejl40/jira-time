@@ -25,9 +25,9 @@ public sealed record PeriodExtras(
 
 /// <summary>
 /// Loads a period for the timesheet: logged time (from Jira), days, the previous period's state, and the
-/// issues and comments the pickers offer. Jira being down for issue lists just means fewer picks.
+/// issues and comments the pickers offer, and the header's streak. Jira being down for issue lists just means fewer picks.
 /// </summary>
-public class PeriodLoader(TimeLog log, WorkCalendarService calendar, JiraIssueLookup issues, CurrentUser user)
+public class PeriodLoader(TimeLog log, WorkCalendarService calendar, JiraIssueLookup issues, CurrentUser user, WorkStreak streak)
 {
     /// <summary>Loads the sheet's saved data and sprint, notes the statuses of its issues, and returns what goes around it.</summary>
     public async Task<PeriodExtras> LoadAsync(PeriodSheet sheet, IssueStatuses statuses)
@@ -51,6 +51,7 @@ public class PeriodLoader(TimeLog log, WorkCalendarService calendar, JiraIssueLo
         sheet.Sprint = await sprint;
         statuses.Add(sheet.Sprint.Concat(earlier));
         await statuses.LookUpAsync(sheet.Entries.Select(e => e.IssueKey));
+        await streak.CountAsync(sheet.Today, recent, time.IsComplete);
 
         return new PeriodExtras(time.JiraError, await PreviousAsync(sheet, time), RecentWork.Issues(recent), RecentWork.Comments(recent), earlier);
     }

@@ -1,0 +1,57 @@
+@* The header's flame: workdays in a row logged in full (Domain/Streak.cs). It flickers, grows a size at 5, 10 and
+   20 days and flares once when the row gets longer while the user watches; styles are .streak-* in Styles/motion.css. *@
+@implements IDisposable
+@inject WorkStreak Streaks
+
+@if (Streaks.Current is { Shows: true } streak)
+{
+    <span @key="streak.Days" class="streak streak-size-@streak.Size @(_flare ? "streak-flare" : "")" role="img"
+          title="@Tooltip(streak)" aria-label="@Tooltip(streak)"
+          data-streak-flame data-streak-days="@streak.Days" data-streak-size="@streak.Size" data-streak-flare="@(_flare ? "true" : null)">
+        <span class="streak-glow" aria-hidden="true"></span>
+        <svg class="streak-icon" viewBox="0 0 24 32" aria-hidden="true">
+            <defs>
+                <linearGradient id="streak-outer" x1="0" y1="1" x2="0" y2="0">
+                    <stop offset="0" stop-color="#ef4444" />
+                    <stop offset="0.45" stop-color="#f97316" />
+                    <stop offset="1" stop-color="#fbbf24" />
+                </linearGradient>
+                <linearGradient id="streak-inner" x1="0" y1="1" x2="0" y2="0">
+                    <stop offset="0" stop-color="#fffbeb" />
+                    <stop offset="1" stop-color="#fcd34d" />
+                </linearGradient>
+            </defs>
+            <path class="streak-outer" fill="url(#streak-outer)"
+                  d="M12 1c1 4.6 6 7.6 7.8 12.6 2 5.4-.5 11.4-5.4 13.6-5.2 2.3-11.6-.6-12.3-6.8-.4-3.4 1.2-6 3.1-7.8.2 2 1 3.5 2.4 4.4C7.3 12.4 8.4 6 12 1z" />
+            <path class="streak-inner" fill="url(#streak-inner)"
+                  d="M12.4 13.5c.6 2.6 3.7 4.3 3.9 7.4.2 2.8-1.9 5-4.4 5s-4.5-1.9-4.3-4.5c.1-1.6 1-2.8 2-3.6.1 1 .6 1.8 1.3 2.2-.3-2.4.3-4.6 1.5-6.5z" />
+        </svg>
+        <span class="streak-count">@streak.Days@(streak.Capped ? "+" : "")</span>
+    </span>
+}
+
+@code {
+    private Streak? _seen;
+    private bool _flare;
+
+    protected override void OnInitialized()
+    {
+        _seen = Streaks.Current;
+        Streaks.Changed += OnChanged;
+    }
+
+    /// <summary>A longer row flares the flame once; the new count is a new element (@key), so the flare plays again each time.</summary>
+    private void OnChanged() => InvokeAsync(() =>
+    {
+        var now = Streaks.Current;
+        _flare = now is not null && Streak.Grew(_seen, now);
+        _seen = now;
+        StateHasChanged();
+    });
+
+    private static string Tooltip(Streak streak) =>
+        $"{(streak.Capped ? "At least " : "")}{Format.Count(streak.Days, "workday")} in a row with all hours logged. " +
+        "Weekends, holidays and days off don't break the streak; today counts once it is complete.";
+
+    public void Dispose() => Streaks.Changed -= OnChanged;
+}

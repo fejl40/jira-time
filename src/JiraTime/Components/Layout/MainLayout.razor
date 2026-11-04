@@ -20,6 +20,10 @@
         }
 
         <div class="ml-auto flex flex-none items-center gap-3 text-sm">
+            @if (User.IsSignedIn)
+            {
+                <StreakFlame />
+            }
             <ThemeToggle />
             @if (User.Jira is { Connection: var c, Profile: var p })
             {
