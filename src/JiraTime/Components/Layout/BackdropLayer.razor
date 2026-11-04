@@ -1,21 +1,80 @@
-@* The background behind every page (Styles/backdrop.css): a fixed layer that never takes clicks. The aurora's
-   colours follow the shown period's progress (BackdropState). *@
+@* The background behind every page (Styles/backdrop.css): a fixed layer that never takes clicks. Shows the user's
+   choice from Settings: the aurora, whose colours follow the shown period's progress (BackdropState), the sky at
+   their time of day, or the plain page colour. *@
 @implements IDisposable
 @inject BackdropState State
+@inject BackgroundSettings Settings
+@inject CurrentUser User
+@inject TimeProvider Clock
 
-<div class="backdrop" aria-hidden="true" data-backdrop="aurora" data-palette="@Backdrop.Name(State.Palette)">
-    <div class="aurora">
-        <span class="aurora-blob aurora-blob-1"></span>
-        <span class="aurora-blob aurora-blob-2"></span>
-        <span class="aurora-blob aurora-blob-3"></span>
-        <span class="aurora-blob aurora-blob-4"></span>
-    </div>
+<div class="backdrop" aria-hidden="true" data-backdrop="@Backdrop.Name(_choice)" data-palette="@Backdrop.Name(State.Palette)">
+    @if (_choice == BackgroundChoice.Aurora)
+    {
+        <div class="aurora">
+            <span class="aurora-blob aurora-blob-1"></span>
+            <span class="aurora-blob aurora-blob-2"></span>
+            <span class="aurora-blob aurora-blob-3"></span>
+            <span class="aurora-blob aurora-blob-4"></span>
+        </div>
+    }
+    else if (_choice == BackgroundChoice.Sky)
+    {
+        <div class="absolute inset-0" style="@SkyStyle" data-sky-phase="@Backdrop.Name(_sky.Phase)" data-sky-blend="@_sky.Blend">
+            @foreach (var (phase, _) in Sky.Phases)
+            {
+                <span class="sky-layer sky-@Backdrop.Name(phase)"></span>
+            }
+            <span class="sky-stars" data-sky-stars>
+                <span class="sky-star sky-star-1"></span>
+                <span class="sky-star sky-star-2"></span>
+                <span class="sky-star sky-star-3"></span>
+            </span>
+        </div>
+    }
 </div>
 
 @code {
-    protected override void OnInitialized() => State.Changed += OnChanged;
+    /// <summary>How often the sky moves on; its blends change by the minute.</summary>
+    private static readonly TimeSpan SkyTick = TimeSpan.FromMinutes(1);
+
+    private BackgroundChoice _choice = BackgroundChoice.Aurora;
+    private SkyState _sky = Sky.At(new TimeOnly(12, 0));
+    private ITimer? _timer;
+
+    private string SkyStyle => string.Join(' ', Sky.Phases.Select(p => $"--sky-{Backdrop.Name(p.Phase)}: {_sky.Opacity(p.Phase)};"));
+
+    protected override async Task OnInitializedAsync()
+    {
+        State.Changed += OnChanged;
+        Settings.Changed += OnChoiceChanged;
+        User.Changed += OnChoiceChanged;
+        _sky = Sky.Now(Clock, User.TimeZone);
+        _timer = Clock.CreateTimer(_ => MoveSkyOn(), null, SkyTick, SkyTick);
+        _choice = await Settings.GetAsync();
+    }
+
+    private void MoveSkyOn()
+    {
+        var now = Sky.Now(Clock, User.TimeZone);
+        if (now == _sky) return;
+        _sky = now;
+        OnChanged();
+    }
+
+    private void OnChoiceChanged() => InvokeAsync(async () =>
+    {
+        _choice = await Settings.GetAsync();
+        _sky = Sky.Now(Clock, User.TimeZone); // the time zone comes with the sign-in
+        StateHasChanged();
+    });
 
     private void OnChanged() => InvokeAsync(StateHasChanged);
 
-    public void Dispose() => State.Changed -= OnChanged;
+    public void Dispose()
+    {
+        State.Changed -= OnChanged;
+        Settings.Changed -= OnChoiceChanged;
+        User.Changed -= OnChoiceChanged;
+        _timer?.Dispose();
+    }
 }

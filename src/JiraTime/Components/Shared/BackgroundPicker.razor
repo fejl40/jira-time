@@ -1,0 +1,46 @@
+@* Settings → Background: Aurora, Sky or Plain, saved for the user as soon as one is picked. *@
+@inject BackgroundSettings Settings
+
+<section class="card p-6" data-background-picker>
+    <h2 class="font-semibold">Background</h2>
+    <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">What shows behind the pages. Kept for you on this server, in every browser you use.</p>
+    <div class="mt-4 grid grid-cols-3 gap-3" role="radiogroup" aria-label="Background">
+        @foreach (var option in Options)
+        {
+            var selected = option.Choice == _choice;
+            <button type="button" role="radio" aria-checked="@(selected ? "true" : "false")" disabled="@_saving"
+                    class="motion-colors group rounded-lg p-2 text-left ring-1 transition @(selected ? "bg-blue-50 ring-2 ring-blue-600 dark:bg-blue-950/50 dark:ring-blue-400" : "ring-slate-200 hover:bg-slate-50 dark:ring-slate-700 dark:hover:bg-slate-800")"
+                    @onclick="() => PickAsync(option.Choice)" data-background-choice="@Backdrop.Name(option.Choice)" data-selected="@(selected ? "" : null)">
+                <span class="background-swatch background-swatch-@Backdrop.Name(option.Choice) block h-14 rounded-md ring-1 ring-black/5 dark:ring-white/10"></span>
+                <span class="mt-2 block text-sm font-medium">@option.Choice</span>
+                <span class="hidden text-xs text-muted sm:block">@option.Description</span>
+            </button>
+        }
+    </div>
+    @if (_saved)
+    {
+        <p class="mt-3 text-sm text-emerald-700 dark:text-emerald-400" role="status">Saved.</p>
+    }
+</section>
+
+@code {
+    private static readonly (BackgroundChoice Choice, string Description)[] Options =
+    [
+        (BackgroundChoice.Aurora, "Soft colours that warm up as the period fills"),
+        (BackgroundChoice.Sky, "The sky at your time of day; night in dark mode"),
+        (BackgroundChoice.Plain, "The flat page colour"),
+    ];
+
+    private BackgroundChoice _choice;
+    private bool _saving, _saved;
+
+    protected override async Task OnInitializedAsync() => _choice = await Settings.GetAsync();
+
+    private async Task PickAsync(BackgroundChoice choice)
+    {
+        if (choice == _choice) return;
+        (_choice, _saving, _saved) = (choice, true, false);
+        await Settings.SaveAsync(choice);
+        (_saving, _saved) = (false, true);
+    }
+}

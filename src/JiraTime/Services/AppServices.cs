@@ -44,6 +44,7 @@ public static class AppServices
         services.AddTransient<IssueStatuses>();
         services.AddSingleton<RecentWorklogIssues>();
         services.AddScoped<WorkCalendarService>();
+        services.AddScoped<BackgroundSettings>();
         services.AddScoped<EpicExportStore>();
         services.AddScoped<MonthExportLoader>();
         services.AddScoped<ProfilePictures>();

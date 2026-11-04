@@ -77,3 +77,84 @@
 @media (prefers-reduced-motion: reduce) {
   .aurora-blob { animation: none; }
 }
+
+/* ---- Sky: the sky at the user's time of day (Domain/Sky.cs) ---- */
+
+/* One gradient layer per phase; BackdropLayer sets --sky-<phase> to how much of each shows, so neighbouring phases
+   cross-fade. In light mode the colours are strongest at the top and fade into the page colour, so text on the page
+   stays easy to read. Dark mode always shows the night. */
+.sky-layer, .sky-stars {
+  position: absolute;
+  inset: 0;
+  transition: opacity 4s ease;
+}
+.sky-night { opacity: var(--sky-night, 0); background: linear-gradient(180deg, var(--color-indigo-200), var(--color-indigo-100) 30%, transparent 75%); }
+.sky-dawn { opacity: var(--sky-dawn, 0); background: linear-gradient(180deg, var(--color-purple-200), var(--color-pink-100) 22%, var(--color-orange-100) 40%, transparent 78%); }
+.sky-day { opacity: var(--sky-day, 0); background: linear-gradient(180deg, var(--color-sky-300), var(--color-sky-100) 30%, transparent 78%); }
+.sky-dusk { opacity: var(--sky-dusk, 0); background: linear-gradient(180deg, var(--color-violet-200), var(--color-pink-200) 20%, var(--color-orange-100) 40%, transparent 78%); }
+
+.dark .sky-layer { opacity: 0; }
+.dark .sky-night {
+  opacity: 1;
+  background:
+    radial-gradient(ellipse 80% 50% at 70% 0%, rgb(99 102 241 / 0.18), transparent 70%),
+    linear-gradient(180deg, #0b1233, #0b1026 40%, var(--color-slate-950) 90%);
+}
+
+/* Stars: three sets of fixed points (box-shadows of one tiny dot) that twinkle out of step. They show with the
+   night layer, and always in dark mode. */
+.sky-stars { opacity: var(--sky-night, 0); color: var(--color-indigo-400); }
+.dark .sky-stars { opacity: 1; color: white; }
+.sky-star {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  border-radius: 9999px;
+  animation: sky-twinkle 5s ease-in-out infinite alternate;
+}
+.sky-star-1 {
+  opacity: 0.7;
+  box-shadow: 45.3vw 35.1vh, 91.6vw 29.4vh, 50.8vw 36.8vh, 19.1vw 32.2vh, 62.7vw 49.4vh, 10.2vw 19.5vh, 9.9vw 50.4vh,
+    69vw 3.6vh, 97.3vw 59.9vh, 65.1vw 38.5vh, 16.4vw 1.9vh, 52.8vw 4.6vh, 19.6vw 15.8vh, 3.9vw 29.3vh, 44.2vw 52.4vh,
+    51.9vw 40.1vh, 45.8vw 18vh, 98.8vw 61.7vh, 83.3vw 44.2vh, 31.9vw 15vh, 29.3vw 5.3vh, 76.1vw 25.4vh, 84vw 24.6vh,
+    94.9vw 52.7vh, 1.1vw 13.8vh;
+}
+.sky-star-2 {
+  width: 1.5px;
+  height: 1.5px;
+  animation-duration: 7s;
+  animation-delay: -3s;
+  box-shadow: 90.2vw 29.7vh, 97.1vw 25.2vh, 8.2vw 39.4vh, 77.3vw 17.5vh, 9.5vw 21.3vh, 95.5vw 47.2vh, 12.6vw 16vh,
+    10.9vw 4.7vh, 79.1vw 11.8vh, 55.8vw 28.3vh, 19.7vw 45.6vh, 13.8vw 40.3vh, 12.4vw 26.7vh, 21.9vw 17.5vh, 96.2vw 50vh,
+    30.8vw 55vh, 21.6vw 25.1vh, 84.7vw 40.2vh;
+}
+.sky-star-3 {
+  width: 2px;
+  height: 2px;
+  animation-duration: 9s;
+  animation-delay: -6s;
+  box-shadow: 10.8vw 61.3vh, 21.9vw 16.8vh, 76.7vw 21.1vh, 30vw 5.5vh, 9.8vw 36.5vh, 24.8vw 37.7vh, 37.4vw 28.6vh,
+    95vw 30.5vh, 57.3vw 53.9vh, 18.9vw 10.4vh;
+}
+@keyframes sky-twinkle { to { opacity: 0.2; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sky-star { animation: none; }
+}
+
+/* ---- The previews on Settings → Background (Components/Shared/BackgroundPicker.razor) ---- */
+
+.background-swatch-aurora {
+  background:
+    radial-gradient(circle at 20% 30%, rgb(96 165 250 / 0.7), transparent 55%),
+    radial-gradient(circle at 80% 40%, rgb(52 211 153 / 0.6), transparent 55%),
+    radial-gradient(circle at 55% 95%, rgb(251 191 36 / 0.6), transparent 55%),
+    var(--color-slate-100);
+}
+.dark .background-swatch-aurora { background-color: var(--color-slate-950); }
+.background-swatch-sky { background: linear-gradient(180deg, var(--color-sky-300), var(--color-pink-100) 60%, var(--color-orange-100)); }
+.dark .background-swatch-sky { background: linear-gradient(180deg, #0b1233, var(--color-slate-950)); }
+.background-swatch-plain { background: var(--color-slate-100); }
+.dark .background-swatch-plain { background: var(--color-slate-950); }

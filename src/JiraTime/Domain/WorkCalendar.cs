@@ -64,7 +64,7 @@ public record DayInfo(DateOnly Date, DayKind Kind, string? Name)
     }
 }
 
-/// <summary>Hours each weekday needs, per user (id = owner).</summary>
+/// <summary>Hours each weekday needs and the background the user picked, per user (id = owner).</summary>
 [DocumentCollection("user-settings")]
 public class UserSettings : IOwnedDocument
 {
@@ -72,6 +72,9 @@ public class UserSettings : IOwnedDocument
     public string? Owner { get; set; }
 
     public Dictionary<DayOfWeek, TimeSpan> WorkHours { get; set; } = StandardWeek();
+
+    /// <summary>The background behind the pages (Settings → Background).</summary>
+    public BackgroundChoice Background { get; set; } = BackgroundChoice.Aurora;
 
     public TimeSpan HoursOn(DayOfWeek day) => WorkHours.GetValueOrDefault(day);
 
