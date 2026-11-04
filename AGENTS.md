@@ -83,6 +83,9 @@ Domain/HealthCheck.cs              the health check on Settings: its checks in o
 Domain/HealthFixes.cs              what a health check's answer means: fix sentences per failure, the Work On Issues permission, time zone and clock rules
 Domain/DayFill.cs                  how full a day is (saved against needed hours, capped; none for days that need nothing or while Jira can't be read), and DayFills: a wave per change of a day's level
 Domain/WeekRings.cs                a ring per week of a period: its share of the hours it needs (capped, unknown when Jira can't be read)
+Domain/Backdrop.cs                 the background: BackgroundChoice (Aurora, Sky, Plain), the aurora's palette from a period's progress, glass only where there is something to see through
+Domain/Sky.cs                      the sky at the user's time of day: phases, their start times and the hour-long blends
+Domain/PeriodFinish.cs             timing of the finish when a period becomes complete: sweep steps, glow, when the confetti bursts
 Domain/Streak.cs                   the header's streak: complete workdays in a row back from today, when the flame shows, its size, when it flares
 Domain/SeasonTouches.cs            seasonal touches of a day: snow in December, lights on a Danish holiday, on the user's clock
 Domain/JiraLog/                    one logged Jira request (JiraLogEntry: state, short path, outcome), the Logs page's day, groups and filters, JsonBody (a body as a foldable JSON tree or raw text), RequestToasts (order, how long they stay, bursts)
@@ -94,6 +97,7 @@ Services/AppServices.cs            AddJiraTime: registers the app's services, fo
 Services/OwnedCollection.cs        one collection of the signed-in user's documents: the only owner filter
 Services/WorkCalendarService.cs    days and work hours of the signed-in user
 Services/WorkStreak.cs             the signed-in user's streak in this tab, counted by PeriodLoader from the recent work it reads anyway
+Services/BackgroundSettings.cs     the background the user picked, in their settings document; tells the tab when it changes
 Services/PeriodLoader.cs           loads a period for the timesheet: time, days, picks, previous period
 Services/IssueStatuses.cs          current status of the issues a timesheet shows, and the issue picker's Jira search
 Services/EpicExportStore.cs        Fase, Forordning and Hovedleverance per epic for the export
@@ -106,6 +110,8 @@ Services/Worklogs/                 TimeLog (Jira worklogs plus the retry queue, 
 Services/Jira/                     JiraHttp (the one typed HttpClient for Jira), JiraResilience (429 retries, pause, queue), JiraSearch (pages, batches of keys, POST), JiraClient (issues: myself, picker, searches, epics), JiraWorklogClient (reads and writes worklogs), JiraIssueLookup (sprint and period issues, statuses and epics, cached briefly per user), JiraWorklogJson and JiraIssueJson (Jira's JSON mapped to the app's worklogs, issues, profile and epics), JQL quoting, comment format, raw JSON shapes
 Services/JiraLog/                  the Jira request log: user action (JiraAction), JiraRecordingHandler (records each attempt for JiraHttp) and the recorder, JSONL files, live feed per user, MyJiraLog (the signed-in user's log)
 Components/Layout/MainLayout.razor header + redirect to setup when not signed in
+Components/Layout/BackdropLayer.razor  the fixed layer behind every page: aurora blobs, sky layers and stars, or nothing (Plain); data-glass
+Components/Layout/BackdropState.cs the aurora's palette for the tab: the timesheet's progress, neutral elsewhere
 Components/Pages/Connect.razor     connecting to Jira (route /setup/connect)
 Components/Pages/Timesheet.razor   shows a period: URL and selected day, modals, focus and animations around ShownPeriod
 Components/Pages/SettingsPage.razor
@@ -122,12 +128,15 @@ Components/Sheet/                  period header (with confetti), reminders, gri
 Components/Export/                 ExportPage (a month in the agency's format: Copy, Download .tsv), EpicValuesForm (values per epic), ExportTable
 Components/Modals/                 the modal system: ModalService (injected as Modals), ModalQueue and ModalContext, ModalHost (in MainLayout), the Modal frame, ConfirmModal (wwwroot/modal.js)
 Components/Logs/                   request toasts (in MainLayout), the log's action groups, a request's details and its status dot, the JSON tree
-Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow, Avatar (the header's profile picture over the initials), Waiting (the waiting-for-Jira spinner), StreakFlame, Snowfall, HolidayLights, FlipNumber (hours as flip-board tiles)
+Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow, Avatar (the header's profile picture over the initials), Waiting (the waiting-for-Jira spinner), StreakFlame, Snowfall, HolidayLights, FlipNumber (hours as flip-board tiles), BackgroundPicker (Settings → Background)
 Styles/app.css, motion.css         Tailwind input and animations (compiled to wwwroot/app.css)
 Styles/rings.css, flip.css         week rings and flip-board numbers (imported by app.css)
+Styles/backdrop.css, glass.css     the aurora, sky, Settings previews and finish styles; frosted glass and the mouse light
 Styles/touches.css                 the streak flame, snow and holiday lights (imported by app.css)
 wwwroot/files.js                   copy to the clipboard and file downloads (Export and Logs)
 wwwroot/flight.js                  after Save all: the modal's day lines fly into their days, the saved weeks ripple, then the ticks fly
+wwwroot/glass.js                   the light that follows the mouse over cards
+wwwroot/finish.js                  the finish when a period becomes complete (sweep, glow, then confetti)
 wwwroot/timezone.js                the browser's time zone, read at sign-in
 wwwroot/favicon.svg                the app icon (apple-touch-icon.png is it as a 180 px square PNG)
 ```
@@ -140,7 +149,7 @@ wwwroot/favicon.svg                the app icon (apple-touch-icon.png is it as a
 | Encryption keys | `data/keys/` on the server (DPAPI-protected on Windows) |
 | Users Jira confirmed (profile, hashes of confirmed tokens) | `data/documents/users/<owner>.json` |
 | Days off (whole or partial) | `data/documents/days-off/<owner>-<date>.json` |
-| Work hours per weekday | `data/documents/user-settings/<owner>.json` |
+| Work hours per weekday and the background | `data/documents/user-settings/<owner>.json` |
 | Jira profile picture (as read from Jira, for two days) | `data/documents/profile-pictures/<owner>.json` |
 | Export values per epic (Fase, Forordning, Hovedleverance) | `data/documents/epic-export-values/<owner>-<epic>.json` |
 | Logged time | **Jira** (your worklogs) |
@@ -443,6 +452,35 @@ markup: `data-modal-close` cancels, `data-modal-result="x"` closes with `x` (rea
 enum name), `data-modal-autofocus` gets the focus on open, and `data-modal-busy` (set on the dialog while busy)
 stops closing. `[Modal(Size = ModalSize.Small/Medium/Large, Dismiss = true)]` on the component sets its width and
 whether Esc and a click on the backdrop cancel it. The timesheet's keyboard shortcuts are off while a modal is open.
+
+### Background
+
+Behind every page is a fixed layer (`BackdropLayer` in `MainLayout`, z-index −1, never takes clicks; the page colour is
+on `<html>` only so it shows through). Settings → **Background** picks Aurora (the default), Sky or Plain, kept per user
+in `user-settings` (`BackgroundSettings`) and switched without a reload.
+
+**Aurora**: soft colour blobs drift on slow CSS loops (transform only). Their colours follow the shown period
+(`Backdrop.Palette`): blue when under 40% of what the days up to today need is logged, teal under 75%, then green, gold
+when nothing up to today is missing. It is neutral on other pages, when Jira can't be read and before any day needs
+hours. The timesheet hands its summary to `BackdropState`; colours are registered CSS colours that ease over 1.2 s.
+
+**Sky**: the sky at the user's time of day in the browser's time zone (`Sky.Now`): dawn from 05:00, day from 08:00, dusk
+from 17:00, night from 20:00. The last hour of each phase cross-fades into the next, and the layer is re-read every
+minute. Faint stars twinkle at night. Dark mode always shows the night. In light mode the colours fade into the page
+colour below the header so text stays readable. **Plain** is the flat page colour. Data attributes: `data-backdrop`,
+`data-palette`, `data-sky-phase`, `data-sky-blend`, `data-glass`.
+
+**Frosted glass**: over Aurora and Sky, cards, panels, the header and modals are translucent with a backdrop blur
+(`Styles/glass.css`, keyed on `data-glass`). Plain and browsers without `backdrop-filter` keep the solid surfaces. Light
+mode stays 86% white, so muted text keeps WCAG AA. A soft light follows the mouse under the content of the card it is
+over (`wwwroot/glass.js` writes `--light-x/--light-y` at most once per animation frame and sets `data-lit`). There is no
+light on touch-only devices or with reduced motion.
+
+**Period finish**: when the shown period becomes complete (the header's `Milestones`), `finish.js` sweeps a warm band
+across the grid's day columns, one after another (down the day list on phones). The background glows for a moment at
+the same time (`finish-glow`, `data-glowing`; a soft edge glow over Plain). The confetti bursts as the light reaches the
+last day. Timing is `PeriodFinish.For(days)`: about 600 ms across whatever the period's length. It plays once per user
+and period in a browser (`jiraMotion.firstTime`), and not at all with reduced motion.
 
 ### Theme
 
