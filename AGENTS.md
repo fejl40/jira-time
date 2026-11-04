@@ -81,6 +81,9 @@ Domain/ProfilePicture.cs           the user's Jira profile picture as kept: whic
 Domain/MonthExport.cs              the month export: rows per day and issue, tab-separated text
 Domain/HealthCheck.cs              the health check on Settings: its checks in order, their states, the report (a failed token check skips the rest)
 Domain/HealthFixes.cs              what a health check's answer means: fix sentences per failure, the Work On Issues permission, time zone and clock rules
+Domain/DayFill.cs                  how full a day is (saved against needed hours, capped; none for days that need nothing or while Jira can't be read), and DayFills: a wave per change of a day's level
+Domain/Streak.cs                   the header's streak: complete workdays in a row back from today, when the flame shows, its size, when it flares
+Domain/SeasonTouches.cs            seasonal touches of a day: snow in December, lights on a Danish holiday, on the user's clock
 Domain/JiraLog/                    one logged Jira request (JiraLogEntry: state, short path, outcome), the Logs page's day, groups and filters, JsonBody (a body as a foldable JSON tree or raw text), RequestToasts (order, how long they stay, bursts)
 Storage/IDocumentStore.cs          the document store interfaces
 Storage/FileDocumentStore.cs       the file store: one JSON file per document
@@ -89,6 +92,7 @@ Storage/SharedFile.cs              reads that let others write or delete meanwhi
 Services/AppServices.cs            AddJiraTime: registers the app's services, for Program.cs and the tests
 Services/OwnedCollection.cs        one collection of the signed-in user's documents: the only owner filter
 Services/WorkCalendarService.cs    days and work hours of the signed-in user
+Services/WorkStreak.cs             the signed-in user's streak in this tab, counted by PeriodLoader from the recent work it reads anyway
 Services/PeriodLoader.cs           loads a period for the timesheet: time, days, picks, previous period
 Services/IssueStatuses.cs          current status of the issues a timesheet shows, and the issue picker's Jira search
 Services/EpicExportStore.cs        Fase, Forordning and Hovedleverance per epic for the export
@@ -112,13 +116,15 @@ Components/DayLook.cs              how a day looks: weekend and holiday grey and
 Components/Links.cs                builds and reads timesheet links (period, selected day), export links and log links
 Components/Motion.cs               animation classes (Styles/motion.css), MotionScript (calls wwwroot/motion.js)
 Components/Sheet/ShownPeriod.cs    the period on screen and its work with Jira: open, reload, Try again, Sync now, Save all, time off; SaveMotion
-Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, IssueColors (an issue's dot colour), DayKeys (keyboard shortcuts), JiraWaits (running Jira requests: what shows pending, which buttons wait, the status text), TimeOffModal, SaveAllModal
+Components/Sheet/                  period header (with confetti), reminders, grid and its cells, day list (phones), day panel and header, day editor and its rows, issue picker, IssueColors (an issue's dot colour), DayKeys (keyboard shortcuts), JiraWaits (running Jira requests: what shows pending, which buttons wait, the status text), TimeOffModal, SaveAllModal, DayWater (a day's glass of water), SaveMotion (the last save's animation and SaveChoreography: which days fly, the week ripple, when the ticks leave)
 Components/Export/                 ExportPage (a month in the agency's format: Copy, Download .tsv), EpicValuesForm (values per epic), ExportTable
 Components/Modals/                 the modal system: ModalService (injected as Modals), ModalQueue and ModalContext, ModalHost (in MainLayout), the Modal frame, ConfirmModal (wwwroot/modal.js)
 Components/Logs/                   request toasts (in MainLayout), the log's action groups, a request's details and its status dot, the JSON tree
-Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow, Avatar (the header's profile picture over the initials), Waiting (the waiting-for-Jira spinner)
+Components/Shared/                 StepNav (‹ today ›), ErrorCard, Count, ThemeToggle, UserRow, Avatar (the header's profile picture over the initials), Waiting (the waiting-for-Jira spinner), StreakFlame, Snowfall, HolidayLights
 Styles/app.css, motion.css         Tailwind input and animations (compiled to wwwroot/app.css)
+Styles/touches.css                 the streak flame, snow and holiday lights (imported by app.css)
 wwwroot/files.js                   copy to the clipboard and file downloads (Export and Logs)
+wwwroot/flight.js                  after Save all: the modal's day lines fly into their days, the saved weeks ripple, then the ticks fly
 wwwroot/timezone.js                the browser's time zone, read at sign-in
 wwwroot/favicon.svg                the app icon (apple-touch-icon.png is it as a 180 px square PNG)
 ```
@@ -434,12 +440,38 @@ Light, dark or system (follows the OS). Switch with the icon in the header; the 
 
 ### Animations
 
-Totals count to their new value, Fill period suggestions drop in day by day, day headers fill like a
-progress bar, saved cells settle while a tick flies to the Jira status, removed rows turn red and
+Totals count to their new value, Fill period suggestions drop in day by day, saved cells settle while a tick flies to the Jira status, removed rows turn red and
 collapse, periods slide, the selected day glides, picker groups slide in, reminders pulse once, time off
 fades to grey (with a sun for vacation), and a period that becomes complete gets confetti once. They
 are quick (150–300 ms) and switch off when your system asks for reduced motion. Styles and speeds are in
 `Styles/motion.css`, the script parts in `wwwroot/motion.js`, called through `MotionScript` in `Components/Motion.cs`.
+
+Each day header in the grid is a glass of water filled to the day's saved hours against what it needs (emerald when
+full; none on days that need no hours, or while Jira can't be read), rising smoothly. A wave runs once on its surface
+each time the level changes, and the glass glows once when the day becomes complete (`Domain/DayFill.cs`,
+`Components/Sheet/DayWater.razor`; 700 ms rise and 1.2 s wave, `--motion-water` and `--motion-wave`, because a liquid
+looks wrong faster). On phones each day in the list has a small glass.
+
+When Save is clicked in the Save all modal, each day's line is copied where it stands and waits there while Jira saves.
+Then each saved day's copy flies into its day (the grid's day header, or the row on phones), following the cell so it
+lands exactly even when the page or grid scrolls. Copies of days that couldn't be saved fade. The cells of each saved
+week then pulse one after another (40 ms apart), and the ticks fly to the Jira status, all within about 900 ms
+(`SaveChoreography` in `Components/Sheet/SaveMotion.cs`, `wwwroot/flight.js`). With reduced motion none of this plays
+and the water stands still.
+
+### Streak and seasonal touches
+
+A flame in the header counts the workdays in a row logged in full, back from today (`Domain/Streak.cs`): weekends,
+holidays and whole days off are skipped, part of a day off needs only the rest, and today counts once it is complete
+(an incomplete today doesn't break the streak). It shows from 2 days, grows a size at 5, 10 and 20, and flares once
+when the streak gets longer while the tab is open. It is counted from the last 60 days of work each period load reads
+anyway (`WorkStreak`, updated by `PeriodLoader`), so it costs no Jira request; a streak older than that shows as "N+",
+and there is none while Jira can't be read.
+
+In December light snow drifts down behind the content (`Snowfall`, a fixed layer that takes no clicks), and on a Danish
+public holiday a string of lights hangs under the header with a slow chase (`HolidayLights`); Christmas gets both
+(`Domain/SeasonTouches.cs`, on the user's clock). Styles are in `Styles/touches.css`. With reduced motion the flame
+stands still, the snow is gone and the lights stay lit without the chase.
 
 ### Storage abstraction
 
@@ -470,8 +502,10 @@ suggestions, the Save all change list, Settings work hours and the Jira URL from
 (queue, results, defaults), the waits on Jira (what shows pending and which buttons wait), Jira rate limits (retries
 after 429, the pause across users and hosts, the queue), parallel reads (overlap, the cap of ten, writes one at a
 time), the profile picture (read once per two days, logged, the default avatar and failures keep the initials, each
-user only their own), searches by key (batches, pages, POST, unknown keys), and the health check (outcomes, fix sentences, skipped checks,
-read-only, logged under its action).
+user only their own), searches by key (batches, pages, POST, unknown keys), the health check (outcomes, fix sentences, skipped checks,
+read-only, logged under its action), the day's water level and its waves (DayFill), the Save all choreography (which
+days fly, ripple order, under 900 ms), the streak (weekends, holidays, days off, period edges, no extra Jira request)
+and seasonal touches.
 
 `TimeHarness` builds the app's own services from `AddJiraTime` with a `TestClock` (timers fire at once), a temp
 store and `FakeJira` (a fake Jira answering by URL, `Pictures` included; `Myself`, `Writes`, `WorklogReads`, `Searches` and
