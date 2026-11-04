@@ -2,7 +2,7 @@
 // through Components/MotionScript.cs:
 //   collapse(selector)            rows shrink away; resolves when done, so the page can then remove them
 //   glide(grid)                   moves the grid's selected-day highlight to the selected column
-//   flyTicks(from, to)            a check mark flies from each saved cell to the period status
+//   flyTicks(from, to, spread)    a check mark flies from each saved cell to the period status, all leaving within spread ms
 //   celebrate(key, from)          confetti, at most once per key in this browser
 // Numbers need no call: an element with data-count="7.5" shows that many hours (data-zero for 0,
 // data-unit after the number) and counts to a new value when the attribute changes.
@@ -95,13 +95,14 @@
     el.classList.add(className);
   };
 
-  const flyTicks = (fromSelector, toSelector) => {
+  const flyTicks = (fromSelector, toSelector, spread = Infinity) => {
     const target = document.querySelector(toSelector);
     const duration = speed();
     if (!target || !duration) return;
     const to = target.getBoundingClientRect();
     const end = { x: to.left + 12, y: to.top + to.height / 2 };
     const sources = [...document.querySelectorAll(fromSelector)].slice(0, 24);
+    const gap = Math.min(stagger(), Math.max(0, spread) / Math.max(1, sources.length - 1));
     sources.forEach((cell, i) => {
       const at = center(cell.getBoundingClientRect());
       const dx = end.x - at.x, dy = end.y - at.y;
@@ -109,9 +110,9 @@
         [{ transform: 'translate(-50%, -50%) scale(0.6)', opacity: 0 },
          { transform: 'translate(-50%, -50%) scale(1.2)', opacity: 1, offset: 0.25 },
          { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(0.8)`, opacity: 0.2 }],
-        { duration, delay: i * stagger() });
+        { duration, delay: i * gap });
     });
-    if (sources.length) setTimeout(() => restart(target, 'motion-received'), duration + sources.length * stagger());
+    if (sources.length) setTimeout(() => restart(target, 'motion-received'), duration + (sources.length - 1) * gap);
   };
 
   const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4'];
@@ -161,5 +162,5 @@
   };
   if (document.body) start(); else addEventListener('DOMContentLoaded', start);
 
-  window.jiraMotion = { collapse, glide, flyTicks, celebrate };
+  window.jiraMotion = { collapse, glide, flyTicks, celebrate, speed, ease, restart };
 })();

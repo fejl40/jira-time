@@ -1,3 +1,4 @@
+using JiraTime.Components.Sheet;
 using JiraTime.Domain;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -34,8 +35,15 @@ public sealed class MotionScript(IJSRuntime js)
     /// <summary>Moves the grid's selected-day highlight to the selected column.</summary>
     public Task GlideAsync(ElementReference grid) => Call("jiraMotion.glide", grid);
 
-    /// <summary>Sends a check mark from every cell marked data-sent to the period status.</summary>
-    public Task FlyTicksAsync() => Call("jiraMotion.flyTicks", "[data-sent]", "[data-period-status]");
+    /// <summary>
+    /// Plays what follows Save all (wwwroot/flight.js): saved lines fly from the modal into their days, the saved
+    /// weeks ripple, then a check mark flies from every cell marked data-sent to the period status.
+    /// </summary>
+    public Task PlaySaveAsync(SaveChoreography steps) => Call("jiraFlight.land", steps, SaveChoreography.Flight,
+        SaveChoreography.Pulse, SaveChoreography.EndsBy, "[data-sent]", "[data-period-status]");
+
+    /// <summary>The lines lifted from the Save all modal fade where they are: nothing was saved.</summary>
+    public Task DropSaveAsync() => PlaySaveAsync(new SaveChoreography([], [], false));
 
     /// <summary>Confetti for a complete period, once per user and period in this browser.</summary>
     public Task CelebrateAsync(UserKey user, Period period) =>

@@ -7,8 +7,8 @@
         var saved = Sheet.SavedOn(day);
         var logged = TimeEntry.Total(saved);
         <li>
-            <button type="button" class="motion-colors flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm @RowClass(day, info)"
-                    @onclick="() => OnSelect.InvokeAsync(day)" data-day-off="@DayLook.Data(info)">
+            <button type="button" class="motion-colors relative flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm @RowClass(day, info)"
+                    @onclick="() => OnSelect.InvokeAsync(day)" data-day-off="@DayLook.Data(info)" data-day-cell="@Format.Iso(day)">
                 <span class="w-16 flex-none @(day == Sheet.Today ? "font-semibold text-blue-700 dark:text-blue-400" : "")">@Format.WeekdayAndNumber(day)</span>
                 @if (info?.Reason is { } reason)
                 {

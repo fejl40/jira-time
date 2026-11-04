@@ -42,7 +42,10 @@ public class ShownPeriodTests : IDisposable
         Assert.True(reloaded); // ran while the save was still running, before the period was read again
         Assert.Equal(8 * 3600, _h.JiraSeconds("ABC-2"));
         Assert.Equal([Tuesday], shown.SaveMotion.JustSaved);
-        Assert.True(shown.SaveMotion.TakeFlyTicks());
+        var steps = shown.SaveMotion.TakeChoreography(shown.Sheet!.Period);
+        Assert.Equal(["2026-10-20"], steps?.Fly); // Monday couldn't be saved, so its line doesn't fly
+        Assert.True(steps?.FlyTicks);
+        Assert.Null(shown.SaveMotion.TakeChoreography(shown.Sheet!.Period));
         Assert.True(shown.Waits.CanStart);
     }
 

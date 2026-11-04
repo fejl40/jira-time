@@ -187,36 +187,3 @@ public sealed class ShownPeriod(
     private Task RunTimeOffAsync(Func<Task> work) =>
         Waits.RunAsync(JiraWait.TimeOff, () => Task.WhenAll(work(), Task.Delay(TimeOffShownFor, clock)));
 }
-
-/// <summary>The last save, for its animation: days saved, and those Jira got completely.</summary>
-public sealed class SaveMotion
-{
-    private bool _flyTicks;
-
-    public HashSet<DateOnly> JustSaved { get; } = [];
-    public HashSet<DateOnly> SentToJira { get; } = [];
-
-    /// <summary>A save begins: the last one's days no longer animate.</summary>
-    public void Start()
-    {
-        JustSaved.Clear();
-        SentToJira.Clear();
-    }
-
-    public void Saved(DateOnly day, bool sentToJira)
-    {
-        JustSaved.Add(day);
-        if (sentToJira) SentToJira.Add(day);
-    }
-
-    /// <summary>Called after the saved work has reloaded, so the ticks start from the saved cells.</summary>
-    public void Finish() => _flyTicks = SentToJira.Count > 0;
-
-    /// <summary>True once after a save that sent days to Jira: time to fly the ticks.</summary>
-    public bool TakeFlyTicks()
-    {
-        var fly = _flyTicks;
-        _flyTicks = false;
-        return fly;
-    }
-}

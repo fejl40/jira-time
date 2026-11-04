@@ -1,7 +1,7 @@
 @* Period grid: one row per issue, one column per day, with day, week, unsaved and missing totals. *@
 @inject MotionScript Animations
 
-<div @ref="_grid" class="relative hidden overflow-x-auto panel sm:block">
+<div @ref="_grid" class="relative hidden overflow-x-auto panel sm:block" data-period-grid>
     <table class="w-full border-collapse text-sm">
         <thead>
             <tr class="border-b border-slate-200 dark:border-slate-700 text-xs text-muted">
@@ -9,7 +9,7 @@
                 @foreach (var (day, i) in Days)
                 {
                     <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium" title="@DayLook.Title(Sheet.Info(day))" data-selected-day="@(day == Selected ? "" : null)" data-day-off="@DayLook.Data(Sheet.Info(day))">
-                        <button type="button" class="relative isolate w-full px-1 py-2" @onclick="() => OnSelectDay.InvokeAsync(day)">
+                        <button type="button" class="relative isolate w-full px-1 py-2" @onclick="() => OnSelectDay.InvokeAsync(day)" data-day-cell="@Format.Iso(day)">
                             <div class="uppercase">@if (Sheet.Info(day) is { HasPartialDayOff: true, Reason: { } partOff }) { <span class="mr-0.5 text-[10px]" aria-hidden="true">@DayLook.Icon(partOff)</span> }@Format.TwoLetterWeekday(day)</div>
                             <div class="text-sm @(day == Sheet.Today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700 dark:text-slate-200")">@day.Day</div>
                             @if (Sheet.IsUnsaved(day))

@@ -76,7 +76,12 @@ else
     {
         if (User.Jira is null || !Shown.Waits.CanStart || Sheet.UnsavedDays.Count == 0) return;
         var changes = new Dictionary<string, object?> { [nameof(SaveAllModal.Changes)] = UnsavedChanges.Of(Sheet) };
-        if (!await Modals.ShowAsync<SaveAllModal, bool>(changes) || !Shown.Waits.CanStart) return;
+        if (!await Modals.ShowAsync<SaveAllModal, bool>(changes)) return;
+        if (!Shown.Waits.CanStart)
+        {
+            await Animations.DropSaveAsync();
+            return;
+        }
         // Removed rows of the shown day shrink away once it is saved, before the period is read again.
         var toFix = await Shown.SaveDaysAsync(() => Shown.SaveMotion.JustSaved.Contains(Shown.Day)
             ? Animations.CollapseAsync(MotionScript.RemovedRows) : Task.CompletedTask);
@@ -111,7 +116,7 @@ else
         if (Shown.Sheet is null) return;
         _cascade = false;
         if (_keys is not null) await _keys.PageRenderedAsync();
-        if (Shown.SaveMotion.TakeFlyTicks()) await Animations.FlyTicksAsync();
+        if (Shown.SaveMotion.TakeChoreography(Sheet.Period) is { } steps) await Animations.PlaySaveAsync(steps);
     }
 
     private async Task AddRowFromKeyboardAsync()
