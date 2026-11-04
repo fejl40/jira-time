@@ -160,3 +160,44 @@
 .dark .background-swatch-sky { background: linear-gradient(180deg, #0b1233, var(--color-slate-950)); }
 .background-swatch-plain { background: var(--color-slate-100); }
 .dark .background-swatch-plain { background: var(--color-slate-950); }
+
+/* ---- The finish when a period becomes complete (wwwroot/finish.js) ---- */
+
+/* A warm band of light over one day column (or one day of the phone list); the script lights them in turn. */
+.finish-sweep {
+  position: fixed;
+  z-index: 55; /* over the grid, under the confetti */
+  pointer-events: none;
+  border-radius: 0.5rem;
+  background: linear-gradient(180deg, transparent, rgb(251 191 36 / 0.42) 30%, rgb(253 230 138 / 0.6) 50%, rgb(251 191 36 / 0.42) 70%, transparent);
+  will-change: opacity, transform;
+}
+.dark .finish-sweep {
+  background: linear-gradient(180deg, transparent, rgb(253 230 138 / 0.22) 30%, rgb(254 243 199 / 0.34) 50%, rgb(253 230 138 / 0.22) 70%, transparent);
+}
+
+/* The background glows for a moment: a warm light from the top over the aurora and the sky, a soft glow around
+   the edges over Plain. Only its opacity moves. */
+.backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(ellipse 90% 70% at 50% 0%, rgb(253 230 138 / 0.75), rgb(251 191 36 / 0.25) 45%, transparent 75%);
+}
+.dark .backdrop::after {
+  background: radial-gradient(ellipse 90% 70% at 50% 0%, rgb(251 191 36 / 0.35), rgb(245 158 11 / 0.12) 45%, transparent 75%);
+}
+.backdrop[data-backdrop="plain"]::after {
+  background: radial-gradient(ellipse at center, transparent 45%, rgb(251 191 36 / 0.3) 100%);
+}
+.dark .backdrop[data-backdrop="plain"]::after {
+  background: radial-gradient(ellipse at center, transparent 45%, rgb(245 158 11 / 0.22) 100%);
+}
+.backdrop.finish-glow::after { animation: finish-glow var(--finish-glow, 1100ms) ease-out; }
+@keyframes finish-glow { 25% { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .finish-sweep { display: none; }
+  .backdrop.finish-glow::after { animation: none; }
+}

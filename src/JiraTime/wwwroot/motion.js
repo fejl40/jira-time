@@ -3,7 +3,8 @@
 //   collapse(selector)            rows shrink away; resolves when done, so the page can then remove them
 //   glide(grid)                   moves the grid's selected-day highlight to the selected column
 //   flyTicks(from, to, spread)    a check mark flies from each saved cell to the period status, all leaving within spread ms
-//   celebrate(key, from)          confetti, at most once per key in this browser
+//   confetti(from)                confetti bursting from an element (wwwroot/finish.js plays it once per period)
+//   firstTime(key)                true the first time a key is seen in this browser
 //   sparkle(selector)             a week ring that closed pops and throws sparks
 // Numbers need no call: an element with data-count="7.5" shows that many hours (data-zero for 0,
 // data-unit after the number) and counts to a new value when the attribute changes.
@@ -126,8 +127,8 @@
     } catch { /* no storage: celebrate anyway */ }
     return true;
   };
-  const celebrate = (key, fromSelector) => {
-    if (!speed() || !firstTime(key)) return;
+  const confetti = fromSelector => {
+    if (!speed()) return;
     const from = document.querySelector(fromSelector)?.getBoundingClientRect();
     const at = from ? center(from) : { x: innerWidth / 2, y: 120 };
     for (let i = 0; i < 48; i++) {
@@ -183,5 +184,5 @@
   };
   if (document.body) start(); else addEventListener('DOMContentLoaded', start);
 
-  window.jiraMotion = { collapse, glide, flyTicks, celebrate, sparkle, speed, ease, restart };
+  window.jiraMotion = { collapse, glide, flyTicks, confetti, firstTime, sparkle, speed, ease, restart };
 })();

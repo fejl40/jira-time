@@ -45,9 +45,12 @@ public sealed class MotionScript(IJSRuntime js)
     /// <summary>The lines lifted from the Save all modal fade where they are: nothing was saved.</summary>
     public Task DropSaveAsync() => PlaySaveAsync(new SaveChoreography([], [], false));
 
-    /// <summary>Confetti for a complete period, once per user and period in this browser.</summary>
+    /// <summary>
+    /// The finish for a complete period (wwwroot/finish.js): a light sweeps across the days and the background glows,
+    /// then confetti. Once per user and period in this browser.
+    /// </summary>
     public Task CelebrateAsync(UserKey user, Period period) =>
-        Call("jiraMotion.celebrate", $"{user.Id}:{Format.Iso(period.Start)}", "[data-period-complete]");
+        Call("jiraFinish.celebrate", $"{user.Id}:{Format.Iso(period.Start)}", "[data-period-complete]", PeriodFinish.For(period.Length));
 
     /// <summary>A week ring that just closed pops and throws sparks.</summary>
     public Task SparkleAsync(string selector) => Call("jiraMotion.sparkle", selector);
