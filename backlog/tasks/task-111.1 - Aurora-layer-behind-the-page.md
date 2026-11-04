@@ -1,9 +1,10 @@
 ---
 id: TASK-111.1
 title: Aurora layer behind the page
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-02 18:25'
+updated_date: '2026-11-04 09:15'
 labels:
   - ui
   - wow
@@ -21,7 +22,13 @@ A fixed layer behind all content with 3–4 blurred blobs drifting slowly on CSS
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The layer sits behind every page and never takes clicks
-- [ ] #2 Blobs drift with transform/opacity only, slowly (tens of seconds per loop)
-- [ ] #3 Still blobs with reduced motion
+- [x] #1 The layer sits behind every page and never takes clicks
+- [x] #2 Blobs drift with transform/opacity only, slowly (tens of seconds per loop)
+- [x] #3 Still blobs with reduced motion
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Components/Layout/BackdropLayer.razor draws a fixed layer (z-index -1, pointer-events none) behind every page from MainLayout; four radial-gradient blobs drift on 48–67 s CSS loops (transform only) and stand still with reduced motion.
+<!-- SECTION:FINAL_SUMMARY:END -->

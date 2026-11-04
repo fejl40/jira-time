@@ -1,0 +1,79 @@
+/* The background behind every page (Components/Layout/BackdropLayer.razor). A fixed layer under all content that
+   never takes clicks. Only transform and opacity move, so it costs almost nothing to run; with reduced motion it
+   stands still. */
+
+/* Registered so the colours ease from one palette to the next instead of jumping. */
+@property --aurora-a { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --aurora-b { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --aurora-c { syntax: "<color>"; inherits: true; initial-value: transparent; }
+@property --aurora-d { syntax: "<color>"; inherits: true; initial-value: transparent; }
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* ---- Aurora: soft colour blobs drifting slowly; the palette follows the period's progress ---- */
+
+/* Neutral: no progress to show (other pages, Jira unknown). Blue to gold as the days up to today fill up. */
+.backdrop[data-palette="neutral"] {
+  --aurora-a: var(--color-indigo-400); --aurora-b: var(--color-sky-400);
+  --aurora-c: var(--color-violet-400); --aurora-d: var(--color-slate-400);
+}
+.backdrop[data-palette="blue"] {
+  --aurora-a: var(--color-blue-400); --aurora-b: var(--color-sky-400);
+  --aurora-c: var(--color-indigo-400); --aurora-d: var(--color-cyan-400);
+}
+.backdrop[data-palette="teal"] {
+  --aurora-a: var(--color-teal-400); --aurora-b: var(--color-cyan-400);
+  --aurora-c: var(--color-sky-400); --aurora-d: var(--color-emerald-400);
+}
+.backdrop[data-palette="green"] {
+  --aurora-a: var(--color-emerald-400); --aurora-b: var(--color-green-400);
+  --aurora-c: var(--color-teal-400); --aurora-d: var(--color-lime-400);
+}
+.backdrop[data-palette="gold"] {
+  --aurora-a: var(--color-amber-400); --aurora-b: var(--color-yellow-400);
+  --aurora-c: var(--color-orange-400); --aurora-d: var(--color-emerald-400);
+}
+
+.aurora {
+  position: absolute;
+  inset: 0;
+  transition: --aurora-a 1.2s ease, --aurora-b 1.2s ease, --aurora-c 1.2s ease, --aurora-d 1.2s ease;
+}
+
+/* A blob is a radial gradient that fades to nothing, so no blur filter is needed. Light mode keeps them pale so
+   text stays easy to read; dark mode lets them glow. */
+.aurora-blob {
+  position: absolute;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 9999px;
+  opacity: 0.36;
+  will-change: transform;
+  animation: aurora-drift 48s ease-in-out infinite alternate;
+}
+.dark .aurora-blob { opacity: 0.3; }
+
+.aurora-blob-1 { left: -25vmax; top: -30vmax; background: radial-gradient(closest-side, var(--aurora-a), transparent); }
+.aurora-blob-2 { right: -30vmax; top: -20vmax; background: radial-gradient(closest-side, var(--aurora-b), transparent);
+                 animation-duration: 61s; animation-delay: -20s; animation-direction: alternate-reverse; }
+.aurora-blob-3 { left: 5vmax; bottom: -45vmax; background: radial-gradient(closest-side, var(--aurora-c), transparent);
+                 animation-duration: 54s; animation-delay: -35s; }
+.aurora-blob-4 { right: -20vmax; bottom: -35vmax; background: radial-gradient(closest-side, var(--aurora-d), transparent);
+                 animation-duration: 67s; animation-delay: -10s; animation-direction: alternate-reverse; }
+
+@keyframes aurora-drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  33% { transform: translate3d(12vw, 6vh, 0) scale(1.12); }
+  66% { transform: translate3d(-6vw, 12vh, 0) scale(0.92); }
+  100% { transform: translate3d(8vw, -8vh, 0) scale(1.05); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-blob { animation: none; }
+}

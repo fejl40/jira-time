@@ -1,5 +1,6 @@
 using System.Globalization;
 using JiraTime.Components;
+using JiraTime.Components.Layout;
 using JiraTime.Components.Modals;
 using JiraTime.Components.Sheet;
 using JiraTime.Services;
@@ -18,6 +19,7 @@ builder.Services.AddJiraTime(dataDir);
 // The UI's own services, per browser tab.
 builder.Services.AddScoped<MotionScript>();
 builder.Services.AddScoped<ModalService>();
+builder.Services.AddScoped<BackdropState>();
 builder.Services.AddTransient<ShownPeriod>(); // one per timesheet page
 
 var app = builder.Build();

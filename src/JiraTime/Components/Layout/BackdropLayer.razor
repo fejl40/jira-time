@@ -1,0 +1,21 @@
+@* The background behind every page (Styles/backdrop.css): a fixed layer that never takes clicks. The aurora's
+   colours follow the shown period's progress (BackdropState). *@
+@implements IDisposable
+@inject BackdropState State
+
+<div class="backdrop" aria-hidden="true" data-backdrop="aurora" data-palette="@Backdrop.Name(State.Palette)">
+    <div class="aurora">
+        <span class="aurora-blob aurora-blob-1"></span>
+        <span class="aurora-blob aurora-blob-2"></span>
+        <span class="aurora-blob aurora-blob-3"></span>
+        <span class="aurora-blob aurora-blob-4"></span>
+    </div>
+</div>
+
+@code {
+    protected override void OnInitialized() => State.Changed += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => State.Changed -= OnChanged;
+}

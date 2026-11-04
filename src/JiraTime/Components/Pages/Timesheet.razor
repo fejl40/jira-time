@@ -5,6 +5,7 @@
 @inject NavigationManager Nav
 @inject ModalService Modals
 @inject MotionScript Animations
+@inject BackdropState Background
 @implements IDisposable
 
 @* Shows a period: the URL and selected day, modals, focus and animations. Loading, saving and syncing are
@@ -58,7 +59,11 @@ else
 
     protected override void OnInitialized() => Shown.Waits.Changed += StateHasChanged;
 
-    public void Dispose() => Shown.Waits.Changed -= StateHasChanged;
+    public void Dispose()
+    {
+        Shown.Waits.Changed -= StateHasChanged;
+        Background.Show(null); // other pages show the neutral aurora
+    }
 
     protected override Task OnParametersSetAsync() =>
         Shown.ShowAsync(LinkTo(Nav.Uri) ?? new TimesheetLink(Period.For(Shown.Today), null));
@@ -114,6 +119,7 @@ else
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (Shown.Sheet is null) return;
+        Background.Show(Shown.Sheet.Summary);
         _cascade = false;
         if (_keys is not null) await _keys.PageRenderedAsync();
         if (Shown.SaveMotion.TakeChoreography(Sheet.Period) is { } steps) await Animations.PlaySaveAsync(steps);

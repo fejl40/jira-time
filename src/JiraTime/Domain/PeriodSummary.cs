@@ -75,6 +75,9 @@ public sealed class PeriodSummary
     /// <summary>Hours a day should have (zero on weekends, holidays, days off and days that weren't loaded).</summary>
     public TimeSpan ExpectedOn(DateOnly day) => _days.TryGetValue(day, out var info) ? info.Expected : TimeSpan.Zero;
 
+    /// <summary>Hours the workdays up to today need, whatever is logged.</summary>
+    public TimeSpan NeededSoFar => Period.Days.Where(d => d <= _today).Select(ExpectedOn).Sum();
+
     /// <summary>Hours expected on the workdays after today, whatever is logged.</summary>
     public TimeSpan StillToLog => Period.Days.Where(d => d > _today).Select(ExpectedOn).Sum();
 

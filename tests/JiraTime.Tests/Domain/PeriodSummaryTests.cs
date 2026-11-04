@@ -34,6 +34,7 @@ public class PeriodSummaryTests
         Assert.Equal(TimeSpan.FromHours(23), summary.Logged);
         Assert.Equal(TimeSpan.FromHours(2 + 8), summary.Missing);       // Mon short 2, Wed 8; Tue's extra hour doesn't count
         Assert.Equal(TimeSpan.FromHours(7 * 8), summary.StillToLog);    // Thu 22 to Fri 30
+        Assert.Equal(TimeSpan.FromHours(4 * 8), summary.NeededSoFar);   // Fri 16 to Wed 21, whatever is logged
     }
 
     private static List<TimeEntry> FullDaysUpToToday() =>
