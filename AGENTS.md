@@ -79,6 +79,8 @@ Domain/Milestones.cs               things reached while the user watches (a day 
 Domain/Users.cs                    UserKey (host + Jira user id), UserAccount, IOwnedDocument
 Domain/ProfilePicture.cs           the user's Jira profile picture as kept: which avatar URL to read (not Jira's default), fresh for two days, its app URL
 Domain/MonthExport.cs              the month export: rows per day and issue, tab-separated text
+Domain/HealthCheck.cs              the health check on Settings: its checks in order, their states, the report (a failed token check skips the rest)
+Domain/HealthFixes.cs              what a health check's answer means: fix sentences per failure, the Work On Issues permission, time zone and clock rules
 Domain/JiraLog/                    one logged Jira request (JiraLogEntry: state, short path, outcome), the Logs page's day, groups and filters, JsonBody (a body as a foldable JSON tree or raw text), RequestToasts (order, how long they stay, bursts)
 Storage/IDocumentStore.cs          the document store interfaces
 Storage/FileDocumentStore.cs       the file store: one JSON file per document
@@ -92,6 +94,7 @@ Services/IssueStatuses.cs          current status of the issues a timesheet show
 Services/EpicExportStore.cs        Fase, Forordning and Hovedleverance per epic for the export
 Services/MonthExportLoader.cs      loads a month for the export: time, epics, values per epic
 Services/ProfilePictures.cs        the header's profile picture: read through JiraHttp at most once per two days per user, and the profile-picture/{key} endpoint
+Services/JiraHealth.cs             runs the health check against Jira, one check after the other, under the Health check action; only reads
 Services/ExpiringCache.cs          small cache whose values expire; expired values are dropped as new ones are stored
 Services/SignIn/                   SignInSession (restores, connects and signs out a tab; the encrypted connection in browser localStorage), JiraIdentity (signs a tab in as the user Jira says the token belongs to), CurrentUser (the verified user of this tab and its Jira connection, CurrentUser.Jira), LegacyDataMigration (data saved by older versions: owners, entries Jira has, entries with start and end times; their backups)
 Services/Worklogs/                 TimeLog (Jira worklogs plus the retry queue, cached briefly), RetryQueue (changes Jira couldn't take yet), WorklogSync (saves the Save all plans, sends the retry queue), WorklogWriter (writes or deletes one worklog, queues what fails), RecentWorklogIssues (issues just saved on, read directly while Jira's search catches up)
@@ -101,6 +104,7 @@ Components/Layout/MainLayout.razor header + redirect to setup when not signed in
 Components/Pages/Connect.razor     connecting to Jira (route /setup/connect)
 Components/Pages/Timesheet.razor   shows a period: URL and selected day, modals, focus and animations around ShownPeriod
 Components/Pages/SettingsPage.razor
+Components/Pages/HealthCheckSection.razor, HealthCheckIcon.razor  the Health check section on Settings and a check's icon
 Components/Pages/LogsPage.razor    the Jira request log of a day: filters, download, clear, live (wwwroot/logs.js)
 Components/Pages/Error.razor, NotFound.razor
 Components/Format.cs               how hours, days and counts are written for the user
@@ -152,6 +156,18 @@ Deleting `data/keys` makes the stored token unreadable and the app asks you to c
    - *Cloud*: Atlassian email + API token, sent as Basic auth.
    The token is checked against Jira (`/myself`) before it is saved, and the user it belongs to
    becomes your profile. To log hours as someone else, connect with their token.
+
+### Health check
+
+Settings → **Health check** asks Jira, on demand, whether everything the app needs works (`JiraHealth`, rules in
+`Domain/HealthCheck.cs` and `Domain/HealthFixes.cs`): **Token** (`/myself`, which also gives the profile's time zone),
+**Reading your worklogs** (the worklog search of the last 7 days), **Issue picker** (the sprint search and the issue
+picker), **Logging time** (`mypermissions?permissions=WORK_ON_ISSUES`, on an issue found by the earlier checks; nothing
+is written), **Time zone** (worklogs start at 09:00 in the browser's zone: does that fall on the same day in the Jira
+profile's zone?) and **Clock** (Jira's `serverInfo` against this server's clock, 5 minutes allowed). Each row shows a
+tick, a cross with a sentence saying how to fix it, or a dash when it was skipped: a failed token check skips the rest.
+The checks run one at a time through `JiraHttp` (rate limits, request log) under the **Health check** action, and the
+rows update as each one finishes. Styles: the "Health check" block in `Styles/motion.css`.
 
 ### Profile picture
 
@@ -454,7 +470,8 @@ suggestions, the Save all change list, Settings work hours and the Jira URL from
 (queue, results, defaults), the waits on Jira (what shows pending and which buttons wait), Jira rate limits (retries
 after 429, the pause across users and hosts, the queue), parallel reads (overlap, the cap of ten, writes one at a
 time), the profile picture (read once per two days, logged, the default avatar and failures keep the initials, each
-user only their own), and searches by key (batches, pages, POST, unknown keys).
+user only their own), searches by key (batches, pages, POST, unknown keys), and the health check (outcomes, fix sentences, skipped checks,
+read-only, logged under its action).
 
 `TimeHarness` builds the app's own services from `AddJiraTime` with a `TestClock` (timers fire at once), a temp
 store and `FakeJira` (a fake Jira answering by URL, `Pictures` included; `Myself`, `Writes`, `WorklogReads`, `Searches` and
