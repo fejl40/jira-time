@@ -76,7 +76,7 @@
                 {
                     <td colspan="@week.Days" class="@(week.Start == Sheet.Period.Start ? "" : "border-l-2 border-slate-300 dark:border-slate-600") px-2 py-2 text-center tabular-nums @(week.Expected > TimeSpan.Zero && week.Logged >= week.Expected ? "text-emerald-700 dark:text-emerald-400" : "text-slate-600 dark:text-slate-300")"
                         title="Logged in the week (within this period) / hours the week needs">
-                        <Count Value="week.Logged" Zero="0" Unit=" h" Class="font-semibold" />@if (week.Expected > TimeSpan.Zero)
+                        <FlipNumber Value="week.Logged" Zero="0" Unit=" h" Class="font-semibold" data-week-logged />@if (week.Expected > TimeSpan.Zero)
                         {
                             <span class="text-slate-400 dark:text-slate-500"> / @Format.Hours(week.Expected) h</span>
                         }

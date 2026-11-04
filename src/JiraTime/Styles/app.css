@@ -2,6 +2,7 @@
 @import "./motion.css";
 @import "./touches.css";
 @import "./rings.css";
+@import "./flip.css";
 
 @source "../Components";
 

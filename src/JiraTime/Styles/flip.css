@@ -1,0 +1,72 @@
+/* ---- Flip-board numbers (Components/Shared/FlipNumber.razor) ----
+   Each digit is a small tile with a hairline across its middle. A digit that changes turns over like a
+   departure board: the top half of the old digit folds down, then the bottom half of the new one folds in.
+   Only transforms animate. The resting state is the new digit, so before html.motion-ready and with
+   reduced motion (speeds 0) the number simply shows its new value. */
+
+.flip {
+  --flip-bg: rgb(255 255 255 / 0.9);
+  --flip-line: rgb(15 23 42 / 0.08);
+  --flip-edge: rgb(15 23 42 / 0.08);
+  --flip-half: calc(var(--motion) * 0.6);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.08em;
+  font-variant-numeric: tabular-nums;
+}
+.dark .flip {
+  --flip-bg: var(--color-slate-800);
+  --flip-line: rgb(2 6 23 / 0.7);
+  --flip-edge: rgb(255 255 255 / 0.06);
+}
+
+.flip-tile {
+  position: relative;
+  display: inline-block;
+  padding: 0 0.14em;
+  border-radius: 0.22em;
+  line-height: 1.3;
+  background: var(--flip-bg);
+  box-shadow: 0 0 0 1px var(--flip-edge), 0 1px 1px rgb(15 23 42 / 0.06);
+  perspective: 8em;
+}
+/* The split across the middle of every tile. */
+.flip-tile::after {
+  content: "";
+  position: absolute;
+  inset: 50% 0 auto;
+  height: 1px;
+  background: var(--flip-line);
+  pointer-events: none;
+}
+.flip-point { padding: 0 0.02em; }
+
+.flip-face, .flip-half { display: block; text-align: center; }
+.flip-half {
+  position: absolute;
+  inset: 0;
+  padding: inherit;
+  border-radius: inherit;
+  background: var(--flip-bg);
+  backface-visibility: hidden;
+  transform-origin: 50% 50%;
+}
+/* The first half stays in the flow, so the tile has the digit's width and baseline. */
+.flip-half:first-child { position: relative; padding: 0; }
+.flip-top { clip-path: inset(0 0 50% 0); }
+.flip-bottom { clip-path: inset(50% 0 0 0); }
+
+/* At rest the old top leaf has folded away and the new bottom leaf lies flat. */
+.flip-leaf-out { transform: rotateX(-90deg); }
+.flip-leaf-in { transform: rotateX(0deg); }
+
+.motion-ready .flip-tile[data-flip] .flip-leaf-out {
+  animation: flip-out var(--flip-half) cubic-bezier(0.55, 0, 0.9, 0.5) both;
+  animation-delay: calc(var(--flip-order, 0) * var(--motion-stagger) * 1.5);
+}
+.motion-ready .flip-tile[data-flip] .flip-leaf-in {
+  animation: flip-in var(--flip-half) cubic-bezier(0.2, 0.7, 0.3, 1.25) both;
+  animation-delay: calc(var(--flip-half) + var(--flip-order, 0) * var(--motion-stagger) * 1.5);
+}
+@keyframes flip-out { from { transform: rotateX(0deg); } to { transform: rotateX(-90deg); } }
+@keyframes flip-in { from { transform: rotateX(90deg); } to { transform: rotateX(0deg); } }

@@ -1,0 +1,54 @@
+@* Hours as digit tiles on a flip board: a digit that changes turns over, top half then bottom half, while
+   the others stay still (rules in Components/FlipBoard.cs, styles in Styles/flip.css). Screen readers get
+   the plain number. Tiles turn one after another from the right. With reduced motion, or before the first screen has settled, the new value shows at once. *@
+
+<span class="flip @Class" role="img" aria-label="@Text" data-flip-number="@Text" @attributes="Attributes">
+    @for (var i = 0; i < _tiles.Count; i++)
+    {
+        var tile = _tiles[i];
+        if (tile.IsPoint)
+        {
+            <span @key="tile.Place" class="flip-point" aria-hidden="true">.</span>
+        }
+        else if (tile.Flips)
+        {
+            <span @key="(tile.Place, _turn)" class="flip-tile" style="--flip-order: @(_tiles.Count - 1 - i)" aria-hidden="true" data-flip="turning">
+                <span class="flip-half flip-top">@tile.Now</span>
+                <span class="flip-half flip-bottom">@tile.Before</span>
+                <span class="flip-half flip-top flip-leaf-out">@tile.Before</span>
+                <span class="flip-half flip-bottom flip-leaf-in">@tile.Now</span>
+            </span>
+        }
+        else
+        {
+            <span @key="tile.Place" class="flip-tile" aria-hidden="true"><span class="flip-face">@tile.Now</span></span>
+        }
+    }@if (Text != "" && Unit != "") { <span aria-hidden="true">@Unit</span> }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public TimeSpan Value { get; set; }
+    /// <summary>Text for zero hours, e.g. "0"; empty by default, like <see cref="Format.Hours"/>.</summary>
+    [Parameter] public string Zero { get; set; } = "";
+    /// <summary>Text after the number, e.g. " h". Not shown when the text is empty.</summary>
+    [Parameter] public string Unit { get; set; } = "";
+    [Parameter] public string? Class { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? Attributes { get; set; }
+
+    private string? _number;
+    private IReadOnlyList<FlipTile> _tiles = [];
+    /// <summary>Counts the changes, so a tile that turns again is a new element and its animation plays again.</summary>
+    private int _turn;
+
+    private string Number => Format.Hours(Value) is { Length: > 0 } hours ? hours : Zero;
+    private string Text => Number == "" ? "" : Number + Unit;
+
+    protected override void OnParametersSet()
+    {
+        var now = Number;
+        if (now == _number) return;
+        _tiles = FlipBoard.Between(_number, now);
+        _number = now;
+        _turn++;
+    }
+}
