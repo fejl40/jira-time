@@ -1,0 +1,36 @@
+@* A health check's state as an icon: a hollow ring while it waits, the spinner while it runs, then a tick, a cross or a
+   dash. A finished icon pops in (.health-icon-pop in Styles/motion.css). *@
+
+<span class="health-icon flex size-6 flex-none items-center justify-center" aria-hidden="true">
+    @switch (State)
+    {
+        case HealthState.Waiting:
+            <span class="size-4 rounded-full border-2 border-slate-300 dark:border-slate-600"></span>
+            break;
+        case HealthState.Running:
+            <span class="text-blue-600 dark:text-blue-400"><Waiting /></span>
+            break;
+        case HealthState.Passed:
+            <svg class="health-icon-pop size-6 text-emerald-500 dark:text-emerald-400" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M7.5 12.5l3 3 6-6.5" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="dark:stroke-slate-900" />
+            </svg>
+            break;
+        case HealthState.Failed:
+            <svg class="health-icon-pop health-icon-shake size-6 text-red-500 dark:text-red-400" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9 9l6 6M15 9l-6 6" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" class="dark:stroke-slate-900" />
+            </svg>
+            break;
+        default:
+            <svg class="health-icon-pop size-6 text-slate-300 dark:text-slate-600" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 12h8" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" class="dark:stroke-slate-900" />
+            </svg>
+            break;
+    }
+</span>
+
+@code {
+    [Parameter, EditorRequired] public HealthState State { get; set; }
+}

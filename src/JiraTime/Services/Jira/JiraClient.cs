@@ -11,6 +11,25 @@ public class JiraClient(JiraHttp jira)
     public async Task<JiraProfile> GetMyselfAsync(JiraConnection c, CancellationToken ct = default) =>
         JiraIssueJson.ToProfile(await jira.GetAsync<RawUser>(c, $"{Api(c)}/myself", ct));
 
+    /// <summary>The user the token belongs to and the time zone of their Jira profile (Europe/Copenhagen), when Jira says.</summary>
+    public async Task<(JiraProfile Profile, string? TimeZone)> GetMyselfAndTimeZoneAsync(JiraConnection c, CancellationToken ct = default)
+    {
+        var raw = await jira.GetAsync<RawUser>(c, $"{Api(c)}/myself", ct);
+        return (JiraIssueJson.ToProfile(raw), raw.TimeZone);
+    }
+
+    /// <summary>Whether the user may log work on <paramref name="issueKey"/> (in any project when null). Only asks; writes nothing.</summary>
+    public async Task<bool> MayLogWorkAsync(JiraConnection c, string? issueKey, CancellationToken ct = default)
+    {
+        var issue = issueKey is null ? "" : $"&issueKey={Uri.EscapeDataString(issueKey)}";
+        var answer = await jira.GetAsync<RawPermissions>(c, $"{Api(c)}/mypermissions?permissions=WORK_ON_ISSUES{issue}", ct);
+        return answer.Permissions?.GetValueOrDefault("WORK_ON_ISSUES")?.HavePermission == true;
+    }
+
+    /// <summary>Jira's clock, from its server info; null when Jira doesn't say.</summary>
+    public async Task<DateTimeOffset?> GetServerTimeAsync(JiraConnection c, CancellationToken ct = default) =>
+        JiraWorklogJson.ParseCreated((await jira.GetAsync<RawServerInfo>(c, $"{Api(c)}/serverInfo", ct)).ServerTime);
+
     /// <summary>Issue search for autocomplete. Uses the issue picker, which exists on both Cloud and Server/DC.</summary>
     public async Task<IReadOnlyList<JiraIssue>> SearchIssuesAsync(JiraConnection c, string query, CancellationToken ct = default)
     {

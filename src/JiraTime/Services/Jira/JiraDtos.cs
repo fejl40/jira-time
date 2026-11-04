@@ -6,7 +6,7 @@ namespace JiraTime.Services.Jira;
 // Raw JSON shapes of Jira's REST answers, only the fields the app reads.
 
 internal record RawUser(string? AccountId, string? Key, string? Name, string? DisplayName, string? EmailAddress,
-    Dictionary<string, string>? AvatarUrls = null);
+    Dictionary<string, string>? AvatarUrls = null, string? TimeZone = null);
 internal record PickerResult(List<PickerSection> Sections);
 internal record PickerSection(List<PickerIssue> Issues);
 internal record PickerIssue(string Key, string? SummaryText);
@@ -36,4 +36,7 @@ internal record EpicParentFields(IssueTypeField? IssueType);
 internal record IssueTypeField(string? Name, int? HierarchyLevel, bool Subtask);
 internal record RawField(string? Id, string? Name, RawFieldSchema? Schema);
 internal record RawFieldSchema(string? Custom);
+internal record RawPermissions(Dictionary<string, RawPermission>? Permissions);
+internal record RawPermission(bool HavePermission);
+internal record RawServerInfo(string? ServerTime);
 internal record JiraErrorBody(List<string>? ErrorMessages, Dictionary<string, string>? Errors);

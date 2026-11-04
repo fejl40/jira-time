@@ -1,0 +1,95 @@
+@using System.Globalization
+@using JiraTime.Services.Jira
+@* The Health check on Settings: asks Jira, on demand, whether everything the app needs works, and shows each check as
+   it finishes. The checks and their fixes are Domain/HealthCheck.cs and Domain/HealthFixes.cs; JiraHealth runs them.
+   Animations are the "Health check" block in Styles/motion.css. *@
+@inject JiraHealth Health
+@inject TimeProvider Clock
+@inject CurrentUser User
+
+<section class="card health-card p-6" data-health aria-busy="@(_running ? "true" : "false")" data-health-done="@(_report.IsDone ? "true" : null)"
+         data-health-all-passed="@(_report.IsDone && _report.Count(HealthState.Failed) == 0 ? "true" : null)">
+    <div class="flex flex-wrap items-start gap-3">
+        <div class="min-w-0 flex-1">
+            <h2 class="font-semibold">Health check</h2>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">Asks Jira whether everything Jira Time needs works. It only reads: nothing changes in Jira.</p>
+        </div>
+        <button class="btn-primary sm:min-w-40" disabled="@_running" @onclick="RunAsync" data-health-run>
+            @if (_running) { <Waiting /> }
+            @(_running ? "Checking…" : _ran ? "Run again" : "Run health check")
+        </button>
+    </div>
+
+    <div class="health-progress mt-4" aria-hidden="true" data-visible="@(_ran ? "true" : null)">
+        <div class="health-progress-fill @ProgressTone" style="transform: scaleX(@_report.Progress.ToString("0.###", CultureInfo.InvariantCulture))"></div>
+    </div>
+
+    <ol class="mt-3 divide-y divide-slate-100 dark:divide-slate-800" aria-live="polite">
+        @foreach (var result in _report.Results)
+        {
+            <li class="health-row flex items-start gap-3 py-2.5" data-health-check="@result.Check" data-health-state="@result.State.ToString().ToLowerInvariant()">
+                <HealthCheckIcon State="result.State" />
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium @(result.State == HealthState.Skipped ? "text-muted" : "")">@HealthReport.Title(result.Check)</p>
+                    <p class="text-sm @DetailTone(result.State)" data-health-detail>@Detail(result)</p>
+                </div>
+            </li>
+        }
+    </ol>
+
+    @if (_report.IsDone)
+    {
+        var allPassed = _report.Count(HealthState.Failed) == 0;
+        <div class="health-summary mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg px-3 py-2 text-sm @(allPassed ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300" : "bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200")"
+             role="status" data-health-summary>
+            <span class="font-medium">@_report.Summary()</span>
+            @if (!allPassed)
+            {
+                <a class="underline underline-offset-2 hover:no-underline" href="@LogLinks.To(Clock.Today(User.TimeZone))">See the requests on the Logs page</a>
+            }
+        </div>
+    }
+    @if (_error is not null)
+    {
+        <p class="mt-3 text-sm text-red-700 dark:text-red-400" role="alert">@_error</p>
+    }
+</section>
+
+@code {
+    private HealthReport _report = new();
+    private bool _running, _ran;
+    private string? _error;
+
+    private async Task RunAsync()
+    {
+        (_report, _running, _ran, _error) = (new HealthReport(), true, true, null);
+        try
+        {
+            await Health.RunAsync(_report, () => InvokeAsync(StateHasChanged));
+        }
+        catch (JiraException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _running = false;
+        }
+    }
+
+    private static string Detail(HealthResult result) => result.State switch
+    {
+        HealthState.Running => "Asking Jira…",
+        HealthState.Waiting => HealthReport.Question(result.Check),
+        _ => result.Detail ?? "",
+    };
+
+    private static string DetailTone(HealthState state) => state switch
+    {
+        HealthState.Failed => "text-red-700 dark:text-red-300",
+        HealthState.Running => "text-blue-700 dark:text-blue-300",
+        _ => "text-muted",
+    };
+
+    private string ProgressTone => _report.Count(HealthState.Failed) > 0 ? "bg-amber-500" : "bg-emerald-500";
+}

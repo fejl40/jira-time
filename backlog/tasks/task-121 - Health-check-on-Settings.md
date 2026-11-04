@@ -1,9 +1,10 @@
 ---
 id: TASK-121
 title: Health check on Settings
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-04 09:06'
+updated_date: '2026-11-04 09:18'
 labels:
   - jira
   - settings
@@ -20,9 +21,15 @@ Settings gets a Health check section that asks Jira, on demand, whether everythi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Settings shows the Health check with a Run button; each check shows passed, failed with a fix, or skipped
-- [ ] #2 No check changes anything in Jira
-- [ ] #3 Every request is logged under the Health check action and respects the rate limits
-- [ ] #4 Works in light and dark mode, with the Waiting spinner while running
-- [ ] #5 Build has 0 warnings, tests pass, wwwroot/app.css committed with the styles
+- [x] #1 Settings shows the Health check with a Run button; each check shows passed, failed with a fix, or skipped
+- [x] #2 No check changes anything in Jira
+- [x] #3 Every request is logged under the Health check action and respects the rate limits
+- [x] #4 Works in light and dark mode, with the Waiting spinner while running
+- [x] #5 Build has 0 warnings, tests pass, wwwroot/app.css committed with the styles
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Settings has a Health check: token, reading worklogs, issue picker, logging time (permission only), time zone and clock, each passed, failed with a fix sentence, or skipped. Read-only, logged under Health check, through JiraHttp's rate limits. Icons pop in, a progress bar fills, the running row is washed blue, and a run where everything passed glows once; all still under reduced motion.
+<!-- SECTION:FINAL_SUMMARY:END -->
