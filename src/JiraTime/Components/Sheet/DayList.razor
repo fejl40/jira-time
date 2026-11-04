@@ -26,6 +26,7 @@
                 {
                     <span class="dot-unsaved size-2" title="Unsaved changes"></span>
                 }
+                <DayWater Fill="_water.Fill(day)" Wave="_water.Wave(day)" Class="relative h-5 w-2 flex-none rounded-sm" />
                 <span class="w-20 flex-none text-right tabular-nums">
                     @if (logged > TimeSpan.Zero || info is { Expected.Ticks: > 0 }) { <Count Value="logged" Zero="0" Unit=" h" /> }@if (info?.Expected is { } exp && exp > TimeSpan.Zero)
                     {
@@ -42,6 +43,11 @@
     [Parameter, EditorRequired] public PeriodSheet Sheet { get; set; } = default!;
     [Parameter] public DateOnly Selected { get; set; }
     [Parameter] public EventCallback<DateOnly> OnSelect { get; set; }
+
+    /// <summary>Each day's small glass of water, with a wave each time its level changes.</summary>
+    private readonly DayFills _water = new();
+
+    protected override void OnParametersSet() => _water.Show(Sheet);
 
     /// <summary>Selected in blue, weekends and holidays grey, time off in its reason's tint.</summary>
     private string RowClass(DateOnly day, DayInfo? info)

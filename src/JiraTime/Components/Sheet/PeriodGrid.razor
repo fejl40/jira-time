@@ -9,7 +9,7 @@
                 @foreach (var (day, i) in Days)
                 {
                     <th class="@DayCellClass(day, i) min-w-12 p-0 font-medium" title="@DayLook.Title(Sheet.Info(day))" data-selected-day="@(day == Selected ? "" : null)" data-day-off="@DayLook.Data(Sheet.Info(day))">
-                        <button type="button" class="relative w-full px-1 py-2" @onclick="() => OnSelectDay.InvokeAsync(day)">
+                        <button type="button" class="relative isolate w-full px-1 py-2" @onclick="() => OnSelectDay.InvokeAsync(day)">
                             <div class="uppercase">@if (Sheet.Info(day) is { HasPartialDayOff: true, Reason: { } partOff }) { <span class="mr-0.5 text-[10px]" aria-hidden="true">@DayLook.Icon(partOff)</span> }@Format.TwoLetterWeekday(day)</div>
                             <div class="text-sm @(day == Sheet.Today ? "mx-auto grid size-6 place-items-center rounded-full bg-blue-600 font-semibold text-white" : "text-slate-700 dark:text-slate-200")">@day.Day</div>
                             @if (Sheet.IsUnsaved(day))
@@ -20,13 +20,7 @@
                             {
                                 <span class="mt-0.5 block text-xs leading-none" aria-hidden="true">@DayLook.Icon(reason)</span>
                             }
-                            @if (Sheet.Day(day) is { Expected.Ticks: > 0 } sheetDay)
-                            {
-                                var complete = sheetDay.IsComplete;
-                                <span class="mx-1.5 mt-1 block h-1 rounded-full bg-slate-200 dark:bg-slate-700 @(_complete.Fresh.Contains(day) ? "motion-pop" : "")" data-day-progress="@(complete ? "complete" : "")">
-                                    <span class="motion-bar block h-full rounded-full @(complete ? "bg-emerald-500" : "bg-blue-500")" style="width: @Format.Percent(sheetDay.Progress)"></span>
-                                </span>
-                            }
+                            <DayWater Fill="_water.Fill(day)" Wave="_water.Wave(day)" Brim="_complete.Fresh.Contains(day)" Class="absolute inset-1 -z-10 rounded-md" />
                         </button>
                     </th>
                 }
@@ -141,12 +135,15 @@
     /// <summary>Days that became complete while this period is shown; they pop once.</summary>
     private Milestones<DateOnly> _complete = new();
     private PeriodSheet? _shown;
+    /// <summary>How full each day's column is, with a wave each time its level changes.</summary>
+    private readonly DayFills _water = new();
 
     protected override void OnParametersSet()
     {
         Rows = Sheet.Rows;
         if (_shown != Sheet) (_shown, _complete) = (Sheet, new());
         _complete.Update(Sheet.Period.Days.Where(day => Sheet.Day(day).IsComplete));
+        _water.Show(Sheet);
     }
 
     private ElementReference _grid;

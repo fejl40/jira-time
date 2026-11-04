@@ -15,10 +15,13 @@
   --motion-stagger: 30ms;
   /* How long a wait on Jira runs before it shows, so fast answers don't flicker. */
   --waiting-delay: 200ms;
+  /* Water in the grid's day columns: how long it takes to rise, and the wave on its surface. */
+  --motion-water: 700ms;
+  --motion-wave: 1200ms;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --motion-fast: 0ms; --motion: 0ms; --motion-stagger: 0ms; }
+  :root { --motion-fast: 0ms; --motion: 0ms; --motion-stagger: 0ms; --motion-water: 0ms; --motion-wave: 0ms; }
   *, *::before, *::after {
     animation-duration: 0ms !important;
     animation-delay: 0ms !important;
@@ -181,4 +184,51 @@
 @keyframes health-glow { 30% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .health-card[data-health-all-passed]::after { animation: none; }
+
+/* ---- Water in the grid's day columns (Components/Sheet/DayWater.razor) ---- */
+
+/* The glass: a faint outline; the water inside rises to the day's level by moving up (transform only). */
+.day-water {
+  --water: var(--color-blue-500);
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--water) 14%, transparent);
+  transition: box-shadow var(--motion) var(--motion-ease);
+}
+.dark .day-water { --water: var(--color-blue-400); }
+.day-water:is([data-day-fill="full"], [data-day-fill="over"]) { --water: var(--color-emerald-500); }
+.dark .day-water:is([data-day-fill="full"], [data-day-fill="over"]) { --water: var(--color-emerald-400); }
+.day-water-body {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, color-mix(in oklab, var(--water) 30%, transparent), color-mix(in oklab, var(--water) 16%, transparent));
+  will-change: transform;
+  transition: transform var(--motion-water) cubic-bezier(0.3, 0.9, 0.3, 1);
+}
+.dark .day-water-body {
+  background: linear-gradient(to top, color-mix(in oklab, var(--water) 34%, transparent), color-mix(in oklab, var(--water) 18%, transparent));
+}
+
+/* The wave: twice the glass's width, just above the surface. It slides by half (a seamless loop) while it
+   flattens and fades, once per change of the level; with reduced motion it ends at once, leaving still water. */
+.day-water-wave {
+  position: absolute; left: 0; bottom: calc(100% - 1px);
+  width: 200%; height: 8px; overflow: visible;
+  fill: color-mix(in oklab, var(--water) 24%, transparent);
+  transform-origin: bottom;
+  opacity: 0;
+}
+.day-water-crest { opacity: 0.5; }
+.motion-ready .motion-wave:not([data-settled]) {
+  animation: motion-wave var(--motion-wave) linear both;
+}
+/* The swell keeps its height while the water rises, then calms down. */
+@keyframes motion-wave {
+  from { transform: translateX(0) scaleY(1); opacity: 1; }
+  45% { transform: translateX(-22%) scaleY(0.85); opacity: 1; animation-timing-function: ease-out; }
+  to { transform: translateX(-50%) scaleY(0); opacity: 0; }
+}
+
+/* Brim: the glass glows once when its day becomes complete. */
+.motion-ready .motion-brim:not([data-settled]) { animation: motion-brim calc(var(--motion) * 2) var(--motion-ease); }
+@keyframes motion-brim {
+  40% { box-shadow: inset 0 0 0 1px var(--water), 0 0 0 3px color-mix(in oklab, var(--water) 25%, transparent); }
 }

@@ -1,0 +1,31 @@
+@* A day's glass of water: it fills from the bottom to the day's saved hours against what the day needs
+   (Domain/DayFill.cs), rising smoothly, and a wave runs once on the surface each time the level changes.
+   Styles are .day-water in Styles/motion.css; with reduced motion the water stands still. *@
+
+@if (Fill is { } fill)
+{
+    <span class="day-water @Class @(Brim ? "motion-brim" : "")" data-day-fill="@fill.Data" data-fill-level="@Format.Percent(fill.Level)" aria-hidden="true">
+        <span class="day-water-body" style="transform: translateY(@Format.Percent(1 - fill.Level))">
+            @if (Wave > 0)
+            {
+                @* A new element for each change, so its one-off animation plays again. Four swells across twice the
+                   glass's width: sliding by half loops seamlessly. *@
+                <svg @key="Wave" class="day-water-wave motion-wave" viewBox="0 0 96 8" preserveAspectRatio="none" data-fill-wave>
+                    <path class="day-water-crest" d="M0 4 Q12 8 24 4 T48 4 T72 4 T96 4 V8 H0 Z" />
+                    <path d="M0 4 Q12 0 24 4 T48 4 T72 4 T96 4 V8 H0 Z" />
+                </svg>
+            }
+        </span>
+    </span>
+}
+
+@code {
+    /// <summary>How full the day is; null draws nothing.</summary>
+    [Parameter] public DayFill? Fill { get; set; }
+    /// <summary>Changes of the level so far (Domain/DayFillWaves); a wave runs each time it goes up.</summary>
+    [Parameter] public int Wave { get; set; }
+    /// <summary>The day just became complete: the glass glows once at the brim.</summary>
+    [Parameter] public bool Brim { get; set; }
+    /// <summary>Size and place of the glass.</summary>
+    [Parameter] public string? Class { get; set; }
+}
