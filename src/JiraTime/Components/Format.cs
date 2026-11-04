@@ -1,4 +1,5 @@
 using System.Globalization;
+using JiraTime.Domain;
 
 namespace JiraTime.Components;
 
@@ -14,6 +15,11 @@ public static class Format
 
     /// <summary>Hours with a unit, "0 h" for none: 7.5 h.</summary>
     public static string HoursText(TimeSpan t) => $"{(Hours(t) is { Length: > 0 } h ? h : "0")} h";
+
+    /// <summary>A week ring's tooltip and label: "Week 44: 32 of 40 h".</summary>
+    public static string WeekRing(WeekRing ring) => ring.Share is null
+        ? $"Week {ring.Number}: hours unknown, Jira couldn't be read ({HoursText(ring.Needed)} needed)"
+        : $"Week {ring.Number}: {(Hours(ring.Logged) is { Length: > 0 } logged ? logged : "0")} of {HoursText(ring.Needed)}";
 
     /// <summary>A number and a word, plural when it isn't one: "1 row", "3 rows", "2 entries".</summary>
     public static string Count(int n, string word)

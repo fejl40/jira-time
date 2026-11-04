@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./motion.css";
 @import "./touches.css";
+@import "./rings.css";
 
 @source "../Components";
 

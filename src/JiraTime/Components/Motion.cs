@@ -49,6 +49,9 @@ public sealed class MotionScript(IJSRuntime js)
     public Task CelebrateAsync(UserKey user, Period period) =>
         Call("jiraMotion.celebrate", $"{user.Id}:{Format.Iso(period.Start)}", "[data-period-complete]");
 
+    /// <summary>A week ring that just closed pops and throws sparks.</summary>
+    public Task SparkleAsync(string selector) => Call("jiraMotion.sparkle", selector);
+
     private async Task Call(string function, params object[] args)
     {
         try

@@ -1,0 +1,51 @@
+@* One ring per week of the period, closing as its logged hours reach what the week needs (rules in
+   Domain/WeekRings.cs, styles in Styles/rings.css). A ring that closes while the user watches sparkles once. *@
+@using System.Globalization
+@inject MotionScript Animations
+
+@if (_rings.Count > 0)
+{
+    <div class="flex items-center gap-1.5" data-week-rings>
+        @foreach (var ring in _rings)
+        {
+            var closed = ring.IsClosed;
+            <div @key="ring.Start" role="img" class="week-ring motion-ring @(closed ? "week-ring-closed" : "") @(ring.Share is null ? "week-ring-unknown" : "") @(ring.Share is 0.0 ? "week-ring-empty" : "")"
+                 title="@Format.WeekRing(ring)" aria-label="@Format.WeekRing(ring)" data-week-ring="@Format.Iso(ring.Start)" data-ring-share="@Share(ring)" data-ring-closed="@(closed ? "" : null)">
+                <svg viewBox="0 0 36 36" aria-hidden="true">
+                    <circle class="week-ring-track" cx="18" cy="18" r="15" pathLength="100" />
+                    <circle class="week-ring-progress" cx="18" cy="18" r="15" pathLength="100" style="stroke-dashoffset: @Offset(ring)" />
+                </svg>
+                <span class="week-ring-label" aria-hidden="true">@(closed ? "✓" : ring.Number)</span>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public PeriodSummary Summary { get; set; } = default!;
+
+    private IReadOnlyList<WeekRing> _rings = [];
+    private Period? _shown;
+    /// <summary>Notices rings closing while the period is shown (not the ones closed at first look).</summary>
+    private Milestones<DateOnly> _closed = new();
+
+    protected override void OnParametersSet()
+    {
+        _rings = WeekRing.For(Summary);
+        if (_shown == Summary.Period) return;
+        _shown = Summary.Period;
+        _closed = new();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        foreach (var week in _closed.Update(WeekRing.Closed(_rings)))
+            await Animations.SparkleAsync($"[data-week-ring=\"{Format.Iso(week)}\"]");
+    }
+
+    /// <summary>The share as a script reads it: "0.625", empty when unknown.</summary>
+    private static string Share(WeekRing ring) => ring.Share is { } s ? s.ToString("0.###", CultureInfo.InvariantCulture) : "";
+
+    /// <summary>How much of the ring's stroke is hidden: 100 for none logged, 0 for a closed ring.</summary>
+    private static string Offset(WeekRing ring) => (100 - (ring.Share ?? 0) * 100).ToString("0.##", CultureInfo.InvariantCulture);
+}

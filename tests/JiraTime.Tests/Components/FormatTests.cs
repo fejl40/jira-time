@@ -1,4 +1,5 @@
 using JiraTime.Components;
+using JiraTime.Domain;
 
 namespace JiraTime.Tests.Components;
 
@@ -59,4 +60,18 @@ public class FormatTests
     [InlineData(1536, "1.5 KB")]
     [InlineData(2_411_724, "2.3 MB")]
     public void Sizes_read_in_bytes_KB_or_MB(long bytes, string expected) => Assert.Equal(expected, Format.Bytes(bytes));
+
+    private static readonly DateOnly Monday = new(2026, 10, 26);
+
+    [Theory]
+    [InlineData(32, 40, "Week 44: 32 of 40 h")]
+    [InlineData(0, 40, "Week 44: 0 of 40 h")]
+    [InlineData(7.5, 8, "Week 44: 7.5 of 8 h")]
+    public void A_week_ring_says_its_hours_against_what_the_week_needs(double logged, double needed, string text) =>
+        Assert.Equal(text, Format.WeekRing(new WeekRing(Monday, 44, TimeSpan.FromHours(logged), TimeSpan.FromHours(needed), logged / needed)));
+
+    [Fact]
+    public void A_week_ring_says_when_its_hours_are_unknown() =>
+        Assert.Equal("Week 44: hours unknown, Jira couldn't be read (40 h needed)",
+            Format.WeekRing(new WeekRing(Monday, 44, TimeSpan.Zero, TimeSpan.FromHours(40), null)));
 }

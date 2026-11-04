@@ -1,0 +1,84 @@
+/* ---- Week rings in the period header (Components/Sheet/WeekRings.razor) ----
+   A ring per week: a faint track and a stroke that goes round as the week's hours are logged. The stroke's
+   length is 100 (pathLength), so stroke-dashoffset 100 hides it and 0 closes the ring. Changes ease round;
+   a new period's rings draw in; a ring that closes while watched sparkles (wwwroot/motion.js). With reduced
+   motion every speed is 0, so the rings show their value at once and nothing sparkles. */
+
+.week-ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  flex: none;
+  color: var(--color-slate-500);
+}
+.dark .week-ring { color: var(--color-slate-400); }
+
+.week-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+
+.week-ring circle { fill: none; stroke-width: 3.5; }
+.week-ring-track { stroke: var(--color-slate-200); }
+.dark .week-ring-track { stroke: var(--color-slate-700); }
+
+.week-ring-progress {
+  stroke: var(--color-blue-500);
+  stroke-linecap: round;
+  stroke-dasharray: 100 100;
+  transition:
+    stroke-dashoffset calc(var(--motion) * 2.5) var(--motion-ease),
+    stroke var(--motion) var(--motion-ease);
+}
+.dark .week-ring-progress { stroke: var(--color-blue-400); }
+.week-ring-closed .week-ring-progress { stroke: var(--color-emerald-500); }
+.dark .week-ring-closed .week-ring-progress { stroke: var(--color-emerald-400); }
+/* Nothing logged: no round cap showing as a dot at the top. */
+.week-ring-empty .week-ring-progress { stroke: transparent; }
+
+.week-ring-label {
+  position: relative;
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.week-ring-closed .week-ring-label { color: var(--color-emerald-600); font-size: 0.75rem; }
+.dark .week-ring-closed .week-ring-label { color: var(--color-emerald-400); }
+
+/* Jira couldn't be read: a dashed track, no stroke. */
+.week-ring-unknown .week-ring-track { stroke-dasharray: 4 4; }
+.week-ring-unknown .week-ring-label { opacity: 0.6; }
+
+/* A new period's rings draw in from empty (only after the first screen, like other entrances). */
+.motion-ready .motion-ring:not([data-settled]) .week-ring-progress {
+  animation: week-ring-draw calc(var(--motion) * 3) var(--motion-ease) backwards;
+  animation-delay: calc(var(--motion) * 0.5);
+}
+@keyframes week-ring-draw { from { stroke-dashoffset: 100; } }
+
+/* A ring that closes pops, and a halo spreads from it once. */
+.motion-ring-closing svg { animation: week-ring-pop calc(var(--motion) * 2) var(--motion-ease); }
+@keyframes week-ring-pop { 40% { transform: rotate(-90deg) scale(1.22); } }
+.motion-ring-closing::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 2px solid var(--color-emerald-400);
+  opacity: 0;
+  pointer-events: none;
+  animation: week-ring-halo calc(var(--motion) * 2.5) ease-out;
+}
+@keyframes week-ring-halo { from { opacity: 0.8; transform: scale(1); } to { opacity: 0; transform: scale(1.9); } }
+
+/* The sparks thrown out by wwwroot/motion.js. */
+.motion-spark {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  font-size: 0.8125rem;
+  line-height: 1;
+  color: var(--color-amber-400);
+  text-shadow: 0 0 6px rgb(251 191 36 / 0.7);
+}
+.motion-spark-green { color: var(--color-emerald-400); text-shadow: 0 0 6px rgb(52 211 153 / 0.7); }

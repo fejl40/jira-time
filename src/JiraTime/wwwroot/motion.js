@@ -4,6 +4,7 @@
 //   glide(grid)                   moves the grid's selected-day highlight to the selected column
 //   flyTicks(from, to, spread)    a check mark flies from each saved cell to the period status, all leaving within spread ms
 //   celebrate(key, from)          confetti, at most once per key in this browser
+//   sparkle(selector)             a week ring that closed pops and throws sparks
 // Numbers need no call: an element with data-count="7.5" shows that many hours (data-zero for 0,
 // data-unit after the number) and counts to a new value when the attribute changes.
 (() => {
@@ -140,6 +141,26 @@
     }
   };
 
+  // A ring pops (Styles/rings.css) and a few sparks fly out from its edge and fade.
+  const sparkle = selector => {
+    const ring = document.querySelector(selector);
+    if (!ring || !speed()) return;
+    restart(ring, 'motion-ring-closing');
+    const box = ring.getBoundingClientRect();
+    const at = center(box), radius = box.width / 2;
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2 + Math.random() * 0.4;
+      const reach = radius + 10 + Math.random() * 12;
+      const x = Math.cos(angle), y = Math.sin(angle);
+      const spark = fly('motion-spark' + (i % 3 ? '' : ' motion-spark-green'), i % 2 ? '✦' : '•', at,
+        [{ transform: `translate(calc(-50% + ${x * radius}px), calc(-50% + ${y * radius}px)) scale(0.3)`, opacity: 0 },
+         { transform: `translate(calc(-50% + ${x * reach * 0.8}px), calc(-50% + ${y * reach * 0.8}px)) scale(1.1)`, opacity: 1, offset: 0.35 },
+         { transform: `translate(calc(-50% + ${x * reach}px), calc(-50% + ${y * reach}px)) scale(0.4)`, opacity: 0 }],
+        { duration: speed() * 2.5, delay: 80 + Math.random() * 60 });
+      spark.setAttribute('aria-hidden', 'true');
+    }
+  };
+
   // ---- Start ----
   const start = () => {
     new MutationObserver(records => {
@@ -162,5 +183,5 @@
   };
   if (document.body) start(); else addEventListener('DOMContentLoaded', start);
 
-  window.jiraMotion = { collapse, glide, flyTicks, celebrate, speed, ease, restart };
+  window.jiraMotion = { collapse, glide, flyTicks, celebrate, sparkle, speed, ease, restart };
 })();

@@ -1,4 +1,4 @@
-@* Period header: navigation and title, one status line and the main action (Save all asks in
+@* Period header: navigation and title, one status line, a ring per week and the main action (Save all asks in
    SaveAllModal, opened by the page). Confetti when the period shown becomes complete. *@
 @inject MotionScript Animations
 @inject CurrentUser User
@@ -35,6 +35,7 @@
             }
         </p>
     </div>
+    <WeekRings Summary="Summary" />
     <div class="ml-auto flex items-center gap-2">
         @if (Unsaved.Count > 0)
         {
