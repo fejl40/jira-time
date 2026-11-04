@@ -1,13 +1,14 @@
 @* The background behind every page (Styles/backdrop.css): a fixed layer that never takes clicks. Shows the user's
    choice from Settings: the aurora, whose colours follow the shown period's progress (BackdropState), the sky at
-   their time of day, or the plain page colour. *@
+   their time of day, or the plain page colour. Over Aurora and Sky the cards turn to frosted glass (data-glass). *@
 @implements IDisposable
 @inject BackdropState State
 @inject BackgroundSettings Settings
 @inject CurrentUser User
 @inject TimeProvider Clock
 
-<div class="backdrop" aria-hidden="true" data-backdrop="@Backdrop.Name(_choice)" data-palette="@Backdrop.Name(State.Palette)">
+<div class="backdrop" aria-hidden="true" data-backdrop="@Backdrop.Name(_choice)" data-palette="@Backdrop.Name(State.Palette)"
+     data-glass="@(Backdrop.UsesGlass(_choice) ? "" : null)">
     @if (_choice == BackgroundChoice.Aurora)
     {
         <div class="aurora">

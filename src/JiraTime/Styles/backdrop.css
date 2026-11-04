@@ -58,6 +58,8 @@
   animation: aurora-drift 48s ease-in-out infinite alternate;
 }
 .dark .aurora-blob { opacity: 0.3; }
+/* Warm colours look muddy when dim, so gold glows a little brighter in the dark. */
+.dark [data-palette="gold"] .aurora-blob { opacity: 0.36; }
 
 .aurora-blob-1 { left: -25vmax; top: -30vmax; background: radial-gradient(closest-side, var(--aurora-a), transparent); }
 .aurora-blob-2 { right: -30vmax; top: -20vmax; background: radial-gradient(closest-side, var(--aurora-b), transparent);

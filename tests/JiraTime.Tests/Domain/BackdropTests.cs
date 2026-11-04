@@ -51,6 +51,13 @@ public class BackdropTests
         Assert.Equal(AuroraPalette.Neutral, Backdrop.Palette(future));
     }
 
+    [Theory]
+    [InlineData(BackgroundChoice.Aurora, true)]
+    [InlineData(BackgroundChoice.Sky, true)]
+    [InlineData(BackgroundChoice.Plain, false)]
+    public void Cards_are_glass_over_a_background_with_something_to_see(BackgroundChoice choice, bool glass) =>
+        Assert.Equal(glass, Backdrop.UsesGlass(choice));
+
     [Fact]
     public void Names_are_lower_case() => Assert.Equal("gold", Backdrop.Name(AuroraPalette.Gold));
 }

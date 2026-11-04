@@ -33,6 +33,12 @@ public static class Backdrop
         };
     }
 
+    /// <summary>
+    /// Cards turn to frosted glass over a background with something to see through (Aurora and Sky); over Plain they
+    /// stay solid, as there is nothing to blur.
+    /// </summary>
+    public static bool UsesGlass(BackgroundChoice choice) => choice != BackgroundChoice.Plain;
+
     /// <summary>The name a data attribute and the styles use for a value, such as "gold" or "sky".</summary>
     public static string Name<T>(T value) where T : struct, Enum => value.ToString().ToLowerInvariant();
 }

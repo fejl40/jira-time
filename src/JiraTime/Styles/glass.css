@@ -1,0 +1,44 @@
+/* Frosted glass and the light that follows the mouse (wwwroot/glass.js).
+
+   Over Aurora and Sky (BackdropLayer sets data-glass) cards, panels, the header and modals let the background shine
+   through, blurred. Browsers without backdrop-filter keep the solid surfaces from app.css, and so does Plain, where
+   there is nothing to see through. The surfaces stay mostly opaque so text keeps its contrast. */
+
+@property --light-alpha { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
+
+@layer components {
+  @supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+    :root:has([data-glass]) :is(.card, .panel) {
+      background-color: rgb(255 255 255 / 0.86);
+      backdrop-filter: blur(20px) saturate(1.2);
+    }
+    :root.dark:has([data-glass]) :is(.card, .panel) {
+      background-color: rgb(15 23 42 / 0.74);
+    }
+    :root:has([data-glass]) .app-header {
+      background-color: rgb(30 41 59 / 0.9);
+      backdrop-filter: blur(16px) saturate(1.6);
+    }
+    :root.dark:has([data-glass]) .app-header { background-color: rgb(2 6 23 / 0.8); }
+    :root:has([data-glass]) .modal {
+      background-color: rgb(255 255 255 / 0.9);
+      backdrop-filter: blur(24px) saturate(1.5);
+    }
+    :root.dark:has([data-glass]) .modal { background-color: rgb(15 23 42 / 0.88); }
+  }
+
+  /* The light: a soft glow under the content of the card the mouse is over, where the pointer is. glass.js sets
+     --light-x and --light-y (at most once per animation frame) and data-lit; it fades in and out. */
+  .card, .panel {
+    --light-color: var(--color-sky-400);
+    background-image: radial-gradient(22rem circle at var(--light-x, 50%) var(--light-y, 50%),
+      color-mix(in oklab, var(--light-color) var(--light-alpha), transparent), transparent 70%);
+    transition: --light-alpha 400ms ease;
+  }
+  .dark :is(.card, .panel) { --light-color: var(--color-sky-300); }
+  [data-lit] { --light-alpha: 16%; }
+  .dark [data-lit] { --light-alpha: 11%; }
+  @media (prefers-reduced-motion: reduce) {
+    [data-lit] { --light-alpha: 0%; }
+  }
+}
