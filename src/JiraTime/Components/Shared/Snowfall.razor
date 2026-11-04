@@ -1,0 +1,37 @@
+@* Light snow drifting down the page in December (Domain/SeasonTouches.cs). A fixed layer behind the content that never
+   takes clicks; a fixed number of flakes, pure CSS (.snow* in Styles/touches.css), gone with reduced motion. *@
+@inject TimeProvider Clock
+@inject CurrentUser User
+
+@if (SeasonTouches.Today(Clock, User.TimeZone).Snow)
+{
+    <div class="snowfall" aria-hidden="true" data-snow>
+        @foreach (var flake in Flakes)
+        {
+            <span class="snowflake" style="@flake"><span></span></span>
+        }
+    </div>
+}
+
+@code {
+    /// <summary>How many flakes fall at once; phones show the first half (Styles/touches.css).</summary>
+    private const int Count = 28;
+
+    /// <summary>
+    /// Each flake's place, size and speeds, spread evenly with the golden ratio so they look random but are the same
+    /// on every render. Bigger flakes are nearer: they fall faster and are a little blurred.
+    /// </summary>
+    private static readonly string[] Flakes = Enumerable.Range(0, Count).Select(Flake).ToArray();
+
+    private static string Flake(int i)
+    {
+        var spread = i * 0.6180339887 % 1;
+        var size = 3 + i * 7 % 5;                  // 3 to 7 px
+        var fall = 22 - size * 1.6 + i % 3 * 1.5;  // 10.8 to 20.2 s
+        var sway = 3 + i % 4 * 0.8;
+        var drift = 8 + i * 3 % 4 * 6;
+        var alpha = 0.45 + size * 0.07;
+        return FormattableString.Invariant(
+            $"--x: {spread * 100:0.#}%; --size: {size}px; --fall: {fall:0.#}s; --delay: {-(i * 2.7 % fall):0.#}s; --sway: {sway:0.#}s; --drift: {drift}px; --alpha: {alpha:0.##}; --blur: {(size >= 7 ? 1 : 0)}px");
+    }
+}

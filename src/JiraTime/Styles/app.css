@@ -12,7 +12,9 @@
 }
 
 @layer base {
-  html, body { @apply h-full bg-slate-100 text-slate-800 antialiased dark:bg-slate-950 dark:text-slate-100; }
+  html, body { @apply h-full text-slate-800 antialiased dark:text-slate-100; }
+  /* The page colour is on <html> only, so the background layer (Styles/backdrop.css) shows between it and the content. */
+  html { @apply bg-slate-100 dark:bg-slate-950; }
   html.dark { color-scheme: dark; }
 }
 

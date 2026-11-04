@@ -1,0 +1,22 @@
+@* A string of small lights hanging from the header on a Danish public holiday (Domain/SeasonTouches.cs), glowing in a
+   slow chase (.holiday-lights in Styles/touches.css); still lit with reduced motion. It sits right under the header
+   and takes no room or clicks. *@
+@inject TimeProvider Clock
+@inject CurrentUser User
+
+@if (SeasonTouches.Today(Clock, User.TimeZone) is { Lights: true, Holiday: var holiday })
+{
+    <div class="holiday-lights" aria-hidden="true" data-holiday-lights="@holiday">
+        <div class="holiday-strand">
+            @for (var i = 0; i < Count; i++)
+            {
+                <span class="holiday-light" style="--i: @i"><span class="holiday-bulb"></span></span>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    /// <summary>Lights along the strand; phones show the first half, spread over the narrower header (Styles/touches.css).</summary>
+    private const int Count = 36;
+}

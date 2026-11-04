@@ -63,3 +63,67 @@
     animation: none !important;
   }
 }
+
+/* ---- Snow in December ---- */
+
+/* Behind the content like the page background (Styles/backdrop.css), so it never covers text or takes clicks. Pale
+   blue-grey flakes on the light page, white ones on the dark page. */
+.snowfall {
+  --snow: rgb(120 152 194);
+  position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; contain: strict;
+}
+.dark .snowfall { --snow: rgb(241 245 249); }
+
+/* The outer span falls, the inner one sways, so the two motions mix without keyframes per flake. */
+.snowflake {
+  position: absolute; top: -12px; left: var(--x); width: var(--size); height: var(--size);
+  will-change: transform; animation: snow-fall var(--fall) linear var(--delay) infinite;
+}
+.snowflake > span {
+  display: block; width: 100%; height: 100%; border-radius: 9999px; opacity: var(--alpha);
+  background: radial-gradient(circle, var(--snow) 0 40%, transparent 72%); filter: blur(var(--blur));
+  animation: snow-sway var(--sway) ease-in-out var(--delay) infinite alternate;
+}
+@keyframes snow-fall { to { transform: translate3d(0, calc(100vh + 24px), 0); } }
+@keyframes snow-sway {
+  from { transform: translate3d(calc(var(--drift) * -1), 0, 0); }
+  to { transform: translate3d(var(--drift), 0, 0); }
+}
+@media (width < 40rem) { .snowflake:nth-child(n + 15) { display: none; } }
+@media (prefers-reduced-motion: reduce) { .snowfall { display: none; } }
+
+/* ---- Lights on holidays ---- */
+
+/* A zero-height strip right under the header; the strand hangs from its top edge over the page's top padding. */
+.holiday-lights { position: relative; z-index: 10; height: 0; flex: none; pointer-events: none; }
+.holiday-strand { position: absolute; inset: 0 0 auto; display: flex; height: 1.25rem; padding: 0 0.5rem; }
+
+/* Each light hangs from its own dip of the wire (the ::before arc). The bulb dims and brightens in turn, a wave that
+   runs along the strand; its ::after is the glow around it. */
+.holiday-light { --bulb: var(--color-red-400); position: relative; flex: 1 1 0; }
+.holiday-light:nth-child(4n + 2) { --bulb: var(--color-amber-300); }
+.holiday-light:nth-child(4n + 3) { --bulb: var(--color-emerald-400); }
+.holiday-light:nth-child(4n + 4) { --bulb: var(--color-sky-400); }
+.holiday-light::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 0.45rem;
+  border-bottom: 1.5px solid var(--color-slate-600); border-radius: 0 0 50% 50% / 0 0 100% 100%;
+}
+.dark .holiday-light::before { border-color: var(--color-slate-700); }
+.holiday-bulb {
+  position: absolute; top: 0.3rem; left: 50%; width: 0.4rem; height: 0.6rem; margin-left: -0.2rem;
+  border-radius: 50% 50% 50% 50% / 40% 40% 60% 60%; background: var(--bulb);
+  box-shadow: inset 0 -2px 2px rgb(0 0 0 / 0.18);
+  animation: lights-chase 3.2s ease-in-out infinite; animation-delay: calc(var(--i) * 0.2s - 32s);
+}
+/* The socket the bulb hangs from. */
+.holiday-bulb::before {
+  content: ""; position: absolute; top: -2px; left: 50%; width: 4px; height: 3px; margin-left: -2px;
+  border-radius: 1px; background: var(--color-slate-500);
+}
+.holiday-bulb::after {
+  content: ""; position: absolute; inset: -0.55rem -0.65rem; border-radius: 9999px;
+  background: radial-gradient(circle, color-mix(in oklab, var(--bulb) 70%, transparent), transparent 70%);
+}
+@keyframes lights-chase { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+@media (width < 40rem) { .holiday-light:nth-child(n + 19) { display: none; } }
+@media (prefers-reduced-motion: reduce) { .holiday-bulb { animation: none !important; opacity: 1; } }
